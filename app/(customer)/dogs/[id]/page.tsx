@@ -42,17 +42,19 @@ export default async function DogDetailPage({
   const coverage = summarizeCoverage((vaxRes.data ?? []) as DogVaccination[]);
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6 animate-fade-up">
       <div className="flex items-center gap-4">
         <DogAvatar photoPath={dog.photo_path} name={dog.name} size={80} />
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">{dog.name}</h1>
-          <p className="text-stone-500">{dog.breed ?? "Mixed breed"}</p>
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            {dog.name}
+          </h1>
+          <p className="text-ink-500">{dog.breed ?? "Mixed breed"}</p>
         </div>
       </div>
 
       {isNew && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900 shadow-soft">
           Profile saved. Upload your dog&apos;s vaccine records below to unlock
           booking.
         </div>
@@ -62,12 +64,16 @@ export default async function DogDetailPage({
 
       {notes.length > 0 && (
         <section className="card">
-          <h2 className="text-lg font-semibold text-stone-900">Day care notes</h2>
-          <ul className="mt-3 divide-y divide-stone-200">
+          <h2 className="font-display text-xl font-semibold text-ink-900">
+            Day care notes
+          </h2>
+          <ul className="mt-3 divide-y divide-stone-200/80">
             {notes.map((n) => (
               <li key={n.id} className="py-3">
-                <p className="text-xs text-stone-500">{formatDate(n.created_at)}</p>
-                <p className="mt-1 text-stone-800">{n.note}</p>
+                <p className="text-xs text-ink-500">
+                  {formatDate(n.created_at)}
+                </p>
+                <p className="mt-1 text-ink-900">{n.note}</p>
               </li>
             ))}
           </ul>
@@ -75,7 +81,9 @@ export default async function DogDetailPage({
       )}
 
       <div>
-        <h2 className="text-lg font-semibold text-stone-900">Profile</h2>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Profile
+        </h2>
         <DogForm action={saveDog} dog={dog} />
       </div>
     </div>

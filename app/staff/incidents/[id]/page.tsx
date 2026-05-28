@@ -86,15 +86,17 @@ export default async function StaffIncidentDetailPage({
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">Incident</h1>
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            Incident
+          </h1>
           {dog && (
-            <p className="text-stone-600">
+            <p className="mt-1 text-ink-700">
               <Link
                 href={`/staff/dogs/${dog.id}`}
-                className="text-brand-700 hover:underline"
+                className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
               >
                 {dog.name}
               </Link>
@@ -103,7 +105,7 @@ export default async function StaffIncidentDetailPage({
                   {" · "}
                   <Link
                     href={`/staff/customers/${owner.id}`}
-                    className="text-brand-700 hover:underline"
+                    className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
                   >
                     {owner.full_name || owner.email}
                   </Link>
@@ -113,13 +115,16 @@ export default async function StaffIncidentDetailPage({
             </p>
           )}
         </div>
-        <Link href="/staff/incidents" className="text-sm text-stone-600 hover:underline">
+        <Link
+          href="/staff/incidents"
+          className="text-sm font-medium text-ink-700 hover:text-ink-900 hover:underline"
+        >
           ← Back to incidents
         </Link>
       </header>
 
       {saved && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
           Saved.
         </div>
       )}
@@ -198,7 +203,7 @@ export default async function StaffIncidentDetailPage({
 
       <IncidentPhotosEditor incidentId={incident.id} photos={displayPhotos} />
 
-      <section className="card text-sm text-stone-500">
+      <section className="card text-sm text-ink-500">
         <p>
           Logged {formatDate(incident.created_at)}
           {reporter ? ` by ${reporter.full_name || reporter.email}` : ""}.
@@ -208,17 +213,16 @@ export default async function StaffIncidentDetailPage({
         )}
       </section>
 
-      <section className="card">
-        <h2 className="font-semibold text-red-700">Danger zone</h2>
-        <p className="mt-1 text-sm text-stone-600">
+      <section className="card border-red-200/80">
+        <h2 className="font-display text-lg font-semibold text-red-700">
+          Danger zone
+        </h2>
+        <p className="mt-1 text-sm text-ink-600">
           Delete this incident and all attached photos. Cannot be undone.
         </p>
         <form action={deleteIncident} className="mt-3">
           <input type="hidden" name="id" value={incident.id} />
-          <button
-            type="submit"
-            className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-          >
+          <button type="submit" className="btn-danger">
             Delete incident
           </button>
         </form>

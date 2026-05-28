@@ -57,12 +57,14 @@ export default async function RecurringPage({
 
   if (dogs.length === 0) {
     return (
-      <div className="max-w-xl card">
-        <h1 className="text-xl font-bold text-stone-900">Add a dog first</h1>
-        <p className="mt-2 text-stone-700">
+      <div className="max-w-xl card animate-fade-up">
+        <h1 className="font-display text-2xl font-bold text-ink-900">
+          Add a dog first
+        </h1>
+        <p className="mt-2 text-ink-700">
           Set up your dog&apos;s profile before creating a standing schedule.
         </p>
-        <Link href="/dogs/new" className="btn-primary mt-4 inline-block">
+        <Link href="/dogs/new" className="btn-primary mt-4">
           Add a dog
         </Link>
       </div>
@@ -70,31 +72,39 @@ export default async function RecurringPage({
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-6 animate-fade-up">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Standing schedule</h1>
-        <p className="text-stone-600">
+        <h1 className="font-display text-3xl font-bold text-ink-900">
+          Standing schedule
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">
           Pick the weekdays you want your dog at daycare each week. We&apos;ll
           create bookings ahead of time and use your package days first.
         </p>
       </header>
 
       {params.saved && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
           Schedule saved.
           {params.created && Number(params.created) > 0 && (
-            <> Created {params.created} booking{params.created === "1" ? "" : "s"} through {formatDateShort(horizon)}.</>
+            <>
+              {" "}
+              Created {params.created} booking{params.created === "1" ? "" : "s"}{" "}
+              through {formatDateShort(horizon)}.
+            </>
           )}
         </div>
       )}
       {params.error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
           {params.error}
         </div>
       )}
 
       <section className="card">
-        <h2 className="font-semibold text-stone-900">Add a schedule</h2>
+        <h2 className="font-display text-lg font-semibold text-ink-900">
+          Add a schedule
+        </h2>
         <form action={createRecurring} className="mt-4 space-y-4">
           <div>
             <label className="label" htmlFor="r-dog">Dog</label>

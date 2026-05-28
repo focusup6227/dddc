@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dog, Incident, Profile } from "@/lib/supabase/types";
 import { formatDateShort } from "@/lib/format";
 import { INCIDENT_KIND_LABEL, INCIDENT_SEVERITY_LABEL } from "@/lib/incidents";
 import { StaffSubNav } from "@/components/StaffSubNav";
+import { EmptyState } from "@/components/EmptyState";
+import { ShieldPaw } from "@/components/illustrations";
 import { getPendingVaccineCount } from "@/lib/vaccines.server";
 
 export const dynamic = "force-dynamic";
@@ -59,46 +62,57 @@ export default async function StaffIncidentsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <StaffSubNav items={subnav} />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">Incidents</h1>
-          <p className="text-stone-600">
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            Incidents
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
             Staff-only log of bites, injuries, escapes, and anything else worth
             documenting.
           </p>
         </div>
         <Link href="/staff/incidents/new" className="btn-primary">
-          Log incident
+          <Plus size={16} /> Log incident
         </Link>
       </header>
 
       {incidents.length === 0 ? (
-        <p className="card text-stone-600">No incidents logged yet.</p>
+        <EmptyState
+          illustration={<ShieldPaw className="h-full w-auto" />}
+          title="No incidents logged"
+          description="A quiet record is a good record. New entries will appear here."
+          action={
+            <Link href="/staff/incidents/new" className="btn-secondary">
+              <Plus size={16} /> Log incident
+            </Link>
+          }
+        />
       ) : (
-        <ul className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+        <ul className="divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
           {incidents.map((i) => {
             const dog = dogsById.get(i.dog_id);
             const owner = dog ? ownersById.get(dog.owner_id) : null;
             return (
-              <li key={i.id} className="px-4 py-3">
+              <li key={i.id}>
                 <Link
                   href={`/staff/incidents/${i.id}`}
-                  className="flex flex-wrap items-start justify-between gap-3 hover:bg-stone-50 -mx-4 -my-3 px-4 py-3"
+                  className="flex flex-wrap items-start justify-between gap-3 px-5 py-4 transition-colors hover:bg-cream-50"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-stone-900">
+                    <p className="font-display text-lg font-semibold text-ink-900">
                       {INCIDENT_KIND_LABEL[i.kind]} ·{" "}
                       <span className="text-brand-700">
                         {dog?.name ?? "Unknown dog"}
                       </span>
                     </p>
-                    <p className="text-sm text-stone-500">
+                    <p className="text-sm text-ink-500">
                       {formatDateShort(i.occurred_on)}
                       {owner ? ` · ${owner.full_name || owner.email}` : ""}
                     </p>
-                    <p className="mt-1 line-clamp-1 text-sm text-stone-700">
+                    <p className="mt-1 line-clamp-1 text-sm text-ink-700">
                       {i.description}
                     </p>
                   </div>
@@ -114,16 +128,11 @@ export default async function StaffIncidentsPage() {
 }
 
 function SeverityPill({ severity }: { severity: Incident["severity"] }) {
-  const map: Record<Incident["severity"], string> = {
-    low: "bg-stone-100 text-stone-700",
-    medium: "bg-amber-100 text-amber-800",
-    high: "bg-red-100 text-red-800",
-  };
-  return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${map[severity]}`}
-    >
-      {INCIDENT_SEVERITY_LABEL[severity]}
-    </span>
-  );
+  const cls =
+    severity === "high"
+      ? "pill-danger"
+      : severity === "medium"
+        ? "pill-warn"
+        : "pill-neutral";
+  return <span className={cls}>{INCIDENT_SEVERITY_LABEL[severity]}</span>;
 }

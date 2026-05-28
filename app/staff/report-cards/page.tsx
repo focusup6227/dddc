@@ -61,11 +61,13 @@ export default async function StaffReportCardsPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Report cards</h1>
-        <p className="text-stone-600">
-          Send a cute note + photos home from each stay. 🐾
+        <h1 className="font-display text-3xl font-bold text-ink-900">
+          Report cards
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">
+          Send a cute note + photos home from each stay.
         </p>
       </header>
 
@@ -121,16 +123,16 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="text-lg font-semibold text-stone-900">
+      <h2 className="font-display text-xl font-semibold text-ink-900">
         {title}{" "}
-        <span className="ml-1 text-sm font-normal text-stone-500">
+        <span className="ml-1 text-sm font-normal text-ink-500">
           ({bookings.length})
         </span>
       </h2>
       {bookings.length === 0 ? (
-        <p className="mt-2 text-stone-600">{emptyText}</p>
+        <p className="mt-2 text-sm text-ink-500">{emptyText}</p>
       ) : (
-        <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+        <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
           {bookings.map((b) => {
             const dog = dogById.get(b.dog_id);
             const cust = custById.get(b.customer_id);

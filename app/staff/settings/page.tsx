@@ -36,17 +36,24 @@ export default async function StaffSettingsPage({
     .order("key");
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-xl space-y-6 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
-      <h1 className="text-2xl font-bold text-stone-900">Settings</h1>
+      <div>
+        <h1 className="font-display text-3xl font-bold text-ink-900">
+          Settings
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">
+          Capacity, pricing, and operational defaults.
+        </p>
+      </div>
 
       {params.saved && (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">
+        <p className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-emerald-900 shadow-soft">
           Saved.
         </p>
       )}
       {params.error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-900">
+        <p className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
           {params.error}
         </p>
       )}

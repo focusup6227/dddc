@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Waiver, WaiverSignature } from "@/lib/supabase/types";
@@ -24,7 +25,7 @@ export default async function WaiverPage({
 
   if (!waiver) {
     return (
-      <p className="text-stone-700">
+      <p className="text-ink-700">
         No active waiver is configured. Please ask staff to set one up.
       </p>
     );
@@ -39,14 +40,23 @@ export default async function WaiverPage({
 
   if (existing) {
     return (
-      <div className="card max-w-2xl">
-        <h1 className="text-xl font-bold text-stone-900">Waiver signed ✓</h1>
-        <p className="mt-2 text-stone-700">
-          You signed <strong>{waiver.title}</strong> ({waiver.version}) as{" "}
-          <strong>{existing.signed_full_name}</strong> on{" "}
-          {formatDate(existing.signed_at)}.
-        </p>
-        <a href="/dashboard" className="mt-4 inline-block btn-primary">
+      <div className="card max-w-2xl animate-fade-up">
+        <div className="flex items-start gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+            <CheckCircle2 size={22} />
+          </span>
+          <div>
+            <h1 className="font-display text-2xl font-bold text-ink-900">
+              Waiver signed
+            </h1>
+            <p className="mt-2 text-ink-700">
+              You signed <strong>{waiver.title}</strong> ({waiver.version}) as{" "}
+              <strong>{existing.signed_full_name}</strong> on{" "}
+              {formatDate(existing.signed_at)}.
+            </p>
+          </div>
+        </div>
+        <a href="/dashboard" className="btn-primary mt-5">
           Back to dashboard
         </a>
       </div>
@@ -54,15 +64,24 @@ export default async function WaiverPage({
   }
 
   return (
-    <div className="max-w-3xl">
-      <h1 className="text-2xl font-bold text-stone-900">{waiver.title}</h1>
-      <p className="mt-1 text-sm text-stone-500">Version {waiver.version}</p>
+    <div className="max-w-3xl animate-fade-up">
+      <div className="flex items-start gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700">
+          <ShieldCheck size={22} />
+        </span>
+        <div>
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            {waiver.title}
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">Version {waiver.version}</p>
+        </div>
+      </div>
 
-      <article className="card mt-6 prose prose-stone max-w-none prose-headings:font-semibold prose-strong:text-stone-900">
+      <article className="card mt-6 prose prose-stone max-w-none prose-headings:font-display prose-headings:font-semibold prose-headings:text-ink-900 prose-strong:text-ink-900">
         <ReactMarkdown>{waiver.body_markdown}</ReactMarkdown>
       </article>
 
-      <form action={signWaiver} className="mt-6 space-y-4">
+      <form action={signWaiver} className="card mt-6 space-y-5">
         <input type="hidden" name="waiver_id" value={waiver.id} />
         <div>
           <label htmlFor="signed_full_name" className="label">
@@ -77,7 +96,7 @@ export default async function WaiverPage({
             placeholder="First and last name"
           />
         </div>
-        <label className="flex items-start gap-2 text-sm text-stone-700">
+        <label className="flex items-start gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
             name="agree"
@@ -91,7 +110,11 @@ export default async function WaiverPage({
             signature.
           </span>
         </label>
-        {params.error && <p className="text-sm text-red-600">{params.error}</p>}
+        {params.error && (
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+            {params.error}
+          </p>
+        )}
         <button type="submit" className="btn-primary">
           Sign waiver
         </button>

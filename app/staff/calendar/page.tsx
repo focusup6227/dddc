@@ -82,19 +82,21 @@ export default async function StaffCalendarPage({
   const thisMonth = todayISO().slice(0, 7);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">Calendar</h1>
-          <p className="text-stone-600">
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            Calendar
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
             Bookings, events, and blackouts. Tap a day to edit.
           </p>
         </div>
       </header>
 
       {params.error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-900">
+        <p className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
           {params.error}
         </p>
       )}

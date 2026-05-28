@@ -12,6 +12,8 @@ import {
   VACCINE_LABEL,
 } from "@/lib/vaccines";
 import { StaffSubNav } from "@/components/StaffSubNav";
+import { EmptyState } from "@/components/EmptyState";
+import { ShieldPaw } from "@/components/illustrations";
 import { getPendingVaccineCount } from "@/lib/vaccines.server";
 import { rejectVaccine, verifyVaccine } from "./actions";
 
@@ -92,12 +94,14 @@ export default async function StaffVaccinesPage({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <StaffSubNav items={subnav} />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">Vaccine records</h1>
-          <p className="text-stone-600">
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            Vaccine records
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
             Approve uploaded records so customers can book.
           </p>
         </div>
@@ -108,15 +112,23 @@ export default async function StaffVaccinesPage({
       </header>
 
       {rows.length === 0 ? (
-        <p className="card text-stone-600">
-          {filter === "pending"
-            ? "Nothing pending — you're all caught up."
-            : "No vaccine records yet."}
-        </p>
+        <EmptyState
+          illustration={<ShieldPaw className="h-full w-auto" />}
+          title={
+            filter === "pending"
+              ? "All caught up"
+              : "No vaccine records yet"
+          }
+          description={
+            filter === "pending"
+              ? "Nothing pending review. Customers can book once records are uploaded and approved."
+              : "When customers upload records, they'll appear here for review."
+          }
+        />
       ) : (
         <ul className="space-y-3">
           {rows.map((r) => (
-            <li key={r.id} className="card">
+            <li key={r.id} className="card-lift">
               <VaccineReviewRow row={r} />
             </li>
           ))}
@@ -137,11 +149,13 @@ function FilterLink({
 }) {
   const active = current === value;
   const cls = active
-    ? "rounded-md bg-stone-900 px-3 py-1.5 font-medium text-white"
-    : "rounded-md border border-stone-300 px-3 py-1.5 text-stone-700 hover:bg-stone-50";
+    ? "rounded-xl bg-ink-900 px-3.5 py-1.5 font-semibold text-white shadow-soft"
+    : "rounded-xl border border-stone-200 bg-white px-3.5 py-1.5 font-medium text-ink-700 hover:bg-cream-50 hover:border-stone-300";
   return (
     <Link
-      href={value === "pending" ? "/staff/vaccines" : `/staff/vaccines?filter=${value}`}
+      href={
+        value === "pending" ? "/staff/vaccines" : `/staff/vaccines?filter=${value}`
+      }
       className={cls}
     >
       {label}
@@ -160,26 +174,28 @@ function VaccineReviewRow({ row }: { row: Row }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-stone-900">
+        <p className="font-display text-lg font-semibold text-ink-900">
           {VACCINE_LABEL[row.vaccine_type]} ·{" "}
           <Link
             href={row.dog ? `/staff/dogs/${row.dog.id}` : "#"}
-            className="text-brand-700 hover:underline"
+            className="text-brand-700 hover:text-brand-900 hover:underline"
           >
             {row.dog?.name ?? "Unknown dog"}
           </Link>
         </p>
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-ink-700">
           {row.owner?.full_name || row.owner?.email || "—"}
         </p>
-        <p className="mt-1 text-xs text-stone-500">
+        <p className="mt-1 text-xs text-ink-500">
           Uploaded {formatDate(row.uploaded_at)} · Expires{" "}
           {formatDate(row.expires_on)}
         </p>
-        <p className={`mt-1 text-xs font-medium uppercase tracking-wide ${statusColor}`}>
+        <p
+          className={`mt-1 text-xs font-semibold uppercase tracking-wide ${statusColor}`}
+        >
           {row.status}
           {row.status === "rejected" && row.rejection_reason && (
-            <span className="ml-2 font-normal normal-case text-stone-600">
+            <span className="ml-2 font-normal normal-case text-ink-600">
               — {row.rejection_reason}
             </span>
           )}
@@ -191,12 +207,12 @@ function VaccineReviewRow({ row }: { row: Row }) {
             href={row.signedUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-sm font-medium text-brand-700 hover:underline"
+            className="text-sm font-semibold text-brand-700 hover:text-brand-900 hover:underline"
           >
             View document →
           </a>
         ) : (
-          <span className="text-xs text-stone-500">Document unavailable</span>
+          <span className="text-xs text-ink-500">Document unavailable</span>
         )}
         {row.status === "pending" && (
           <div className="flex flex-wrap items-center gap-2">

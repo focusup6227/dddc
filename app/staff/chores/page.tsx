@@ -94,14 +94,16 @@ export default async function StaffChoresPage({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">Chores</h1>
-          <p className="text-stone-600">
-            {formatDate(date)} · {outstandingCount} to do
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            Chores
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
+            {formatDate(date)} · <span className="font-semibold text-ink-900">{outstandingCount}</span> to do
             {doneCount > 0 && (
-              <span className="text-stone-400"> · {doneCount} done</span>
+              <span className="text-ink-400"> · {doneCount} done</span>
             )}
           </p>
         </div>

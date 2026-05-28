@@ -30,11 +30,13 @@ export default async function StaffCouponsPage({
   const coupons = (data ?? []) as Coupon[];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Coupons</h1>
-        <p className="text-stone-600">
+        <h1 className="font-display text-3xl font-bold text-ink-900">
+          Coupons
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">
           Fixed dollar-off-per-day codes. Customers enter the code when paying
           a booking; we automatically pick the bigger of the coupon and any
           account credit.
@@ -42,18 +44,20 @@ export default async function StaffCouponsPage({
       </header>
 
       {params.saved && (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">
+        <p className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-emerald-900 shadow-soft">
           Saved.
         </p>
       )}
       {params.error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-900">
+        <p className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
           {params.error}
         </p>
       )}
 
       <section className="card">
-        <h2 className="font-semibold text-stone-900">Add a coupon</h2>
+        <h2 className="font-display text-lg font-semibold text-ink-900">
+          Add a coupon
+        </h2>
         <form action={createCoupon} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label htmlFor="code" className="label">Code</label>
@@ -105,45 +109,46 @@ export default async function StaffCouponsPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">All coupons</h2>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          All coupons
+        </h2>
         {coupons.length === 0 ? (
-          <p className="mt-2 text-stone-600">No coupons yet.</p>
+          <p className="mt-2 text-sm text-ink-500">No coupons yet.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+          <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
             {coupons.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <li
+                key={c.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+              >
                 <div className="min-w-0">
-                  <p className="font-semibold text-stone-900">
-                    <code className="font-mono">{c.code}</code>{" "}
-                    <span className="font-normal text-stone-500">
+                  <p className="font-semibold text-ink-900">
+                    <code className="font-mono text-brand-700">{c.code}</code>{" "}
+                    <span className="font-normal text-ink-500">
                       · {formatMoney(c.discount_per_day_cents)}/day off
                     </span>
                   </p>
                   {c.description && (
-                    <p className="text-sm text-stone-600">{c.description}</p>
+                    <p className="text-sm text-ink-700">{c.description}</p>
                   )}
-                  <p className="text-xs text-stone-500">
+                  <p className="mt-0.5 text-xs text-ink-500">
                     Added {formatDate(c.created_at)}
                     {c.expires_on ? ` · expires ${c.expires_on}` : ""}
-                    {!c.active ? " · disabled" : ""}
+                    {!c.active && (
+                      <span className="pill-neutral ml-1.5">Disabled</span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <form action={toggleCoupon}>
                     <input type="hidden" name="id" value={c.id} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                    >
+                    <button type="submit" className="btn-secondary text-sm">
                       {c.active ? "Disable" : "Enable"}
                     </button>
                   </form>
                   <form action={deleteCoupon}>
                     <input type="hidden" name="id" value={c.id} />
-                    <button
-                      type="submit"
-                      className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
-                    >
+                    <button type="submit" className="btn-danger text-sm">
                       Delete
                     </button>
                   </form>

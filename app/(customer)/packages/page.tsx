@@ -1,3 +1,4 @@
+import { Ticket } from "lucide-react";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { CustomerPackage, Package } from "@/lib/supabase/types";
@@ -26,49 +27,63 @@ export default async function PackagesPage({
   const owned = (ownedRes.data ?? []) as CustomerPackage[];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Packages</h1>
-        <p className="text-stone-600">
+        <h1 className="font-display text-3xl font-bold text-ink-900">
+          Packages
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">
           Save money by buying day packs in advance.
         </p>
       </header>
 
       {params.status === "success" && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Thanks! Your purchase is being processed. Your days will appear here once Stripe confirms the payment.
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
+          Thanks! Your purchase is being processed. Your days will appear here
+          once Stripe confirms the payment.
         </div>
       )}
       {params.status === "canceled" && (
-        <div className="rounded-md border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800">
+        <div className="rounded-2xl border border-stone-200 bg-cream-100 px-4 py-3 text-sm text-ink-700 shadow-soft">
           Checkout canceled. No charge was made.
         </div>
       )}
       {params.error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
           {params.error}
         </div>
       )}
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Available packages</h2>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Available packages
+        </h2>
         <ul className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           {packages.map((p) => {
             const perDay = Math.round(p.price_cents / p.days_included);
             return (
-              <li key={p.id} className="card flex flex-col">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-stone-900">{p.name}</h3>
-                  <p className="mt-1 text-sm text-stone-600">{p.description}</p>
-                  <p className="mt-3 text-2xl font-bold text-stone-900">
-                    {formatMoney(p.price_cents)}
-                  </p>
-                  <p className="text-xs text-stone-500">
-                    {p.days_included} {p.days_included === 1 ? "day" : "days"} ·{" "}
-                    {formatMoney(perDay)} / day
-                  </p>
+              <li key={p.id} className="card-lift flex flex-col">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <h3 className="font-display text-lg font-semibold text-ink-900">
+                      {p.name}
+                    </h3>
+                    {p.description && (
+                      <p className="mt-1 text-sm text-ink-500">{p.description}</p>
+                    )}
+                  </div>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                    <Ticket size={18} />
+                  </span>
                 </div>
-                <form action={buyPackage} className="mt-4">
+                <p className="mt-4 font-display text-3xl font-bold text-ink-900">
+                  {formatMoney(p.price_cents)}
+                </p>
+                <p className="text-xs text-ink-500">
+                  {p.days_included} {p.days_included === 1 ? "day" : "days"} ·{" "}
+                  {formatMoney(perDay)} / day
+                </p>
+                <form action={buyPackage} className="mt-5">
                   <input type="hidden" name="package_id" value={p.id} />
                   <button type="submit" className="btn-primary w-full">
                     Buy
@@ -81,19 +96,34 @@ export default async function PackagesPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Your purchases</h2>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Your purchases
+        </h2>
         {owned.length === 0 ? (
-          <p className="mt-2 text-stone-600">No purchases yet.</p>
+          <p className="mt-2 text-sm text-ink-500">No purchases yet.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+          <ul className="mt-4 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
             {owned.map((p) => (
-              <li key={p.id} className="flex items-center justify-between px-4 py-3">
+              <li
+                key={p.id}
+                className="flex items-center justify-between px-5 py-4"
+              >
                 <div>
-                  <p className="font-medium text-stone-900">
+                  <p className="font-semibold text-ink-900">
                     {p.days_remaining} / {p.days_total} days remaining
                   </p>
-                  <p className="text-sm text-stone-500">
-                    {formatDate(p.created_at)} · {formatMoney(p.amount_paid_cents)} · {p.payment_status}
+                  <p className="text-sm text-ink-500">
+                    {formatDate(p.created_at)} ·{" "}
+                    {formatMoney(p.amount_paid_cents)} ·{" "}
+                    <span
+                      className={
+                        p.payment_status === "paid"
+                          ? "text-emerald-700 font-medium"
+                          : ""
+                      }
+                    >
+                      {p.payment_status}
+                    </span>
                   </p>
                 </div>
               </li>

@@ -68,22 +68,24 @@ export default async function StaffDogDetailPage({
   const incidents = (incidentRes.data ?? []) as Incident[];
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-center gap-4">
+    <div className="space-y-8 animate-fade-up">
+      <header className="flex flex-wrap items-center gap-5">
         <DogAvatar photoPath={dog.photo_path} name={dog.name} size={96} />
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">{dog.name}</h1>
-          <p className="text-stone-600">
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            {dog.name}
+          </h1>
+          <p className="text-ink-700">
             {dog.breed ?? "Mixed breed"}
             {dog.weight_lbs ? ` · ${dog.weight_lbs} lbs` : ""}
             {dog.sex ? ` · ${dog.sex}` : ""}
           </p>
           {owner && (
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-ink-500">
               Owner:{" "}
               <Link
                 href={`/staff/customers/${owner.id}`}
-                className="text-brand-700 hover:underline"
+                className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
               >
                 {owner.full_name || owner.email}
               </Link>
@@ -95,29 +97,36 @@ export default async function StaffDogDetailPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="card">
-          <h2 className="font-semibold text-stone-900">Health</h2>
+          <h2 className="font-display text-lg font-semibold text-ink-900">
+            Health
+          </h2>
           <dl className="mt-3 space-y-2 text-sm">
             <Row label="Allergies" value={dog.allergies} />
             <Row label="Medications" value={dog.medications} />
             <Row label="Vet" value={dog.vet_name} />
             <Row label="Vet phone" value={dog.vet_phone} />
           </dl>
-          <div className="mt-4 border-t border-stone-200 pt-3">
+          <div className="mt-5 border-t border-stone-200/80 pt-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-stone-900">Vaccines</h3>
+              <h3 className="text-sm font-semibold text-ink-900">Vaccines</h3>
               <Link
                 href="/staff/vaccines"
-                className="text-xs font-medium text-brand-700 hover:underline"
+                className="text-xs font-semibold text-brand-700 hover:text-brand-900 hover:underline"
               >
                 Review queue →
               </Link>
             </div>
-            <ul className="mt-2 space-y-1 text-sm">
+            <ul className="mt-2 space-y-1.5 text-sm">
               {coverage.map((c) => {
-                const meta = REQUIRED_VACCINES.find((v) => v.key === c.vaccineType)!;
+                const meta = REQUIRED_VACCINES.find(
+                  (v) => v.key === c.vaccineType,
+                )!;
                 return (
-                  <li key={c.vaccineType} className="flex items-center justify-between">
-                    <span className="text-stone-700">{meta.label}</span>
+                  <li
+                    key={c.vaccineType}
+                    className="flex items-center justify-between"
+                  >
+                    <span className="text-ink-700">{meta.label}</span>
                     <VaccineStatusText coverage={c} />
                   </li>
                 );
@@ -127,7 +136,9 @@ export default async function StaffDogDetailPage({
         </section>
 
         <section className="card">
-          <h2 className="font-semibold text-stone-900">Care</h2>
+          <h2 className="font-display text-lg font-semibold text-ink-900">
+            Care
+          </h2>
           <dl className="mt-3 space-y-2 text-sm">
             <Row label="Feeding" value={dog.feeding_notes} />
             <Row label="Behavior" value={dog.behavior_notes} />
@@ -136,8 +147,12 @@ export default async function StaffDogDetailPage({
       </div>
 
       <section className="card">
-        <h2 className="font-semibold text-stone-900">Staff-only notes</h2>
-        <p className="mt-1 text-xs text-stone-500">Customers can&apos;t see these.</p>
+        <h2 className="font-display text-lg font-semibold text-ink-900">
+          Staff-only notes
+        </h2>
+        <p className="mt-1 text-xs text-ink-500">
+          Customers can&apos;t see these.
+        </p>
         <form action={updateStaffNotes} className="mt-3">
           <input type="hidden" name="dog_id" value={dog.id} />
           <textarea
@@ -154,7 +169,9 @@ export default async function StaffDogDetailPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Daily journal</h2>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Daily journal
+        </h2>
         <form action={addDogNote} className="card mt-3">
           <input type="hidden" name="dog_id" value={dog.id} />
           <textarea
@@ -170,13 +187,15 @@ export default async function StaffDogDetailPage({
         </form>
 
         {notes.length === 0 ? (
-          <p className="mt-4 text-stone-600">No notes yet.</p>
+          <p className="mt-4 text-sm text-ink-500">No notes yet.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+          <ul className="mt-4 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
             {notes.map((n) => (
-              <li key={n.id} className="px-4 py-3">
-                <p className="text-xs text-stone-500">{formatDate(n.created_at)}</p>
-                <p className="mt-1 whitespace-pre-wrap text-stone-800">{n.note}</p>
+              <li key={n.id} className="px-5 py-4">
+                <p className="text-xs text-ink-500">
+                  {formatDate(n.created_at)}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-ink-900">{n.note}</p>
               </li>
             ))}
           </ul>
@@ -185,7 +204,9 @@ export default async function StaffDogDetailPage({
 
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-stone-900">Incidents</h2>
+          <h2 className="font-display text-xl font-semibold text-ink-900">
+            Incidents
+          </h2>
           <Link
             href={`/staff/incidents/new?dog=${dog.id}`}
             className="text-sm font-medium text-brand-700 hover:underline"
@@ -194,25 +215,33 @@ export default async function StaffDogDetailPage({
           </Link>
         </div>
         {incidents.length === 0 ? (
-          <p className="mt-2 text-stone-600">None on file.</p>
+          <p className="mt-2 text-sm text-ink-500">None on file.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+          <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
             {incidents.map((i) => (
-              <li key={i.id} className="px-4 py-3 text-sm">
+              <li key={i.id} className="px-5 py-4 text-sm">
                 <Link
                   href={`/staff/incidents/${i.id}`}
                   className="flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-stone-900">
+                    <p className="font-semibold text-ink-900">
                       {INCIDENT_KIND_LABEL[i.kind]} ·{" "}
-                      <span className="text-stone-500">
+                      <span className="font-normal text-ink-500">
                         {formatDateShort(i.occurred_on)}
                       </span>
                     </p>
-                    <p className="line-clamp-1 text-stone-600">{i.description}</p>
+                    <p className="line-clamp-1 text-ink-700">{i.description}</p>
                   </div>
-                  <span className="shrink-0 text-xs font-semibold text-stone-500">
+                  <span
+                    className={
+                      i.severity === "high"
+                        ? "pill-danger"
+                        : i.severity === "medium"
+                          ? "pill-warn"
+                          : "pill-neutral"
+                    }
+                  >
                     {INCIDENT_SEVERITY_LABEL[i.severity]}
                   </span>
                 </Link>
@@ -223,15 +252,22 @@ export default async function StaffDogDetailPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Recent bookings</h2>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Recent bookings
+        </h2>
         {bookings.length === 0 ? (
-          <p className="mt-2 text-stone-600">None.</p>
+          <p className="mt-2 text-sm text-ink-500">None.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+          <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
             {bookings.map((b) => (
-              <li key={b.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span>{formatDateShort(b.service_date)}</span>
-                <span className="text-stone-500">
+              <li
+                key={b.id}
+                className="flex items-center justify-between px-5 py-3 text-sm"
+              >
+                <span className="font-medium text-ink-900">
+                  {formatDateShort(b.service_date)}
+                </span>
+                <span className="text-ink-500">
                   {b.payment_kind} · {b.status} · {b.payment_status}
                 </span>
               </li>
@@ -246,33 +282,43 @@ export default async function StaffDogDetailPage({
 function VaccineStatusText({ coverage }: { coverage: VaccineCoverage }) {
   if (coverage.status === "verified") {
     return (
-      <span className="text-emerald-700">
+      <span className="pill-success">
         ✓ Expires {formatDateShort(coverage.expiresOn!)}
       </span>
     );
   }
   if (coverage.status === "pending") {
-    return <span className="text-amber-700">Pending review</span>;
+    return <span className="pill-warn">Pending review</span>;
   }
   if (coverage.status === "expired") {
     return (
-      <span className="text-red-700">
+      <span className="pill-danger">
         Expired {formatDateShort(coverage.expiresOn!)}
       </span>
     );
   }
   if (coverage.status === "rejected") {
-    return <span className="text-red-700">Rejected</span>;
+    return <span className="pill-danger">Rejected</span>;
   }
-  return <span className="text-stone-400">Missing</span>;
+  return <span className="pill-neutral">Missing</span>;
 }
 
-function Row({ label, value }: { label: string; value: string | null | boolean }) {
+function Row({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | boolean;
+}) {
   return (
     <div className="grid grid-cols-3 gap-2">
-      <dt className="text-stone-500">{label}</dt>
-      <dd className="col-span-2 text-stone-900">
-        {value === null || value === "" ? <span className="text-stone-400">—</span> : String(value)}
+      <dt className="text-ink-500">{label}</dt>
+      <dd className="col-span-2 text-ink-900">
+        {value === null || value === "" ? (
+          <span className="text-ink-400">—</span>
+        ) : (
+          String(value)
+        )}
       </dd>
     </div>
   );

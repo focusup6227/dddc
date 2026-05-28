@@ -37,21 +37,26 @@ export default async function NewIncidentPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">Log an incident</h1>
-          <p className="text-stone-600">
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            Log an incident
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
             Customers can&apos;t see this — it&apos;s for your records.
           </p>
         </div>
-        <Link href="/staff/incidents" className="text-sm text-stone-600 hover:underline">
+        <Link
+          href="/staff/incidents"
+          className="text-sm font-medium text-ink-700 hover:text-ink-900 hover:underline"
+        >
           ← Back to incidents
         </Link>
       </header>
 
       {params.error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
           {params.error}
         </div>
       )}

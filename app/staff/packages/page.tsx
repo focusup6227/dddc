@@ -19,12 +19,22 @@ export default async function StaffPackagesPage() {
   const packages = (data ?? []) as Package[];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
-      <h1 className="text-2xl font-bold text-stone-900">Packages</h1>
+      <div>
+        <h1 className="font-display text-3xl font-bold text-ink-900">
+          Packages
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">
+          Day-pack catalog. Disabled packs disappear from customer-facing
+          screens but keep historical purchases intact.
+        </p>
+      </div>
 
       <section className="card">
-        <h2 className="font-semibold text-stone-900">Add a package</h2>
+        <h2 className="font-display text-lg font-semibold text-ink-900">
+          Add a package
+        </h2>
         <form action={savePackage} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <input name="name" required placeholder="e.g. 5-Day Pack" className="input" />
           <input name="description" placeholder="Description (optional)" className="input" />
@@ -51,29 +61,44 @@ export default async function StaffPackagesPage() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">All packages</h2>
-        <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
-          {packages.map((p) => (
-            <li key={p.id} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <p className="font-medium text-stone-900">
-                  {p.name}{" "}
-                  {!p.active && <span className="text-xs text-stone-400">(inactive)</span>}
-                </p>
-                <p className="text-sm text-stone-500">
-                  {p.days_included} days · {formatMoney(p.price_cents)}
-                </p>
-              </div>
-              <form action={togglePackage}>
-                <input type="hidden" name="id" value={p.id} />
-                <input type="hidden" name="active" value={p.active ? "false" : "true"} />
-                <button type="submit" className="btn-secondary text-sm">
-                  {p.active ? "Disable" : "Enable"}
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          All packages
+        </h2>
+        {packages.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-500">No packages yet.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
+            {packages.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-center justify-between px-5 py-4"
+              >
+                <div>
+                  <p className="font-semibold text-ink-900">
+                    {p.name}{" "}
+                    {!p.active && (
+                      <span className="pill-neutral ml-1">Disabled</span>
+                    )}
+                  </p>
+                  <p className="text-sm text-ink-500">
+                    {p.days_included} days · {formatMoney(p.price_cents)}
+                  </p>
+                </div>
+                <form action={togglePackage}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <input
+                    type="hidden"
+                    name="active"
+                    value={p.active ? "false" : "true"}
+                  />
+                  <button type="submit" className="btn-secondary text-sm">
+                    {p.active ? "Disable" : "Enable"}
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

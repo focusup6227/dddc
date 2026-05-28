@@ -48,11 +48,11 @@ export default async function StaffEventsPage({
       : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Events</h1>
-        <p className="text-stone-600">
+        <h1 className="font-display text-3xl font-bold text-ink-900">Events</h1>
+        <p className="mt-1 text-sm text-ink-500">
           Special days customers see on the booking calendar. Click an event to
           edit; deleting can&apos;t be undone.
         </p>

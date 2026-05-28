@@ -80,10 +80,17 @@ export default async function StaffBookingsPage({
   const eventsByDate = indexEventsByDate(events, from, to);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-2xl font-bold text-stone-900">Bookings</h1>
+        <div>
+          <h1 className="font-display text-3xl font-bold text-ink-900">
+            Bookings
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
+            All scheduled days and stays.
+          </p>
+        </div>
         <ViewToggle view={view} monthAnchor={monthAnchor} from={from} to={to} />
       </header>
 
