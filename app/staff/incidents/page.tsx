@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dog, Incident, Profile } from "@/lib/supabase/types";
 import { formatDateShort } from "@/lib/format";
@@ -13,7 +13,7 @@ import { getPendingVaccineCount } from "@/lib/vaccines.server";
 export const dynamic = "force-dynamic";
 
 export default async function StaffIncidentsPage() {
-  await requireStaff();
+  await requireFullStaff();
   const supabase = await createClient();
 
   const { data: incidentRows } = await supabase

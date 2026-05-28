@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronRight, Search } from "lucide-react";
-import { requireStaff } from "@/lib/auth";
+import { isJuniorStaff, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dog, Profile } from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
@@ -14,7 +14,8 @@ export default async function StaffDogsPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requireStaff();
+  const session = await requireStaff();
+  const isJunior = isJuniorStaff(session.profile);
   const supabase = await createClient();
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
@@ -34,12 +35,14 @@ export default async function StaffDogsPage({
     : { data: [] as Profile[] };
   const owners = (ownersData ?? []) as Profile[];
 
-  const pendingVax = await getPendingVaccineCount();
-  const subnav = [
-    { href: "/staff/dogs", label: "All dogs", active: true },
-    { href: "/staff/vaccines", label: "Vaccines", badge: pendingVax },
-    { href: "/staff/incidents", label: "Incidents" },
-  ];
+  const pendingVax = isJunior ? 0 : await getPendingVaccineCount();
+  const subnav = isJunior
+    ? [{ href: "/staff/dogs", label: "All dogs", active: true }]
+    : [
+        { href: "/staff/dogs", label: "All dogs", active: true },
+        { href: "/staff/vaccines", label: "Vaccines", badge: pendingVax },
+        { href: "/staff/incidents", label: "Incidents" },
+      ];
 
   return (
     <div className="space-y-6 animate-fade-up">

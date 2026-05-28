@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
 import { addDays, todayISO } from "@/lib/format";
@@ -26,7 +26,7 @@ import type {
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function kioskCheckIn(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   if (!booking_id) redirect("/kiosk");
 
@@ -56,7 +56,7 @@ export async function kioskCheckIn(formData: FormData) {
 }
 
 export async function kioskCheckOut(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   if (!booking_id) redirect("/kiosk");
 
@@ -76,7 +76,7 @@ export async function kioskCheckOut(formData: FormData) {
  * then redirect to a Stripe Checkout session. Webhook flips it to paid.
  */
 export async function kioskWalkInCharge(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const customer_id = String(formData.get("customer_id") ?? "");
   const dog_id = String(formData.get("dog_id") ?? "");
   if (!customer_id || !dog_id) {
@@ -189,7 +189,7 @@ export async function kioskWalkInCharge(formData: FormData) {
  * already saw the in-page warning and chose to override).
  */
 export async function kioskCreateBooking(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const customer_id = String(formData.get("customer_id") ?? "");
   const dog_id = String(formData.get("dog_id") ?? "");
   const datesRaw = String(formData.get("service_dates") ?? "");
@@ -412,7 +412,7 @@ async function maybeSendPackageLowAlerts(
  * Re-creates a Stripe Checkout session and redirects.
  */
 export async function kioskTakePayment(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   if (!booking_id) redirect("/kiosk");
 
@@ -432,7 +432,7 @@ export async function kioskTakePayment(formData: FormData) {
  * and skips the waiver hard-block (staff already saw the in-page warning).
  */
 export async function kioskCreateBoarding(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const customer_id = String(formData.get("customer_id") ?? "");
   const dog_id = String(formData.get("dog_id") ?? "");
   const checkIn = String(formData.get("check_in") ?? "");

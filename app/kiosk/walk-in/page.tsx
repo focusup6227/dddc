@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatMoney } from "@/lib/format";
@@ -16,7 +16,7 @@ export default async function WalkInPage({
 }: {
   searchParams: Promise<{ q?: string; customer?: string; error?: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const params = await searchParams;
   const q = (params.q ?? "").trim();
   const selectedCustomerId = params.customer ?? null;

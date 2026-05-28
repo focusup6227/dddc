@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 function str(v: FormDataEntryValue | null): string {
@@ -9,7 +9,7 @@ function str(v: FormDataEntryValue | null): string {
 }
 
 export async function verifyVaccine(formData: FormData): Promise<void> {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const id = str(formData.get("id"));
   if (!id) return;
 
@@ -29,7 +29,7 @@ export async function verifyVaccine(formData: FormData): Promise<void> {
 }
 
 export async function rejectVaccine(formData: FormData): Promise<void> {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const id = str(formData.get("id"));
   const reason = str(formData.get("reason"));
   if (!id) return;

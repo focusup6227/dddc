@@ -1,7 +1,7 @@
 // Minimal hand-written DB types. Regenerate with `supabase gen types typescript`
 // once you wire up the Supabase CLI to your project.
 
-export type UserRole = "customer" | "staff";
+export type UserRole = "customer" | "staff" | "junior_staff";
 export type BookingStatus =
   | "reserved"
   | "checked_in"

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { getDayCounts, getMaxDogsPerDay, getMaxDogsPerNight } from "@/lib/settings";
 import { todayISO } from "@/lib/format";
 import type { ServiceKind } from "@/lib/supabase/types";
@@ -11,7 +11,7 @@ export default async function KioskAvailabilityPage({
 }: {
   searchParams: Promise<{ month?: string; kind?: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const params = await searchParams;
   const kind: ServiceKind = params.kind === "boarding" ? "boarding" : "daycare";
   const monthAnchor = normalizeMonth(params.month) ?? firstOfMonth(todayISO());

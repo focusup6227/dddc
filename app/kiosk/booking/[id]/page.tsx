@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateShort, formatMoney } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
@@ -26,7 +26,7 @@ export default async function KioskBookingPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const { id } = await params;
   const supabase = await createClient();
 

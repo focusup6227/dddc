@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendReportCardReady } from "@/lib/email";
 import type { Booking, Dog, Profile, ReportCard } from "@/lib/supabase/types";
@@ -30,7 +30,7 @@ async function getOrCreateCard(
 }
 
 export async function saveReportCardNote(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   const note = String(formData.get("note") ?? "");
   if (!booking_id) return;
@@ -44,7 +44,7 @@ export async function saveReportCardNote(formData: FormData) {
 }
 
 export async function addReportCardPhoto(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   const storage_path = String(formData.get("storage_path") ?? "");
   const caption = String(formData.get("caption") ?? "").trim() || null;
@@ -77,7 +77,7 @@ export async function addReportCardPhoto(formData: FormData) {
 }
 
 export async function deleteReportCardPhoto(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   const photo_id = String(formData.get("photo_id") ?? "");
   const storage_path = String(formData.get("storage_path") ?? "");
@@ -93,7 +93,7 @@ export async function deleteReportCardPhoto(formData: FormData) {
 }
 
 export async function publishReportCard(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   if (!booking_id) return;
 
@@ -149,7 +149,7 @@ export async function publishReportCard(formData: FormData) {
 }
 
 export async function unpublishReportCard(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   if (!booking_id) return;
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { isJuniorStaff, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
@@ -31,7 +31,8 @@ export default async function StaffBookingsPage({
     month?: string;
   }>;
 }) {
-  await requireStaff();
+  const session = await requireStaff();
+  const isJunior = isJuniorStaff(session.profile);
   const supabase = await createClient();
   const params = await searchParams;
   const view: View = params.view === "calendar" ? "calendar" : "list";
@@ -113,6 +114,7 @@ export default async function StaffBookingsPage({
           bookings={bookings}
           dogs={dogs}
           custs={custs}
+          canCancel={!isJunior}
         />
       )}
     </div>
@@ -157,12 +159,14 @@ function ListView({
   bookings,
   dogs,
   custs,
+  canCancel,
 }: {
   from: string;
   to: string;
   bookings: Booking[];
   dogs: Dog[];
   custs: Profile[];
+  canCancel: boolean;
 }) {
   const byDate = new Map<string, Booking[]>();
   for (const b of bookings) {
@@ -223,7 +227,7 @@ function ListView({
                           {b.payment_kind} · {b.status} · {b.payment_status}
                         </p>
                       </div>
-                      {b.status === "reserved" && (
+                      {canCancel && b.status === "reserved" && (
                         <StaffCancelButton
                           bookingId={b.id}
                           preview={refundPreviewForStaff(b)}

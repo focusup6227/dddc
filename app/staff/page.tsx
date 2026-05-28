@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, PawPrint } from "lucide-react";
-import { requireStaff } from "@/lib/auth";
+import { isJuniorStaff, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
@@ -13,13 +13,15 @@ import { getPendingVaccineCount } from "@/lib/vaccines.server";
 import { firstName, getGreeting } from "@/lib/greeting";
 import { checkInBooking, checkOutBooking } from "./actions";
 
-const SUBNAV = [
-  { href: "/staff", label: "Today", active: true },
-  { href: "/staff/overview", label: "Numbers" },
-];
-
 export default async function StaffTodayPage() {
   const { profile } = await requireStaff();
+  const isJunior = isJuniorStaff(profile);
+  const subnav = isJunior
+    ? [{ href: "/staff", label: "Today", active: true }]
+    : [
+        { href: "/staff", label: "Today", active: true },
+        { href: "/staff/overview", label: "Numbers" },
+      ];
   const supabase = await createClient();
   const today = todayISO();
 
@@ -57,14 +59,14 @@ export default async function StaffTodayPage() {
     return ci?.checked_in_at && !ci.checked_out_at;
   });
 
-  const pendingVaccines = await getPendingVaccineCount();
+  const pendingVaccines = isJunior ? 0 : await getPendingVaccineCount();
 
   const greeting = getGreeting();
   const first = firstName(profile.full_name) || "team";
 
   return (
     <div className="space-y-8 animate-fade-up">
-      <StaffSubNav items={SUBNAV} />
+      <StaffSubNav items={subnav} />
       <header className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-white px-6 py-7 shadow-soft sm:px-10 sm:py-9">
         <div className="absolute -right-6 -bottom-6 text-brand-100">
           <PawPrint size={140} strokeWidth={1} />

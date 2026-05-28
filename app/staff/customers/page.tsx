@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronRight, Search } from "lucide-react";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/supabase/types";
 
@@ -9,7 +9,7 @@ export default async function StaffCustomersPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const supabase = await createClient();
   const params = await searchParams;
   const q = params.q?.trim() ?? "";

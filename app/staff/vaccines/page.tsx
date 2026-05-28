@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Dog,
@@ -30,7 +30,7 @@ export default async function StaffVaccinesPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const params = await searchParams;
   const filter = params.filter === "all" ? "all" : "pending";
 

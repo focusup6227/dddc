@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cancelBookingWithRefund } from "@/lib/bookings.server";
 import type { Booking, CheckIn } from "@/lib/supabase/types";
@@ -68,7 +68,7 @@ export async function addDogNote(formData: FormData) {
 }
 
 export async function staffCancelBooking(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const id = String(formData.get("booking_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim() || null;
   if (!id) return;
@@ -90,7 +90,7 @@ export async function staffCancelBooking(formData: FormData) {
 }
 
 export async function updateStaffNotes(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const dog_id = String(formData.get("dog_id") ?? "");
   const staff_notes = String(formData.get("staff_notes") ?? "");
   if (!dog_id) return;

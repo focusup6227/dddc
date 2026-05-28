@@ -429,6 +429,15 @@ function ChoreRow({
           {done && completedByName && (
             <p className="text-xs text-ink-400">
               by {completedByName}
+              {chore.completed_at && (
+                <span className="text-ink-400">
+                  {" · "}
+                  {new Date(chore.completed_at).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
             </p>
           )}
         </div>

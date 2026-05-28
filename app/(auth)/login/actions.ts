@@ -24,8 +24,10 @@ export async function login(formData: FormData) {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single<{ role: "customer" | "staff" }>();
+    .single<{ role: "customer" | "staff" | "junior_staff" }>();
 
   if (next) redirect(next);
-  redirect(profile?.role === "staff" ? "/staff" : "/dashboard");
+  const isStaff =
+    profile?.role === "staff" || profile?.role === "junior_staff";
+  redirect(isStaff ? "/staff" : "/dashboard");
 }

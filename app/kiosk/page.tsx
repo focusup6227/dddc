@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Calendar, Plus, UserPlus } from "lucide-react";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
@@ -21,7 +21,7 @@ const TOASTS = [
 export const dynamic = "force-dynamic";
 
 export default async function KioskHomePage() {
-  await requireStaff();
+  await requireFullStaff();
   const supabase = await createClient();
   const today = todayISO();
 

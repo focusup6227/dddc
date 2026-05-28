@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
@@ -22,7 +22,7 @@ const SUBNAV = [
 export const dynamic = "force-dynamic";
 
 export default async function StaffOverviewPage() {
-  await requireStaff();
+  await requireFullStaff();
   const supabase = await createClient();
   const today = todayISO();
   const monthStart = `${today.slice(0, 7)}-01`;

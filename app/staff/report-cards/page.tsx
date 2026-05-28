@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, Dog, Profile, ReportCard } from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
@@ -10,7 +10,7 @@ import { formatDateShort, todayISO } from "@/lib/format";
 const LOOKBACK_DAYS = 60;
 
 export default async function StaffReportCardsPage() {
-  await requireStaff();
+  await requireFullStaff();
   const supabase = await createClient();
 
   const today = todayISO();

@@ -13,7 +13,10 @@ export default async function SignupPage({
 }) {
   const session = await getSessionProfile();
   if (session) {
-    redirect(session.profile.role === "staff" ? "/staff" : "/dashboard");
+    const isStaff =
+      session.profile.role === "staff" ||
+      session.profile.role === "junior_staff";
+    redirect(isStaff ? "/staff" : "/dashboard");
   }
   const params = await searchParams;
   const refCode = params.ref?.trim().toUpperCase() ?? "";

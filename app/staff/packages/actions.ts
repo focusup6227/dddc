@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 
 export async function savePackage(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
   const days_included = Number(formData.get("days_included") ?? 0);
@@ -52,7 +52,7 @@ export async function savePackage(formData: FormData) {
 }
 
 export async function togglePackage(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const id = String(formData.get("id") ?? "");
   const active = formData.get("active") === "true";
   if (!id) return;

@@ -8,7 +8,12 @@ export default async function StaffLoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const session = await getSessionProfile();
-  if (session?.profile.role === "staff") redirect("/staff");
+  if (
+    session?.profile.role === "staff" ||
+    session?.profile.role === "junior_staff"
+  ) {
+    redirect("/staff");
+  }
   const params = await searchParams;
 
   return (

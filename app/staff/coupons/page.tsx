@@ -1,4 +1,4 @@
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Coupon } from "@/lib/supabase/types";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -21,7 +21,7 @@ const SUBNAV = [
 export const dynamic = "force-dynamic";
 
 export default async function StaffCouponsPage() {
-  await requireStaff();
+  await requireFullStaff();
   const supabase = await createClient();
   const { data } = await supabase
     .from("coupons")

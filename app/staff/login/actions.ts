@@ -20,11 +20,15 @@ export async function staffLogin(formData: FormData) {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single<{ role: "customer" | "staff" }>();
+    .single<{ role: "customer" | "staff" | "junior_staff" }>();
 
-  if (profile?.role !== "staff") {
+  const isStaff =
+    profile?.role === "staff" || profile?.role === "junior_staff";
+  if (!isStaff) {
     await supabase.auth.signOut();
-    redirect(`/staff/login?error=${encodeURIComponent("This account is not a staff account.")}`);
+    redirect(
+      `/staff/login?error=${encodeURIComponent("This account is not a staff account.")}`,
+    );
   }
 
   redirect("/staff");

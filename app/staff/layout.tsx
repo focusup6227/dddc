@@ -5,12 +5,24 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { getPendingVaccineCount } from "@/lib/vaccines.server";
 import { MobileNav } from "@/components/MobileNav";
 
-const NAV: { href: string; label: string; badgeKey?: "vaccines" }[] = [
-  { href: "/staff", label: "Today" },
-  { href: "/staff/calendar", label: "Schedule" },
+type NavItem = {
+  href: string;
+  label: string;
+  badgeKey?: "vaccines";
+  juniorAllowed?: boolean;
+};
+
+const NAV: NavItem[] = [
+  { href: "/staff", label: "Today", juniorAllowed: true },
+  { href: "/staff/calendar", label: "Schedule", juniorAllowed: true },
   { href: "/staff/customers", label: "Customers" },
-  { href: "/staff/dogs", label: "Dogs", badgeKey: "vaccines" },
-  { href: "/staff/chores", label: "Chores" },
+  {
+    href: "/staff/dogs",
+    label: "Dogs",
+    badgeKey: "vaccines",
+    juniorAllowed: true,
+  },
+  { href: "/staff/chores", label: "Chores", juniorAllowed: true },
   { href: "/staff/report-cards", label: "Report cards" },
   { href: "/staff/settings", label: "Settings" },
   { href: "/kiosk", label: "Kiosk" },
@@ -22,10 +34,16 @@ export default async function StaffLayout({
   children: React.ReactNode;
 }) {
   const session = await getSessionProfile();
-  const isStaff = session?.profile.role === "staff";
-  const pendingVaccines = isStaff ? await getPendingVaccineCount() : 0;
+  const isStaff =
+    session?.profile.role === "staff" ||
+    session?.profile.role === "junior_staff";
+  const isJunior = session?.profile.role === "junior_staff";
+  // Only full staff sees the pending-vaccine badge; junior can't action it.
+  const pendingVaccines =
+    isStaff && !isJunior ? await getPendingVaccineCount() : 0;
 
-  const navWithBadges = NAV.map((n) => ({
+  const visibleNav = NAV.filter((n) => (isJunior ? n.juniorAllowed : true));
+  const navWithBadges = visibleNav.map((n) => ({
     href: n.href,
     label: n.label,
     badge: n.badgeKey === "vaccines" ? pendingVaccines : undefined,
@@ -53,13 +71,13 @@ export default async function StaffLayout({
               <span className="sm:hidden">DDDC</span>
             </span>
             <span className="hidden rounded-full bg-brand-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-300 sm:inline">
-              Operator
+              {isJunior ? "Junior" : "Operator"}
             </span>
           </Link>
           {isStaff && (
             <>
               <nav className="hidden gap-0.5 md:flex">
-                {NAV.map((n) => {
+                {visibleNav.map((n) => {
                   const count = n.badgeKey === "vaccines" ? pendingVaccines : 0;
                   return (
                     <Link

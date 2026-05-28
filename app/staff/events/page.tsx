@@ -1,4 +1,4 @@
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Event } from "@/lib/supabase/types";
 import { formatDateShort, todayISO } from "@/lib/format";
@@ -25,7 +25,7 @@ export default async function StaffEventsPage({
 }: {
   searchParams: Promise<{ saved?: string; error?: string; edit?: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const params = await searchParams;
   const supabase = await createClient();
   const today = todayISO();

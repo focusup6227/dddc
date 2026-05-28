@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
@@ -14,7 +14,7 @@ export default async function NewIncidentPage({
 }: {
   searchParams: Promise<{ error?: string; dog?: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const params = await searchParams;
   const supabase = await createClient();
 

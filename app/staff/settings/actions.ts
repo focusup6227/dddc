@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 function parsePositiveInt(raw: string): number | null {
@@ -18,7 +18,7 @@ function parsePositiveDollarsToCents(raw: string): number | null {
 }
 
 export async function saveSettings(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const dayRaw = String(formData.get("max_dogs_per_day") ?? "").trim();
   const nightRaw = String(formData.get("max_dogs_per_night") ?? "").trim();
   const boardingRaw = String(formData.get("boarding_rate_dollars") ?? "").trim();

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireStaff } from "@/lib/auth";
+import { isJuniorStaff, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
@@ -28,7 +28,8 @@ export default async function StaffDogDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireStaff();
+  const session = await requireStaff();
+  const isJunior = isJuniorStaff(session.profile);
   const { id } = await params;
   const supabase = await createClient();
 
@@ -146,45 +147,49 @@ export default async function StaffDogDetailPage({
         </section>
       </div>
 
-      <section className="card">
-        <h2 className="font-display text-lg font-semibold text-ink-900">
-          Staff-only notes
-        </h2>
-        <p className="mt-1 text-xs text-ink-500">
-          Customers can&apos;t see these.
-        </p>
-        <form action={updateStaffNotes} className="mt-3">
-          <input type="hidden" name="dog_id" value={dog.id} />
-          <textarea
-            name="staff_notes"
-            rows={4}
-            defaultValue={dog.staff_notes ?? ""}
-            className="input"
-            placeholder="e.g. 'reactive on leash, separate during pickup time'"
-          />
-          <div className="mt-2 flex justify-end">
-            <button type="submit" className="btn-primary">Save</button>
-          </div>
-        </form>
-      </section>
+      {!isJunior && (
+        <section className="card">
+          <h2 className="font-display text-lg font-semibold text-ink-900">
+            Staff-only notes
+          </h2>
+          <p className="mt-1 text-xs text-ink-500">
+            Customers can&apos;t see these.
+          </p>
+          <form action={updateStaffNotes} className="mt-3">
+            <input type="hidden" name="dog_id" value={dog.id} />
+            <textarea
+              name="staff_notes"
+              rows={4}
+              defaultValue={dog.staff_notes ?? ""}
+              className="input"
+              placeholder="e.g. 'reactive on leash, separate during pickup time'"
+            />
+            <div className="mt-2 flex justify-end">
+              <button type="submit" className="btn-primary">Save</button>
+            </div>
+          </form>
+        </section>
+      )}
 
       <section>
         <h2 className="font-display text-xl font-semibold text-ink-900">
           Daily journal
         </h2>
-        <form action={addDogNote} className="card mt-3">
-          <input type="hidden" name="dog_id" value={dog.id} />
-          <textarea
-            name="note"
-            rows={3}
-            required
-            className="input"
-            placeholder="What happened today? (visible to the owner)"
-          />
-          <div className="mt-2 flex justify-end">
-            <button type="submit" className="btn-primary">Add note</button>
-          </div>
-        </form>
+        {!isJunior && (
+          <form action={addDogNote} className="card mt-3">
+            <input type="hidden" name="dog_id" value={dog.id} />
+            <textarea
+              name="note"
+              rows={3}
+              required
+              className="input"
+              placeholder="What happened today? (visible to the owner)"
+            />
+            <div className="mt-2 flex justify-end">
+              <button type="submit" className="btn-primary">Add note</button>
+            </div>
+          </form>
+        )}
 
         {notes.length === 0 ? (
           <p className="mt-4 text-sm text-ink-500">No notes yet.</p>
@@ -202,6 +207,7 @@ export default async function StaffDogDetailPage({
         )}
       </section>
 
+      {!isJunior && (
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-display text-xl font-semibold text-ink-900">
@@ -250,6 +256,7 @@ export default async function StaffDogDetailPage({
           </ul>
         )}
       </section>
+      )}
 
       <section>
         <h2 className="font-display text-xl font-semibold text-ink-900">

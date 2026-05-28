@@ -1,4 +1,4 @@
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   getBoardingRateCents,
@@ -24,7 +24,7 @@ const TOASTS = [
 export const dynamic = "force-dynamic";
 
 export default async function StaffSettingsPage() {
-  await requireStaff();
+  await requireFullStaff();
   const [maxDay, maxNight, boardingCents] = await Promise.all([
     getMaxDogsPerDay(),
     getMaxDogsPerNight(),

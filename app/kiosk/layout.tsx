@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { LogOut } from "lucide-react";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export default async function KioskLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   return (
     <div className="min-h-screen bg-cream-50 bg-paw-pattern text-ink-900">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-stone-200/80 bg-cream-50/85 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-cream-50/70">

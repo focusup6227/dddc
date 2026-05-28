@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { ChoreRecurrence } from "@/lib/supabase/types";
 
@@ -76,7 +76,7 @@ export async function createManualChore(formData: FormData) {
 }
 
 export async function deleteChore(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 

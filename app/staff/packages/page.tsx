@@ -1,4 +1,4 @@
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Package } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
@@ -13,7 +13,7 @@ const SUBNAV = [
 ];
 
 export default async function StaffPackagesPage() {
-  await requireStaff();
+  await requireFullStaff();
   const supabase = await createClient();
   const { data } = await supabase.from("packages").select("*").order("sort_order");
   const packages = (data ?? []) as Package[];

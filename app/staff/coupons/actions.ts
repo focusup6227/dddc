@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 function str(v: FormDataEntryValue | null): string | null {
@@ -12,7 +12,7 @@ function str(v: FormDataEntryValue | null): string | null {
 }
 
 export async function createCoupon(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
 
   const code = str(formData.get("code"))?.toUpperCase().replace(/\s+/g, "");
   const dollars = str(formData.get("discount_per_day"));
@@ -57,7 +57,7 @@ export async function createCoupon(formData: FormData) {
 }
 
 export async function toggleCoupon(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const id = str(formData.get("id"));
   if (!id) redirect("/staff/coupons");
 
@@ -79,7 +79,7 @@ export async function toggleCoupon(formData: FormData) {
 }
 
 export async function deleteCoupon(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const id = str(formData.get("id"));
   if (!id) redirect("/staff/coupons");
 

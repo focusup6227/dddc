@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
@@ -23,7 +23,7 @@ export default async function StaffReportCardEditorPage({
 }: {
   params: Promise<{ bookingId: string }>;
 }) {
-  await requireStaff();
+  await requireFullStaff();
   const { bookingId } = await params;
   const supabase = await createClient();
 

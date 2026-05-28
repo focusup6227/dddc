@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { IncidentKind, IncidentSeverity } from "@/lib/supabase/types";
 import { INCIDENT_BUCKET } from "@/lib/incidents";
@@ -28,7 +28,7 @@ const SEVERITIES: ReadonlySet<IncidentSeverity> = new Set([
 ]);
 
 export async function createIncident(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
 
   const dog_id = str(formData.get("dog_id"));
   const occurred_on = str(formData.get("occurred_on"));
@@ -78,7 +78,7 @@ export async function createIncident(formData: FormData) {
 }
 
 export async function updateIncident(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
 
   const id = str(formData.get("id"));
   if (!id) redirect("/staff/incidents");
@@ -114,7 +114,7 @@ export async function updateIncident(formData: FormData) {
 }
 
 export async function deleteIncident(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const id = str(formData.get("id"));
   if (!id) redirect("/staff/incidents");
 
@@ -135,7 +135,7 @@ export async function deleteIncident(formData: FormData) {
 }
 
 export async function addIncidentPhoto(formData: FormData) {
-  const { userId } = await requireStaff();
+  const { userId } = await requireFullStaff();
   const incident_id = str(formData.get("incident_id"));
   const storage_path = str(formData.get("storage_path"));
   const caption = str(formData.get("caption"));
@@ -152,7 +152,7 @@ export async function addIncidentPhoto(formData: FormData) {
 }
 
 export async function deleteIncidentPhoto(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const incident_id = str(formData.get("incident_id"));
   const photo_id = str(formData.get("photo_id"));
   const storage_path = str(formData.get("storage_path"));

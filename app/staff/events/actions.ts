@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireStaff } from "@/lib/auth";
+import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function createEvent(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
   const start_date = String(formData.get("start_date") ?? "");
@@ -36,7 +36,7 @@ export async function createEvent(formData: FormData) {
 }
 
 export async function updateEvent(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
@@ -63,7 +63,7 @@ export async function updateEvent(formData: FormData) {
 }
 
 export async function deleteEvent(formData: FormData) {
-  await requireStaff();
+  await requireFullStaff();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const supabase = await createClient();
