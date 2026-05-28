@@ -1,3 +1,4 @@
+import ReactMarkdown from "react-markdown";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Waiver, WaiverSignature } from "@/lib/supabase/types";
@@ -57,8 +58,8 @@ export default async function WaiverPage({
       <h1 className="text-2xl font-bold text-stone-900">{waiver.title}</h1>
       <p className="mt-1 text-sm text-stone-500">Version {waiver.version}</p>
 
-      <article className="card mt-6 whitespace-pre-wrap text-stone-800">
-        {waiver.body_markdown}
+      <article className="card mt-6 prose prose-stone max-w-none prose-headings:font-semibold prose-strong:text-stone-900">
+        <ReactMarkdown>{waiver.body_markdown}</ReactMarkdown>
       </article>
 
       <form action={signWaiver} className="mt-6 space-y-4">
