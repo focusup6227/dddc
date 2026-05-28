@@ -3,7 +3,7 @@ import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatMoney } from "@/lib/format";
-import type { Dog, Package, Profile, WaiverSignature } from "@/lib/supabase/types";
+import type { Dog, Package, Profile } from "@/lib/supabase/types";
 import { kioskWalkInCharge } from "../actions";
 
 export const dynamic = "force-dynamic";

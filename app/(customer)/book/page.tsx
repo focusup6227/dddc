@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireCustomer } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
 import { addDays, formatMoney, todayISO } from "@/lib/format";
+import { getMaxDogsPerDay } from "@/lib/settings";
 import { BookForm } from "./BookForm";
 
 export default async function BookPage({
@@ -67,13 +68,30 @@ export default async function BookPage({
   // Pre-fetch existing bookings for the next 60 days so the calendar can avoid dupes.
   const startDate = todayISO();
   const endDate = addDays(startDate, 60);
-  const { data: existingData } = await supabase
-    .from("bookings")
-    .select("dog_id, service_date, status")
-    .eq("customer_id", userId)
-    .gte("service_date", startDate)
-    .lte("service_date", endDate)
-    .neq("status", "canceled");
+  const [{ data: existingData }, { data: allDayRows }, maxPerDay] = await Promise.all([
+    supabase
+      .from("bookings")
+      .select("dog_id, service_date, status")
+      .eq("customer_id", userId)
+      .gte("service_date", startDate)
+      .lte("service_date", endDate)
+      .neq("status", "canceled"),
+    createServiceClient()
+      .from("bookings")
+      .select("service_date")
+      .gte("service_date", startDate)
+      .lte("service_date", endDate)
+      .neq("status", "canceled"),
+    getMaxDogsPerDay(),
+  ]);
+  const dayCounts = new Map<string, number>();
+  for (const r of allDayRows ?? []) {
+    dayCounts.set(r.service_date, (dayCounts.get(r.service_date) ?? 0) + 1);
+  }
+  const fullDates: string[] = [];
+  for (const [d, n] of dayCounts) {
+    if (n >= maxPerDay) fullDates.push(d);
+  }
 
   return (
     <div className="max-w-3xl">
@@ -110,6 +128,7 @@ export default async function BookPage({
         dropInPriceCents={dropInPkg?.price_cents ?? null}
         existingBookings={(existingData ?? []) as { dog_id: string; service_date: string }[]}
         startDate={startDate}
+        fullDates={fullDates}
       />
     </div>
   );

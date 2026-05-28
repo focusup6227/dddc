@@ -3,40 +3,39 @@
 import { useMemo, useState } from "react";
 import type { Dog } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
-import { createBooking } from "./actions";
+import { kioskCreateBooking } from "../../actions";
 
-export function BookForm({
+export function KioskBookForm({
+  customerId,
   dogs,
   daysRemaining,
   dropInPriceCents,
   existingBookings,
-  startDate,
   fullDates,
+  startDate,
 }: {
+  customerId: string;
   dogs: Dog[];
   daysRemaining: number;
   dropInPriceCents: number | null;
   existingBookings: { dog_id: string; service_date: string }[];
-  startDate: string;
   fullDates: string[];
+  startDate: string;
 }) {
   const [dogId, setDogId] = useState(dogs[0]?.id ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const taken = useMemo(() => {
     const s = new Set<string>();
-    for (const b of existingBookings) {
-      if (b.dog_id === dogId) s.add(b.service_date);
-    }
+    for (const b of existingBookings) if (b.dog_id === dogId) s.add(b.service_date);
     return s;
   }, [existingBookings, dogId]);
-
   const full = useMemo(() => new Set(fullDates), [fullDates]);
 
   const days = useMemo(() => generateDays(startDate, 42), [startDate]);
 
   function toggle(date: string) {
-    if (taken.has(date) || full.has(date)) return;
+    if (taken.has(date)) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(date)) next.delete(date);
@@ -49,17 +48,15 @@ export function BookForm({
   const packageDaysUsed = Math.min(selectedCount, daysRemaining);
   const dropInDaysNeeded = selectedCount - packageDaysUsed;
   const dropInTotalCents = dropInPriceCents ? dropInDaysNeeded * dropInPriceCents : 0;
+  const overlapsFull = Array.from(selected).some((d) => full.has(d));
 
   return (
-    <form action={createBooking} className="mt-6 space-y-6">
+    <form action={kioskCreateBooking} className="mt-2 space-y-6">
+      <input type="hidden" name="customer_id" value={customerId} />
       <input type="hidden" name="dog_id" value={dogId} />
-      <input
-        type="hidden"
-        name="service_dates"
-        value={Array.from(selected).sort().join(",")}
-      />
+      <input type="hidden" name="service_dates" value={Array.from(selected).sort().join(",")} />
 
-      <section className="card">
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <h3 className="font-semibold text-stone-900">Dog</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           {dogs.map((d) => (
@@ -71,7 +68,7 @@ export function BookForm({
                 setSelected(new Set());
               }}
               className={
-                "rounded-full border px-3 py-1.5 text-sm " +
+                "rounded-full border px-4 py-2 text-base " +
                 (dogId === d.id
                   ? "border-brand-600 bg-brand-50 text-brand-700"
                   : "border-stone-300 text-stone-700 hover:bg-stone-50")
@@ -83,10 +80,10 @@ export function BookForm({
         </div>
       </section>
 
-      <section className="card">
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <h3 className="font-semibold text-stone-900">Dates</h3>
         <p className="mt-1 text-sm text-stone-500">
-          Pick the days you&apos;d like to drop off. Greyed-out days are already booked.
+          Red days are at capacity — staff can still book them, but expect a busy day.
         </p>
         <div className="mt-4 grid grid-cols-7 gap-1 text-xs">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
@@ -102,7 +99,7 @@ export function BookForm({
             const isFull = full.has(d.iso);
             const isSelected = selected.has(d.iso);
             const isPast = d.iso < startDate;
-            const disabled = isTaken || isFull || isPast;
+            const disabled = isTaken || isPast;
             return (
               <button
                 key={d.iso}
@@ -112,13 +109,15 @@ export function BookForm({
                 className={
                   "aspect-square rounded-md border text-sm transition-colors " +
                   (isSelected
-                    ? "border-brand-600 bg-brand-600 text-white"
+                    ? isFull
+                      ? "border-red-600 bg-red-600 text-white"
+                      : "border-brand-600 bg-brand-600 text-white"
                     : isTaken
                       ? "border-stone-200 bg-stone-100 text-stone-400 line-through"
-                      : isFull
-                        ? "border-red-200 bg-red-50 text-red-400"
-                        : isPast
-                          ? "border-stone-100 text-stone-300"
+                      : isPast
+                        ? "border-stone-100 text-stone-300"
+                        : isFull
+                          ? "border-red-200 bg-red-50 text-red-700 hover:border-red-400"
                           : "border-stone-200 bg-white text-stone-800 hover:border-brand-400 hover:bg-brand-50")
                 }
                 title={isFull ? `${d.iso} · full` : d.iso}
@@ -130,9 +129,9 @@ export function BookForm({
         </div>
       </section>
 
-      <section className="card">
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <h3 className="font-semibold text-stone-900">Summary</h3>
-        <dl className="mt-3 space-y-1 text-sm">
+        <dl className="mt-3 space-y-1 text-base">
           <div className="flex justify-between">
             <dt className="text-stone-600">Days selected</dt>
             <dd className="font-medium text-stone-900">{selectedCount}</dd>
@@ -143,28 +142,32 @@ export function BookForm({
           </div>
           {dropInDaysNeeded > 0 && dropInPriceCents && (
             <div className="flex justify-between">
-              <dt className="text-stone-600">Drop-in days × {dropInDaysNeeded}</dt>
-              <dd className="font-medium text-stone-900">
-                {formatMoney(dropInTotalCents)}
-              </dd>
+              <dt className="text-stone-600">Drop-in × {dropInDaysNeeded}</dt>
+              <dd className="font-medium text-stone-900">{formatMoney(dropInTotalCents)}</dd>
             </div>
           )}
-          <div className="flex justify-between border-t border-stone-200 pt-2">
-            <dt className="font-semibold text-stone-900">Due today</dt>
+          <div className="flex justify-between border-t border-stone-200 pt-2 text-lg">
+            <dt className="font-semibold text-stone-900">Due now</dt>
             <dd className="font-semibold text-stone-900">
               {formatMoney(dropInTotalCents)}
             </dd>
           </div>
         </dl>
+        {overlapsFull && (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            At least one selected day is already at capacity. Continue only if you&apos;re
+            sure you have room.
+          </p>
+        )}
       </section>
 
       <button
         type="submit"
         disabled={selectedCount === 0 || !dogId || (dropInDaysNeeded > 0 && !dropInPriceCents)}
-        className="btn-primary w-full"
+        className="w-full rounded-2xl bg-brand-600 px-6 py-5 text-xl font-bold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
       >
         {dropInDaysNeeded > 0
-          ? `Continue to checkout (${formatMoney(dropInTotalCents)})`
+          ? `Continue to payment (${formatMoney(dropInTotalCents)})`
           : "Confirm booking"}
       </button>
     </form>

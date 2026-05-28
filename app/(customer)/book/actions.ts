@@ -5,6 +5,7 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
 import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
+import { getFullDates } from "@/lib/settings";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,6 +32,16 @@ export async function createBooking(formData: FormData) {
     .eq("owner_id", userId)
     .maybeSingle<Dog>();
   if (!dog) redirect("/book?error=Dog+not+found");
+
+  // Capacity check: block any requested date that's already at the daily cap.
+  const full = await getFullDates(dates);
+  const fullRequested = dates.filter((d) => full.has(d));
+  if (fullRequested.length > 0) {
+    const list = fullRequested.join(", ");
+    redirect(
+      `/book?error=${encodeURIComponent(`These days are full, please pick another: ${list}`)}`,
+    );
+  }
 
   // Pull paid packages with remaining days, oldest first (FIFO).
   const { data: pkgRows } = await supabase

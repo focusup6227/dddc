@@ -96,8 +96,6 @@ export default async function KioskBookingPage({
 
       <ActionPanel
         booking={booking}
-        dog={dog}
-        cust={cust}
         isPaid={isPaid}
         isCheckedIn={isCheckedIn}
         isCheckedOut={isCheckedOut}
@@ -118,16 +116,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 async function ActionPanel({
   booking,
-  dog,
-  cust,
   isPaid,
   isCheckedIn,
   isCheckedOut,
   ci,
 }: {
   booking: Booking;
-  dog: Dog;
-  cust: Profile;
   isPaid: boolean;
   isCheckedIn: boolean;
   isCheckedOut: boolean;

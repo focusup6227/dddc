@@ -84,12 +84,26 @@ export default async function KioskHomePage({
             {bookings.length} booked · {here.length} on site · {gone.length} gone
           </p>
         </div>
-        <Link
-          href="/kiosk/walk-in"
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-brand-700"
-        >
-          + New walk-in
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/kiosk/availability"
+            className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-3 text-base font-semibold text-stone-700 hover:bg-stone-50"
+          >
+            Availability
+          </Link>
+          <Link
+            href="/kiosk/booking/new"
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-600 bg-white px-4 py-3 text-base font-semibold text-brand-700 hover:bg-brand-50"
+          >
+            + New booking
+          </Link>
+          <Link
+            href="/kiosk/walk-in"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-brand-700"
+          >
+            + Walk-in
+          </Link>
+        </div>
       </div>
 
       <Section title="Arriving" count={arriving.length} accent="border-amber-300">
