@@ -13,6 +13,7 @@ import { getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { getEventsInRange } from "@/lib/events.server";
 import { getBlackoutsInRange, expandBlackoutDates } from "@/lib/blackouts.server";
+import { materializeForCustomer } from "@/lib/recurring.server";
 import {
   missingForBooking,
   summarizeCoverage,
@@ -28,6 +29,9 @@ export default async function BookPage({
   const { userId } = await requireCustomer();
   const supabase = await createClient();
   const params = await searchParams;
+
+  // Keep standing-schedule bookings materialized so the calendar reflects them.
+  await materializeForCustomer(userId);
 
   // Gate: must have signed an active waiver and have at least one dog.
   const [waiverSigsRes, dogsRes, pkgsRes, dropInPkgRes] = await Promise.all([
@@ -196,7 +200,7 @@ export default async function BookPage({
 
       <KindTabs current="daycare" />
 
-      <section className="mt-2">
+      <section className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-stone-600">
           {daysRemaining > 0
             ? `You have ${daysRemaining} package days available — they'll be used first.`
@@ -204,6 +208,12 @@ export default async function BookPage({
               ? `Day-care drop-in is ${formatMoney(dropInPkg.price_cents)} per day.`
               : "No package days available."}
         </p>
+        <Link
+          href="/recurring"
+          className="text-sm font-medium text-brand-700 hover:underline"
+        >
+          Set up a standing weekly schedule →
+        </Link>
       </section>
 
       {params.status === "package_redeemed" && (

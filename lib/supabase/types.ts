@@ -206,6 +206,19 @@ export interface Blackout {
   created_at: string;
 }
 
+export interface RecurringBooking {
+  id: string;
+  customer_id: string;
+  dog_id: string;
+  weekdays: number[];
+  start_date: string;
+  end_date: string | null;
+  drop_off_time: string;
+  pickup_time: string;
+  active: boolean;
+  created_at: string;
+}
+
 export type VaccineType = "rabies" | "dhpp" | "bordetella";
 export type VaccinationStatus = "pending" | "verified" | "rejected";
 

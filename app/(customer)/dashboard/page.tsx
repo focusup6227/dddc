@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { addDays, formatDateShort, todayISO } from "@/lib/format";
+import { addDays, formatDateShort, formatMoney, todayISO } from "@/lib/format";
 import type {
   Booking,
   CustomerPackage,
@@ -12,12 +12,13 @@ import type {
 } from "@/lib/supabase/types";
 import { ReportCardView } from "@/components/ReportCardView";
 import { EventList } from "@/components/EventList";
+import { payAllUnpaid } from "../bookings/actions";
 
 export default async function CustomerDashboard() {
   const { userId, profile } = await requireCustomer();
   const supabase = await createClient();
 
-  const [dogsRes, bookingsRes, packagesRes] = await Promise.all([
+  const [dogsRes, bookingsRes, packagesRes, unpaidRes] = await Promise.all([
     supabase
       .from("dogs")
       .select("*")
@@ -39,12 +40,30 @@ export default async function CustomerDashboard() {
       .eq("payment_status", "paid")
       .gt("days_remaining", 0)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("bookings")
+      .select("*")
+      .eq("customer_id", userId)
+      .eq("payment_status", "unpaid")
+      .eq("status", "reserved"),
   ]);
 
   const dogs = (dogsRes.data ?? []) as Dog[];
   const bookings = (bookingsRes.data ?? []) as Booking[];
   const packages = (packagesRes.data ?? []) as CustomerPackage[];
   const totalDays = packages.reduce((s, p) => s + p.days_remaining, 0);
+  const unpaid = (unpaidRes.data ?? []) as Booking[];
+  const balanceCents = unpaid.reduce((sum, b) => {
+    const [y1, m1, d1] = b.service_date.split("-").map(Number);
+    const [y2, m2, d2] = b.service_end_date.split("-").map(Number);
+    const nights = Math.max(
+      1,
+      Math.round(
+        (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000,
+      ),
+    );
+    return sum + (b.unit_price_cents ?? 0) * nights;
+  }, 0);
 
   const today = todayISO();
   const horizon = addDays(today, 90);
@@ -97,6 +116,26 @@ export default async function CustomerDashboard() {
         </h1>
         <p className="text-stone-600">Here&apos;s what&apos;s happening.</p>
       </header>
+
+      {unpaid.length > 0 && (
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-900">
+                Outstanding balance: {formatMoney(balanceCents)}
+              </p>
+              <p className="text-xs text-amber-800">
+                {unpaid.length} unpaid booking{unpaid.length === 1 ? "" : "s"}.
+              </p>
+            </div>
+            <form action={payAllUnpaid}>
+              <button type="submit" className="btn-primary">
+                Pay {formatMoney(balanceCents)}
+              </button>
+            </form>
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard

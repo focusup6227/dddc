@@ -7,6 +7,7 @@ import { MobileNav } from "@/components/MobileNav";
 
 const NAV: { href: string; label: string; badgeKey?: "vaccines" }[] = [
   { href: "/staff", label: "Today" },
+  { href: "/staff/overview", label: "Overview" },
   { href: "/staff/calendar", label: "Calendar" },
   { href: "/staff/bookings", label: "Bookings" },
   { href: "/staff/customers", label: "Customers" },

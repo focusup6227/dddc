@@ -9,8 +9,9 @@ import type {
 import { formatDateShort, formatMoney, todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
 import { isPastDueUnpaid, refundFractionForBooking } from "@/lib/bookings.server";
+import { materializeForCustomer } from "@/lib/recurring.server";
 import { ReportCardView } from "@/components/ReportCardView";
-import { cancelBooking, payBooking } from "./actions";
+import { cancelBooking, payAllUnpaid, payBooking } from "./actions";
 import ConfirmCancelButton from "./ConfirmCancelButton";
 
 export default async function BookingsPage({
@@ -21,6 +22,9 @@ export default async function BookingsPage({
   const { userId } = await requireCustomer();
   const supabase = await createClient();
   const params = await searchParams;
+
+  // Keep the 28-day horizon of standing-schedule bookings up to date.
+  await materializeForCustomer(userId);
 
   const [bookingsRes, dogsRes] = await Promise.all([
     supabase
@@ -65,6 +69,14 @@ export default async function BookingsPage({
   const upcoming = bookings.filter((b) => b.service_date >= today && b.status !== "canceled");
   const past = bookings.filter((b) => b.service_date < today || b.status === "canceled");
 
+  const unpaidBookings = bookings.filter(
+    (b) => b.status === "reserved" && b.payment_status === "unpaid",
+  );
+  const balanceCents = unpaidBookings.reduce((sum, b) => {
+    const nights = Math.max(1, nightCount(b.service_date, b.service_end_date));
+    return sum + (b.unit_price_cents ?? 0) * nights;
+  }, 0);
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-stone-900">Bookings</h1>
@@ -83,6 +95,28 @@ export default async function BookingsPage({
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {params.error}
         </div>
+      )}
+
+      {unpaidBookings.length > 0 && (
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-900">
+                Outstanding balance: {formatMoney(balanceCents)}
+              </p>
+              <p className="text-xs text-amber-800">
+                {unpaidBookings.length} unpaid booking
+                {unpaidBookings.length === 1 ? "" : "s"} — pay everything in one
+                checkout.
+              </p>
+            </div>
+            <form action={payAllUnpaid}>
+              <button type="submit" className="btn-primary">
+                Pay {formatMoney(balanceCents)}
+              </button>
+            </form>
+          </div>
+        </section>
       )}
 
       <Section
