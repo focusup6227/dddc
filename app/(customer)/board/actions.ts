@@ -12,6 +12,7 @@ import {
   getFullDates,
 } from "@/lib/settings";
 import { isTimeInWindow } from "@/lib/hours";
+import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import type { Dog } from "@/lib/supabase/types";
@@ -36,6 +37,14 @@ export async function createBoarding(formData: FormData) {
   if (!isTimeInWindow(drop_off_time) || !isTimeInWindow(pickup_time)) {
     redirect(
       "/board?error=Pick+a+drop-off+and+pickup+between+6+AM+and+6+PM",
+    );
+  }
+
+  const pastDue = await getPastDueUnpaid(userId);
+  if (pastDue.length > 0) {
+    redirect(
+      "/board?error=" +
+        encodeURIComponent("Please pay your past balance before booking again."),
     );
   }
 

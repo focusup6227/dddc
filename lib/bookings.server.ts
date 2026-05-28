@@ -1,8 +1,70 @@
 import "server-only";
+import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendBookingCancellation } from "@/lib/email";
-import type { Booking, CustomerPackage } from "@/lib/supabase/types";
+import {
+  BOARDING_STRIPE_PRICE_AMOUNT_CENTS,
+  BOARDING_STRIPE_PRICE_ID,
+} from "@/lib/settings";
+import { todayISO } from "@/lib/format";
+import type {
+  Booking,
+  CustomerPackage,
+  Dog,
+  Package,
+  Profile,
+} from "@/lib/supabase/types";
+
+export type PastDueBooking = Pick<
+  Booking,
+  "id" | "service_date" | "service_end_date" | "service_kind" | "unit_price_cents"
+>;
+
+/**
+ * A booking is past-due once the appointment has *completed* and payment
+ * still hasn't landed. For daycare the appointment ends on service_date; for
+ * boarding it ends on service_end_date (checkout day). We give the customer
+ * through end-of-day on that last day before flagging the row past-due.
+ */
+export function isPastDueUnpaid(
+  b: Pick<
+    Booking,
+    "service_kind" | "service_date" | "service_end_date" | "payment_status" | "status"
+  >,
+  today: string = todayISO(),
+): boolean {
+  if (b.payment_status !== "unpaid") return false;
+  if (b.status === "canceled") return false;
+  const lastDay =
+    b.service_kind === "boarding" ? b.service_end_date : b.service_date;
+  return lastDay < today;
+}
+
+/**
+ * Past-due unpaid bookings for a customer.
+ */
+export async function getPastDueUnpaid(
+  customerId: string,
+): Promise<PastDueBooking[]> {
+  const svc = createServiceClient();
+  const today = todayISO();
+  // PostgREST can't easily express the kind-aware comparison, so fetch all
+  // open unpaid rows (cheap: there are very few per customer) and filter.
+  const { data } = await svc
+    .from("bookings")
+    .select(
+      "id, service_date, service_end_date, service_kind, payment_status, status, unit_price_cents",
+    )
+    .eq("customer_id", customerId)
+    .eq("payment_status", "unpaid")
+    .neq("status", "canceled")
+    .order("service_date");
+  return ((data ?? []) as (PastDueBooking &
+    Pick<Booking, "payment_status" | "status">)[])
+    .filter((b) => isPastDueUnpaid(b, today))
+    .map(({ payment_status: _ps, status: _s, ...rest }) => rest);
+}
 
 export type CancelOutcome =
   | { ok: false; reason: string }
@@ -168,4 +230,121 @@ function countNights(start: string, end: string): number {
   const a = Date.UTC(y1, m1 - 1, d1);
   const b = Date.UTC(y2, m2 - 1, d2);
   return Math.max(0, Math.round((b - a) / 86400000));
+}
+
+/**
+ * Build + open a Stripe Checkout session to collect payment for an unpaid
+ * booking. Used by both the kiosk staff action and the customer-portal "Pay
+ * now" button — only the success/cancel URLs and the `source` tag differ.
+ *
+ * Returns the session URL to redirect to, or null when something is missing
+ * (caller should redirect to its own error page).
+ */
+export async function createBookingCheckoutSession(opts: {
+  bookingId: string;
+  /** When set, the booking must belong to this customer or null is returned. */
+  ownerCustomerId?: string;
+  successUrl: string;
+  cancelUrl: string;
+  source: "kiosk" | "customer-portal";
+}): Promise<string | null> {
+  const svc = createServiceClient();
+  const { data: booking } = await svc
+    .from("bookings")
+    .select("*")
+    .eq("id", opts.bookingId)
+    .maybeSingle<Booking>();
+  if (!booking) return null;
+  if (opts.ownerCustomerId && booking.customer_id !== opts.ownerCustomerId) {
+    return null;
+  }
+  if (booking.status !== "reserved" || booking.payment_status === "paid") {
+    return null;
+  }
+
+  const [{ data: dog }, { data: cust }, { data: dropInPkg }] = await Promise.all(
+    [
+      svc.from("dogs").select("*").eq("id", booking.dog_id).maybeSingle<Dog>(),
+      svc
+        .from("profiles")
+        .select("*")
+        .eq("id", booking.customer_id)
+        .maybeSingle<Profile>(),
+      svc
+        .from("packages")
+        .select("*")
+        .eq("active", true)
+        .eq("days_included", 1)
+        .order("price_cents")
+        .limit(1)
+        .maybeSingle<Package>(),
+    ],
+  );
+  if (!dog || !cust || !dropInPkg) return null;
+
+  const isBoarding = booking.service_kind === "boarding";
+  const nightsCovered = isBoarding
+    ? Math.max(1, countNights(booking.service_date, booking.service_end_date))
+    : 1;
+  const priceCents =
+    booking.unit_price_cents ??
+    (isBoarding ? BOARDING_STRIPE_PRICE_AMOUNT_CENTS : dropInPkg.price_cents);
+
+  // Reuse the matching pre-made Stripe price when the saved booking rate
+  // still matches — otherwise fall back to ad-hoc price_data so the
+  // customer is charged what was originally quoted.
+  let lineItem: Stripe.Checkout.SessionCreateParams.LineItem;
+  if (isBoarding && priceCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS) {
+    lineItem = { price: BOARDING_STRIPE_PRICE_ID, quantity: nightsCovered };
+  } else if (
+    !isBoarding &&
+    dropInPkg.stripe_price_id &&
+    priceCents === dropInPkg.price_cents
+  ) {
+    lineItem = { price: dropInPkg.stripe_price_id, quantity: 1 };
+  } else {
+    lineItem = {
+      price_data: {
+        currency: "usd" as const,
+        product_data: {
+          name: isBoarding
+            ? `Boarding (${dog.name})`
+            : `Day care drop-in (${dog.name})`,
+          description: isBoarding
+            ? `${nightsCovered} night${nightsCovered === 1 ? "" : "s"}: ${booking.service_date} → ${booking.service_end_date}`
+            : `Service date: ${booking.service_date}`,
+        },
+        unit_amount: priceCents,
+      },
+      quantity: isBoarding ? nightsCovered : 1,
+    };
+  }
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: cust.email,
+    line_items: [lineItem],
+    success_url: opts.successUrl,
+    cancel_url: opts.cancelUrl,
+    metadata: {
+      kind: isBoarding ? "boarding" : "drop_in",
+      customer_id: cust.id,
+      dog_id: dog.id,
+      service_dates: booking.service_date,
+      source: opts.source,
+    },
+  });
+
+  await svc
+    .from("bookings")
+    .update({
+      payment_kind: "drop_in",
+      unit_price_cents: priceCents,
+      stripe_checkout_session_id: session.id,
+      payment_status: "unpaid",
+    })
+    .eq("id", booking.id);
+
+  return session.url ?? null;
 }

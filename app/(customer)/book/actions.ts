@@ -7,6 +7,7 @@ import { appUrl, getStripe } from "@/lib/stripe";
 import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
 import { addDays } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
+import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { isTimeInWindow } from "@/lib/hours";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
@@ -34,6 +35,14 @@ export async function createBooking(formData: FormData) {
   ) {
     redirect(
       "/book?error=Pick+a+drop-off+and+pickup+between+6+AM+and+6+PM",
+    );
+  }
+
+  const pastDue = await getPastDueUnpaid(userId);
+  if (pastDue.length > 0) {
+    redirect(
+      "/book?error=" +
+        encodeURIComponent("Please pay your past balance before booking again."),
     );
   }
 

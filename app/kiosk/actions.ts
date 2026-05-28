@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import type Stripe from "stripe";
 import { requireStaff } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
@@ -14,6 +13,7 @@ import {
   getBoardingRateCents,
 } from "@/lib/settings";
 import { isTimeInWindow } from "@/lib/hours";
+import { createBookingCheckoutSession } from "@/lib/bookings.server";
 import type {
   Booking,
   CheckIn,
@@ -24,14 +24,6 @@ import type {
 } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function daysBetween(start: string, end: string): number {
-  const [y1, m1, d1] = start.split("-").map(Number);
-  const [y2, m2, d2] = end.split("-").map(Number);
-  const a = Date.UTC(y1, m1 - 1, d1);
-  const b = Date.UTC(y2, m2 - 1, d2);
-  return Math.max(0, Math.round((b - a) / 86400000));
-}
 
 export async function kioskCheckIn(formData: FormData) {
   const { userId } = await requireStaff();
@@ -424,94 +416,14 @@ export async function kioskTakePayment(formData: FormData) {
   const booking_id = String(formData.get("booking_id") ?? "");
   if (!booking_id) redirect("/kiosk");
 
-  const svc = createServiceClient();
-  const { data: booking } = await svc
-    .from("bookings")
-    .select("*")
-    .eq("id", booking_id)
-    .maybeSingle<Booking>();
-  if (!booking) redirect("/kiosk");
-
-  const [{ data: dog }, { data: cust }, { data: dropInPkg }] = await Promise.all([
-    svc.from("dogs").select("*").eq("id", booking!.dog_id).maybeSingle<Dog>(),
-    svc.from("profiles").select("*").eq("id", booking!.customer_id).maybeSingle<Profile>(),
-    svc
-      .from("packages")
-      .select("*")
-      .eq("active", true)
-      .eq("days_included", 1)
-      .order("price_cents")
-      .limit(1)
-      .maybeSingle<Package>(),
-  ]);
-  if (!dog || !cust || !dropInPkg) redirect("/kiosk");
-
-  const isBoarding = booking!.service_kind === "boarding";
-  const nightsCovered = isBoarding
-    ? daysBetween(booking!.service_date, booking!.service_end_date)
-    : 1;
-  const priceCents =
-    booking!.unit_price_cents ??
-    (isBoarding ? BOARDING_STRIPE_PRICE_AMOUNT_CENTS : dropInPkg!.price_cents);
-
-  // Reuse the matching pre-made Stripe price when the saved booking rate
-  // still matches — otherwise fall back to ad-hoc price_data so the
-  // customer is charged what was originally quoted.
-  let lineItem: Stripe.Checkout.SessionCreateParams.LineItem;
-  if (isBoarding && priceCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS) {
-    lineItem = { price: BOARDING_STRIPE_PRICE_ID, quantity: nightsCovered };
-  } else if (
-    !isBoarding &&
-    dropInPkg!.stripe_price_id &&
-    priceCents === dropInPkg!.price_cents
-  ) {
-    lineItem = { price: dropInPkg!.stripe_price_id, quantity: 1 };
-  } else {
-    lineItem = {
-      price_data: {
-        currency: "usd" as const,
-        product_data: {
-          name: isBoarding
-            ? `Boarding (${dog!.name})`
-            : `Day care drop-in (${dog!.name})`,
-          description: isBoarding
-            ? `${nightsCovered} night${nightsCovered === 1 ? "" : "s"}: ${booking!.service_date} → ${booking!.service_end_date}`
-            : `Service date: ${booking!.service_date}`,
-        },
-        unit_amount: priceCents,
-      },
-      quantity: isBoarding ? nightsCovered : 1,
-    };
-  }
-
-  const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: cust!.email,
-    line_items: [lineItem],
-    success_url: `${appUrl()}/kiosk?paid=1`,
-    cancel_url: `${appUrl()}/kiosk?canceled=1`,
-    metadata: {
-      kind: isBoarding ? "boarding" : "drop_in",
-      customer_id: cust!.id,
-      dog_id: dog!.id,
-      service_dates: booking!.service_date,
-      source: "kiosk",
-    },
+  const url = await createBookingCheckoutSession({
+    bookingId: booking_id,
+    successUrl: `${appUrl()}/kiosk?paid=1`,
+    cancelUrl: `${appUrl()}/kiosk?canceled=1`,
+    source: "kiosk",
   });
-
-  await svc
-    .from("bookings")
-    .update({
-      payment_kind: "drop_in",
-      unit_price_cents: priceCents,
-      stripe_checkout_session_id: session.id,
-      payment_status: "unpaid",
-    })
-    .eq("id", booking_id);
-
-  if (!session.url) redirect("/kiosk?canceled=1");
-  redirect(session.url);
+  if (!url) redirect("/kiosk?canceled=1");
+  redirect(url);
 }
 
 /**

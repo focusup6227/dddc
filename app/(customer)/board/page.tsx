@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Dog, DogVaccination, VaccineType } from "@/lib/supabase/types";
 import { addDays, todayISO } from "@/lib/format";
 import { getBoardingRateCents, getFullDates } from "@/lib/settings";
+import { getPastDueUnpaid } from "@/lib/bookings.server";
 import {
   missingForBooking,
   summarizeCoverage,
@@ -48,6 +49,17 @@ export default async function BoardPage({
         title="Add your dog first"
         body="Tell us about your dog so we can book them in."
         cta={{ href: "/dogs/new", label: "Add a dog" }}
+      />
+    );
+  }
+
+  const pastDue = await getPastDueUnpaid(userId);
+  if (pastDue.length > 0) {
+    return (
+      <Notice
+        title="You have an unpaid balance"
+        body={`Please pay for ${pastDue.length} past booking${pastDue.length === 1 ? "" : "s"} before booking new dates.`}
+        cta={{ href: "/bookings", label: "View bookings" }}
       />
     );
   }
