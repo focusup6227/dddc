@@ -8,6 +8,7 @@ import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
 import { addDays } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
+import { getBlackoutDates } from "@/lib/blackouts.server";
 import { isTimeInWindow } from "@/lib/hours";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
@@ -78,6 +79,19 @@ export async function createBooking(formData: FormData) {
     const list = fullRequested.join(", ");
     redirect(
       `/book?error=${encodeURIComponent(`These days are full, please pick another: ${list}`)}`,
+    );
+  }
+
+  // Blackout check: refuse any blacked-out day for daycare.
+  const blackouts = await getBlackoutDates(
+    dates[0],
+    dates[dates.length - 1],
+    "daycare",
+  );
+  const blocked = dates.filter((d) => blackouts.has(d));
+  if (blocked.length > 0) {
+    redirect(
+      `/book?error=${encodeURIComponent(`We're closed on these days: ${blocked.join(", ")}`)}`,
     );
   }
 

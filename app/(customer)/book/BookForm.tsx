@@ -24,6 +24,8 @@ export function BookForm({
   vaccineLabels,
   events,
   eventDates,
+  blackoutDates,
+  blackoutReasonByDate,
 }: {
   dogs: Dog[];
   daysRemaining: number;
@@ -35,6 +37,8 @@ export function BookForm({
   vaccineLabels: Record<VaccineType, string>;
   events: Event[];
   eventDates: string[];
+  blackoutDates: string[];
+  blackoutReasonByDate: Record<string, string>;
 }) {
   const firstReady = dogs.find((d) => !vaccineBlocks[d.id]?.length);
   const [dogId, setDogId] = useState(firstReady?.id ?? dogs[0]?.id ?? "");
@@ -61,11 +65,12 @@ export function BookForm({
 
   const full = useMemo(() => new Set(fullDates), [fullDates]);
   const eventSet = useMemo(() => new Set(eventDates), [eventDates]);
+  const blackoutSet = useMemo(() => new Set(blackoutDates), [blackoutDates]);
 
   const days = useMemo(() => generateDays(startDate, 42), [startDate]);
 
   function toggle(date: string) {
-    if (taken.has(date) || full.has(date)) return;
+    if (taken.has(date) || full.has(date) || blackoutSet.has(date)) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(date)) next.delete(date);
@@ -162,7 +167,11 @@ export function BookForm({
             const isSelected = selected.has(d.iso);
             const isPast = d.iso < startDate;
             const isEvent = eventSet.has(d.iso);
-            const disabled = isTaken || isFull || isPast;
+            const isBlackout = blackoutSet.has(d.iso);
+            const disabled = isTaken || isFull || isPast || isBlackout;
+            const closedReason = isBlackout
+              ? blackoutReasonByDate[d.iso] ?? "Closed"
+              : null;
             return (
               <button
                 key={d.iso}
@@ -175,16 +184,26 @@ export function BookForm({
                     ? "border-brand-600 bg-brand-600 text-white"
                     : isTaken
                       ? "border-stone-200 bg-stone-100 text-stone-400 line-through"
-                      : isFull
-                        ? "border-red-200 bg-red-50 text-red-400"
-                        : isPast
-                          ? "border-stone-100 text-stone-300"
-                          : "border-stone-200 bg-white text-stone-800 hover:border-brand-400 hover:bg-brand-50")
+                      : isBlackout
+                        ? "border-stone-300 bg-stone-100 bg-[repeating-linear-gradient(45deg,_rgba(120,113,108,0.18)_0,_rgba(120,113,108,0.18)_3px,_transparent_3px,_transparent_7px)] text-stone-400"
+                        : isFull
+                          ? "border-red-200 bg-red-50 text-red-400"
+                          : isPast
+                            ? "border-stone-100 text-stone-300"
+                            : "border-stone-200 bg-white text-stone-800 hover:border-brand-400 hover:bg-brand-50")
                 }
-                title={isFull ? `${d.iso} · full` : isEvent ? `${d.iso} · event` : d.iso}
+                title={
+                  closedReason
+                    ? `${d.iso} · ${closedReason}`
+                    : isFull
+                      ? `${d.iso} · full`
+                      : isEvent
+                        ? `${d.iso} · event`
+                        : d.iso
+                }
               >
                 {d.day}
-                {isEvent && (
+                {isEvent && !isBlackout && (
                   <span
                     aria-hidden
                     className={

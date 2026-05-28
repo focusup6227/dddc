@@ -12,6 +12,7 @@ import { addDays, formatMoney, todayISO } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { getEventsInRange } from "@/lib/events.server";
+import { getBlackoutsInRange, expandBlackoutDates } from "@/lib/blackouts.server";
 import {
   missingForBooking,
   summarizeCoverage,
@@ -152,16 +153,36 @@ export default async function BookPage({
   }
   const fullDates = Array.from(fullDatesSet);
 
-  // Events overlapping the visible window (today → today+42, matching the
-  // BookForm calendar's 6-week grid).
+  // Events + blackouts overlapping the visible window (today → today+42,
+  // matching the BookForm calendar's 6-week grid).
   const calendarEnd = addDays(startDate, 42);
-  const events = await getEventsInRange(startDate, calendarEnd);
+  const [events, blackouts] = await Promise.all([
+    getEventsInRange(startDate, calendarEnd),
+    getBlackoutsInRange(startDate, calendarEnd),
+  ]);
   const eventDates = new Set<string>();
   for (const ev of events) {
     let cur = ev.start_date > startDate ? ev.start_date : startDate;
     const end = ev.end_date < calendarEnd ? ev.end_date : calendarEnd;
     while (cur <= end) {
       eventDates.add(cur);
+      cur = addDays(cur, 1);
+    }
+  }
+  const blackoutDates = expandBlackoutDates(
+    blackouts.filter((b) => b.blocks_daycare),
+    startDate,
+    calendarEnd,
+  );
+  const blackoutReasonByDate: Record<string, string> = {};
+  for (const b of blackouts) {
+    if (!b.blocks_daycare) continue;
+    let cur = b.start_date > startDate ? b.start_date : startDate;
+    const end = b.end_date < calendarEnd ? b.end_date : calendarEnd;
+    while (cur <= end) {
+      if (!blackoutReasonByDate[cur]) {
+        blackoutReasonByDate[cur] = b.reason ?? "Closed";
+      }
       cur = addDays(cur, 1);
     }
   }
@@ -219,6 +240,8 @@ export default async function BookPage({
         vaccineLabels={VACCINE_LABEL}
         events={events}
         eventDates={Array.from(eventDates)}
+        blackoutDates={Array.from(blackoutDates)}
+        blackoutReasonByDate={blackoutReasonByDate}
       />
     </div>
   );

@@ -7,13 +7,13 @@ import { MobileNav } from "@/components/MobileNav";
 
 const NAV: { href: string; label: string; badgeKey?: "vaccines" }[] = [
   { href: "/staff", label: "Today" },
+  { href: "/staff/calendar", label: "Calendar" },
   { href: "/staff/bookings", label: "Bookings" },
   { href: "/staff/customers", label: "Customers" },
   { href: "/staff/dogs", label: "Dogs" },
   { href: "/staff/vaccines", label: "Vaccines", badgeKey: "vaccines" },
   { href: "/staff/report-cards", label: "Report cards" },
   { href: "/staff/chores", label: "Chores" },
-  { href: "/staff/events", label: "Events" },
   { href: "/staff/packages", label: "Packages" },
   { href: "/staff/settings", label: "Settings" },
   { href: "/kiosk", label: "Kiosk" },

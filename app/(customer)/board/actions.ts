@@ -13,6 +13,7 @@ import {
 } from "@/lib/settings";
 import { isTimeInWindow } from "@/lib/hours";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
+import { getBlackoutDates } from "@/lib/blackouts.server";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import type { Dog } from "@/lib/supabase/types";
@@ -85,6 +86,19 @@ export async function createBoarding(formData: FormData) {
   if (overlapping.length > 0) {
     redirect(
       `/board?error=${encodeURIComponent(`These nights are full: ${overlapping.join(", ")}`)}`,
+    );
+  }
+
+  // Blackout check.
+  const blackouts = await getBlackoutDates(
+    nights[0],
+    nights[nights.length - 1],
+    "boarding",
+  );
+  const closed = nights.filter((n) => blackouts.has(n));
+  if (closed.length > 0) {
+    redirect(
+      `/board?error=${encodeURIComponent(`We're closed on these nights: ${closed.join(", ")}`)}`,
     );
   }
 

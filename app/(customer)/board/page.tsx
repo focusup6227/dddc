@@ -6,6 +6,7 @@ import { addDays, todayISO } from "@/lib/format";
 import { getBoardingRateCents, getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { getEventsInRange } from "@/lib/events.server";
+import { getBlackoutsInRange, expandBlackoutDates } from "@/lib/blackouts.server";
 import {
   missingForBooking,
   summarizeCoverage,
@@ -72,7 +73,17 @@ export default async function BoardPage({
   for (let i = 0; i <= 60; i++) datesInRange.push(addDays(startDate, i));
   const endDate = datesInRange[datesInRange.length - 1];
   const fullNights = Array.from(await getFullDates(datesInRange, "boarding"));
-  const events = await getEventsInRange(startDate, endDate);
+  const [events, blackouts] = await Promise.all([
+    getEventsInRange(startDate, endDate),
+    getBlackoutsInRange(startDate, endDate),
+  ]);
+  const blackoutNights = Array.from(
+    expandBlackoutDates(
+      blackouts.filter((b) => b.blocks_boarding),
+      startDate,
+      endDate,
+    ),
+  );
 
   const dogIds = dogs.map((d) => d.id);
   const { data: vaxRows } = dogIds.length
@@ -128,6 +139,7 @@ export default async function BoardPage({
         vaccineBlocks={vaccineBlocks}
         vaccineLabels={VACCINE_LABEL}
         events={events}
+        blackoutNights={blackoutNights}
       />
     </div>
   );

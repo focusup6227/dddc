@@ -196,6 +196,16 @@ export interface Event {
   created_at: string;
 }
 
+export interface Blackout {
+  id: string;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+  blocks_daycare: boolean;
+  blocks_boarding: boolean;
+  created_at: string;
+}
+
 export type VaccineType = "rabies" | "dhpp" | "bordetella";
 export type VaccinationStatus = "pending" | "verified" | "rejected";
 

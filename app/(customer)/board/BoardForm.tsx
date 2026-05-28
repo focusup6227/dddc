@@ -21,6 +21,7 @@ export function BoardForm({
   vaccineBlocks,
   vaccineLabels,
   events,
+  blackoutNights,
 }: {
   dogs: Dog[];
   rateCents: number;
@@ -29,6 +30,7 @@ export function BoardForm({
   vaccineBlocks: Record<string, VaccineType[]>;
   vaccineLabels: Record<VaccineType, string>;
   events: Event[];
+  blackoutNights: string[];
 }) {
   const firstReady = dogs.find((d) => !vaccineBlocks[d.id]?.length);
   const [dogId, setDogId] = useState(firstReady?.id ?? dogs[0]?.id ?? "");
@@ -45,6 +47,10 @@ export function BoardForm({
   const dogBlocked = blockedMissing.length > 0;
 
   const fullSet = useMemo(() => new Set(fullNights), [fullNights]);
+  const blackoutSet = useMemo(
+    () => new Set(blackoutNights),
+    [blackoutNights],
+  );
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
   const eventsInStay = useMemo(() => {
@@ -57,12 +63,22 @@ export function BoardForm({
     () => nights.filter((n) => fullSet.has(n)),
     [nights, fullSet],
   );
+  const overlappingBlackouts = useMemo(
+    () => nights.filter((n) => blackoutSet.has(n)),
+    [nights, blackoutSet],
+  );
 
   const totalCents = nights.length * rateCents;
   const validRange = nights.length > 0;
   const hasFullNights = overlappingFull.length > 0;
+  const hasBlackouts = overlappingBlackouts.length > 0;
   const canSubmit =
-    !!dogId && validRange && !hasFullNights && !dogBlocked && timesValid;
+    !!dogId &&
+    validRange &&
+    !hasFullNights &&
+    !hasBlackouts &&
+    !dogBlocked &&
+    timesValid;
 
   return (
     <form action={createBoarding} className="mt-6 space-y-6">
@@ -151,6 +167,13 @@ export function BoardForm({
             />
           </label>
         </div>
+        {hasBlackouts && (
+          <div className="mt-3 rounded-md border border-stone-300 bg-stone-100 px-3 py-2 text-sm text-stone-800">
+            We&apos;re closed on{" "}
+            {overlappingBlackouts.map((n) => formatDateShort(n)).join(", ")}.
+            Please pick a different range.
+          </div>
+        )}
         {eventsInStay.length > 0 && (
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Your stay overlaps:{" "}
