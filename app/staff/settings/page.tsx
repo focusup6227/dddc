@@ -5,7 +5,14 @@ import {
   getMaxDogsPerDay,
   getMaxDogsPerNight,
 } from "@/lib/settings";
+import { StaffSubNav } from "@/components/StaffSubNav";
 import { saveSettings } from "./actions";
+
+const SUBNAV = [
+  { href: "/staff/settings", label: "General", active: true },
+  { href: "/staff/packages", label: "Packages" },
+  { href: "/staff/events", label: "Events" },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +36,7 @@ export default async function StaffSettingsPage({
 
   return (
     <div className="max-w-xl space-y-6">
+      <StaffSubNav items={SUBNAV} />
       <h1 className="text-2xl font-bold text-stone-900">Settings</h1>
 
       {params.saved && (

@@ -2,7 +2,14 @@ import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Event } from "@/lib/supabase/types";
 import { formatDateShort, todayISO } from "@/lib/format";
+import { StaffSubNav } from "@/components/StaffSubNav";
 import { createEvent, deleteEvent, updateEvent } from "./actions";
+
+const SUBNAV = [
+  { href: "/staff/settings", label: "General" },
+  { href: "/staff/packages", label: "Packages" },
+  { href: "/staff/events", label: "Events", active: true },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +48,7 @@ export default async function StaffEventsPage({
 
   return (
     <div className="space-y-8">
+      <StaffSubNav items={SUBNAV} />
       <header>
         <h1 className="text-2xl font-bold text-stone-900">Events</h1>
         <p className="text-stone-600">

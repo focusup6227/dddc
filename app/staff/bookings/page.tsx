@@ -11,7 +11,13 @@ import type {
 import { addDays, formatDateShort, formatMoney, todayISO } from "@/lib/format";
 import { EventList } from "@/components/EventList";
 import { getEventsInRange, indexEventsByDate } from "@/lib/events.server";
+import { StaffSubNav } from "@/components/StaffSubNav";
 import StaffCancelButton from "./StaffCancelButton";
+
+const SUBNAV = [
+  { href: "/staff/calendar", label: "Calendar" },
+  { href: "/staff/bookings", label: "All bookings", active: true },
+];
 
 type View = "list" | "calendar";
 
@@ -75,6 +81,7 @@ export default async function StaffBookingsPage({
 
   return (
     <div className="space-y-6">
+      <StaffSubNav items={SUBNAV} />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-2xl font-bold text-stone-900">Bookings</h1>
         <ViewToggle view={view} monthAnchor={monthAnchor} from={from} to={to} />

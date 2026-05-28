@@ -117,6 +117,20 @@ export default async function CustomerDashboard() {
         <p className="text-stone-600">Here&apos;s what&apos;s happening.</p>
       </header>
 
+      {profile.account_credit_cents > 0 && (
+        <section className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-900">
+            You have {formatMoney(profile.account_credit_cents)} in account credit
+          </p>
+          <p className="text-xs text-emerald-800">
+            Applied automatically at checkout.{" "}
+            <Link href="/account" className="font-semibold underline">
+              See referrals
+            </Link>
+          </p>
+        </section>
+      )}
+
       {unpaid.length > 0 && (
         <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

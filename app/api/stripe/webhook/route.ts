@@ -117,9 +117,25 @@ async function handleCheckoutSucceeded(
         stripe_payment_intent_id: paymentIntentId,
       })
       .eq("stripe_checkout_session_id", session.id)
-      .select("id, customer_id, dog_id, service_date, service_end_date, unit_price_cents");
+      .select(
+        "id, customer_id, dog_id, service_date, service_end_date, unit_price_cents, credit_applied_cents",
+      );
     const bookings = bookingRows ?? [];
     if (bookings.length === 0) return;
+
+    // Burn down account credit for whatever this session applied. Floor at
+    // zero so concurrent sessions can't drive the balance negative.
+    const customerCreditUsed = bookings.reduce(
+      (sum, b) => sum + (b.credit_applied_cents ?? 0),
+      0,
+    );
+    if (customerCreditUsed > 0) {
+      await deductAccountCredit(svc, bookings[0].customer_id, customerCreditUsed);
+    }
+
+    // First paid booking flips a pending referral into credited and gives
+    // both parties their $10.
+    await creditReferralIfFirstPaid(svc, bookings[0].customer_id);
 
     const customerId = bookings[0].customer_id;
     const dogId = bookings[0].dog_id;
@@ -166,6 +182,72 @@ async function handleCheckoutSucceeded(
     });
     return;
   }
+}
+
+async function deductAccountCredit(
+  svc: Svc,
+  customerId: string,
+  cents: number,
+) {
+  const { data } = await svc
+    .from("profiles")
+    .select("account_credit_cents")
+    .eq("id", customerId)
+    .maybeSingle<{ account_credit_cents: number }>();
+  const current = data?.account_credit_cents ?? 0;
+  const next = Math.max(0, current - cents);
+  if (next !== current) {
+    await svc
+      .from("profiles")
+      .update({ account_credit_cents: next })
+      .eq("id", customerId);
+  }
+}
+
+async function creditReferralIfFirstPaid(svc: Svc, customerId: string) {
+  const { data: referral } = await svc
+    .from("referrals")
+    .select("id, referrer_id, referred_id, status, credit_cents")
+    .eq("referred_id", customerId)
+    .eq("status", "pending")
+    .maybeSingle<{
+      id: string;
+      referrer_id: string;
+      referred_id: string;
+      status: string;
+      credit_cents: number;
+    }>();
+  if (!referral) return;
+
+  // Only credit on the FIRST paid booking — count paid bookings (the row we
+  // just updated is included). If there's more than one paid, the referral
+  // was already missed and we leave it pending so a staff member can decide.
+  const { count } = await svc
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("customer_id", customerId)
+    .eq("payment_status", "paid");
+  if ((count ?? 0) !== 1) return;
+
+  const cents = referral.credit_cents ?? 1000;
+  const ids = [referral.referrer_id, referral.referred_id];
+  for (const id of ids) {
+    const { data } = await svc
+      .from("profiles")
+      .select("account_credit_cents")
+      .eq("id", id)
+      .maybeSingle<{ account_credit_cents: number }>();
+    const current = data?.account_credit_cents ?? 0;
+    await svc
+      .from("profiles")
+      .update({ account_credit_cents: current + cents })
+      .eq("id", id);
+  }
+
+  await svc
+    .from("referrals")
+    .update({ status: "credited", credited_at: new Date().toISOString() })
+    .eq("id", referral.id);
 }
 
 async function handleCheckoutFailed(

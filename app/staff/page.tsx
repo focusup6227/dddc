@@ -5,8 +5,14 @@ import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
 import { DogAvatar } from "@/components/DogAvatar";
+import { StaffSubNav } from "@/components/StaffSubNav";
 import { getPendingVaccineCount } from "@/lib/vaccines.server";
 import { checkInBooking, checkOutBooking } from "./actions";
+
+const SUBNAV = [
+  { href: "/staff", label: "Today", active: true },
+  { href: "/staff/overview", label: "Numbers" },
+];
 
 export default async function StaffTodayPage() {
   await requireStaff();
@@ -51,6 +57,7 @@ export default async function StaffTodayPage() {
 
   return (
     <div className="space-y-8">
+      <StaffSubNav items={SUBNAV} />
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Today</h1>

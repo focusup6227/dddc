@@ -7,6 +7,7 @@ import type {
   Dog,
   DogNote,
   DogVaccination,
+  Incident,
   Profile,
 } from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
@@ -16,6 +17,10 @@ import {
   summarizeCoverage,
   type VaccineCoverage,
 } from "@/lib/vaccines";
+import {
+  INCIDENT_KIND_LABEL,
+  INCIDENT_SEVERITY_LABEL,
+} from "@/lib/incidents";
 import { addDogNote, updateStaffNotes } from "../../actions";
 
 export default async function StaffDogDetailPage({
@@ -34,7 +39,7 @@ export default async function StaffDogDetailPage({
     .maybeSingle<Dog>();
   if (!dog) notFound();
 
-  const [ownerRes, notesRes, bookingsRes, vaxRes] = await Promise.all([
+  const [ownerRes, notesRes, bookingsRes, vaxRes, incidentRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", dog.owner_id).maybeSingle<Profile>(),
     supabase
       .from("dog_notes")
@@ -49,11 +54,18 @@ export default async function StaffDogDetailPage({
       .order("service_date", { ascending: false })
       .limit(20),
     supabase.from("dog_vaccinations").select("*").eq("dog_id", id),
+    supabase
+      .from("incidents")
+      .select("*")
+      .eq("dog_id", id)
+      .order("occurred_on", { ascending: false })
+      .limit(10),
   ]);
   const owner = ownerRes.data ?? null;
   const notes = (notesRes.data ?? []) as DogNote[];
   const bookings = (bookingsRes.data ?? []) as Booking[];
   const coverage = summarizeCoverage((vaxRes.data ?? []) as DogVaccination[]);
+  const incidents = (incidentRes.data ?? []) as Incident[];
 
   return (
     <div className="space-y-8">
@@ -165,6 +177,45 @@ export default async function StaffDogDetailPage({
               <li key={n.id} className="px-4 py-3">
                 <p className="text-xs text-stone-500">{formatDate(n.created_at)}</p>
                 <p className="mt-1 whitespace-pre-wrap text-stone-800">{n.note}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold text-stone-900">Incidents</h2>
+          <Link
+            href={`/staff/incidents/new?dog=${dog.id}`}
+            className="text-sm font-medium text-brand-700 hover:underline"
+          >
+            Log incident →
+          </Link>
+        </div>
+        {incidents.length === 0 ? (
+          <p className="mt-2 text-stone-600">None on file.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+            {incidents.map((i) => (
+              <li key={i.id} className="px-4 py-3 text-sm">
+                <Link
+                  href={`/staff/incidents/${i.id}`}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-stone-900">
+                      {INCIDENT_KIND_LABEL[i.kind]} ·{" "}
+                      <span className="text-stone-500">
+                        {formatDateShort(i.occurred_on)}
+                      </span>
+                    </p>
+                    <p className="line-clamp-1 text-stone-600">{i.description}</p>
+                  </div>
+                  <span className="shrink-0 text-xs font-semibold text-stone-500">
+                    {INCIDENT_SEVERITY_LABEL[i.severity]}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

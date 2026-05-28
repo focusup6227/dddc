@@ -28,6 +28,7 @@ export default async function CustomerLayout({
     { href: "/book", label: "Book" },
     { href: "/packages", label: "Packages" },
     { href: "/bookings", label: "Bookings" },
+    { href: "/account", label: "Account" },
   ];
 
   return (

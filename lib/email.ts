@@ -454,6 +454,46 @@ export async function sendBookingReminder(args: {
   });
 }
 
+// --- Vaccine expiring soon ------------------------------------------------
+
+export async function sendVaccineExpiryReminder(args: {
+  to: string;
+  customerName: string;
+  dogName: string;
+  vaccineLabels: string[]; // e.g. ["Rabies", "Bordetella"]
+  expiresOn: string; // ISO YYYY-MM-DD
+}) {
+  const { to, customerName, dogName, vaccineLabels, expiresOn } = args;
+  const list =
+    vaccineLabels.length === 1
+      ? vaccineLabels[0]
+      : vaccineLabels.slice(0, -1).join(", ") +
+        " and " +
+        vaccineLabels[vaccineLabels.length - 1];
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi ${escape(customerName)},</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">A quick heads-up — <strong style="color:${COLOR.text};">${escape(dogName)}</strong>'s <strong style="color:${COLOR.text};">${escape(list)}</strong> vaccine record${vaccineLabels.length === 1 ? "" : "s"} expire${vaccineLabels.length === 1 ? "s" : ""} on <strong style="color:${COLOR.text};">${escape(formatDateShort(expiresOn))}</strong>.</p>
+    ${detailCard([
+      { label: "Dog", value: escape(dogName) },
+      { label: "Vaccine" + (vaccineLabels.length === 1 ? "" : "s"), value: escape(list) },
+      { label: "Expires", value: escape(formatDateShort(expiresOn)) },
+    ])}
+    <p style="margin:16px 0 4px;font-family:${FONT};font-size:15px;line-height:1.55;color:${COLOR.textMuted};">After it expires we can't accept ${escape(dogName)} for daycare or boarding until we have a current record. Upload a new one whenever you're at the vet.</p>
+    ${button(`${appUrl()}/dogs`, "Upload a new record")}
+  `;
+
+  await send({
+    to,
+    subject: `Heads-up: ${dogName}'s vaccine is expiring soon`,
+    html: shell({
+      preheader: `${dogName}'s ${list} expires ${formatDateShort(expiresOn)}.`,
+      heading: "Vaccine expiring soon",
+      body,
+    }),
+  });
+}
+
 // --- Report card ready ----------------------------------------------------
 
 export async function sendReportCardReady(args: {

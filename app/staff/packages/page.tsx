@@ -2,7 +2,14 @@ import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Package } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
+import { StaffSubNav } from "@/components/StaffSubNav";
 import { savePackage, togglePackage } from "./actions";
+
+const SUBNAV = [
+  { href: "/staff/settings", label: "General" },
+  { href: "/staff/packages", label: "Packages", active: true },
+  { href: "/staff/events", label: "Events" },
+];
 
 export default async function StaffPackagesPage() {
   await requireStaff();
@@ -12,6 +19,7 @@ export default async function StaffPackagesPage() {
 
   return (
     <div className="space-y-8">
+      <StaffSubNav items={SUBNAV} />
       <h1 className="text-2xl font-bold text-stone-900">Packages</h1>
 
       <section className="card">

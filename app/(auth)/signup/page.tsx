@@ -6,13 +6,14 @@ import { signup } from "./actions";
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ref?: string }>;
 }) {
   const session = await getSessionProfile();
   if (session) {
     redirect(session.profile.role === "staff" ? "/staff" : "/dashboard");
   }
   const params = await searchParams;
+  const refCode = params.ref?.trim().toUpperCase() ?? "";
 
   return (
     <main className="mx-auto max-w-md px-6 py-16">
@@ -21,7 +22,15 @@ export default async function SignupPage({
         Tell us a bit about you. You&apos;ll add your dog(s) on the next step.
       </p>
 
+      {refCode && (
+        <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          You&apos;ll get <strong>$10 off</strong> your first booking with code{" "}
+          <code className="font-mono">{refCode}</code>.
+        </div>
+      )}
+
       <form action={signup} className="mt-8 space-y-4">
+        {refCode && <input type="hidden" name="ref" value={refCode} />}
         <div>
           <label htmlFor="full_name" className="label">Full name</label>
           <input id="full_name" name="full_name" required className="input" />

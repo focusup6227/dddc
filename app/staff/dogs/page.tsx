@@ -3,6 +3,8 @@ import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dog, Profile } from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
+import { StaffSubNav } from "@/components/StaffSubNav";
+import { getPendingVaccineCount } from "@/lib/vaccines.server";
 
 export default async function StaffDogsPage({
   searchParams,
@@ -29,8 +31,16 @@ export default async function StaffDogsPage({
     : { data: [] as Profile[] };
   const owners = (ownersData ?? []) as Profile[];
 
+  const pendingVax = await getPendingVaccineCount();
+  const subnav = [
+    { href: "/staff/dogs", label: "All dogs", active: true },
+    { href: "/staff/vaccines", label: "Vaccines", badge: pendingVax },
+    { href: "/staff/incidents", label: "Incidents" },
+  ];
+
   return (
-    <div>
+    <div className="space-y-6">
+      <StaffSubNav items={subnav} />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-2xl font-bold text-stone-900">Dogs</h1>
         <form className="flex w-full items-end gap-2 sm:w-auto">

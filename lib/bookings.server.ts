@@ -2,7 +2,12 @@ import "server-only";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
-import { sendBookingCancellation } from "@/lib/email";
+import {
+  sendBookingCancellation,
+  sendBookingConfirmation,
+  sendPaymentReceipt,
+} from "@/lib/email";
+import { addDays } from "@/lib/format";
 import {
   BOARDING_STRIPE_PRICE_AMOUNT_CENTS,
   BOARDING_STRIPE_PRICE_ID,
@@ -289,34 +294,98 @@ export async function createBookingCheckoutSession(opts: {
   const priceCents =
     booking.unit_price_cents ??
     (isBoarding ? BOARDING_STRIPE_PRICE_AMOUNT_CENTS : dropInPkg.price_cents);
+  const totalCents = priceCents * nightsCovered;
+
+  // Apply any account credit the customer has up front. If credit fully
+  // covers the booking we skip Stripe entirely; otherwise we discount the
+  // line item and let the webhook burn the credit down on payment success.
+  const creditToApply = Math.min(cust.account_credit_cents ?? 0, totalCents);
+  const chargeAfterCredit = totalCents - creditToApply;
+
+  if (chargeAfterCredit === 0 && creditToApply > 0) {
+    await svc
+      .from("bookings")
+      .update({
+        payment_kind: "drop_in",
+        unit_price_cents: priceCents,
+        payment_status: "paid",
+        credit_applied_cents: creditToApply,
+        stripe_checkout_session_id: null,
+      })
+      .eq("id", booking.id);
+    await deductAccountCredit(cust.id, creditToApply);
+
+    const dates: string[] = [];
+    let cur = booking.service_date;
+    while (cur < booking.service_end_date) {
+      dates.push(cur);
+      cur = addDays(cur, 1);
+    }
+    await sendBookingConfirmation({
+      to: cust.email,
+      customerName: cust.full_name || cust.email,
+      dogName: dog.name,
+      dates,
+      paidByPackageCount: 0,
+      dropInCount: dates.length,
+      dropInTotalCents: totalCents,
+    });
+    await sendPaymentReceipt({
+      to: cust.email,
+      customerName: cust.full_name || cust.email,
+      description: `${isBoarding ? "Boarding" : "Drop-in"} for ${dog.name} × ${dates.length} ${isBoarding ? "night" : "day"}${dates.length === 1 ? "" : "s"} (account credit)`,
+      amountCents: totalCents,
+      paidAt: new Date(),
+    });
+    return opts.successUrl;
+  }
+
+  // Stripe rejects unit_amount < 50¢ on most accounts. If a partial credit
+  // would push us under that, round up so we still collect a token charge.
+  const adjustedUnitAmount = Math.max(
+    50,
+    Math.ceil(chargeAfterCredit / nightsCovered),
+  );
+  const effectiveCreditApplied =
+    creditToApply > 0
+      ? Math.max(0, totalCents - adjustedUnitAmount * nightsCovered)
+      : 0;
 
   // Reuse the matching pre-made Stripe price when the saved booking rate
-  // still matches — otherwise fall back to ad-hoc price_data so the
-  // customer is charged what was originally quoted.
+  // still matches AND no credit is being applied — otherwise fall back to
+  // ad-hoc price_data so we can encode the discounted amount.
   let lineItem: Stripe.Checkout.SessionCreateParams.LineItem;
-  if (isBoarding && priceCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS) {
+  if (
+    effectiveCreditApplied === 0 &&
+    isBoarding &&
+    priceCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS
+  ) {
     lineItem = { price: BOARDING_STRIPE_PRICE_ID, quantity: nightsCovered };
   } else if (
+    effectiveCreditApplied === 0 &&
     !isBoarding &&
     dropInPkg.stripe_price_id &&
     priceCents === dropInPkg.price_cents
   ) {
     lineItem = { price: dropInPkg.stripe_price_id, quantity: 1 };
   } else {
+    const baseName = isBoarding
+      ? `Boarding (${dog.name})`
+      : `Day care drop-in (${dog.name})`;
+    const baseDesc = isBoarding
+      ? `${nightsCovered} night${nightsCovered === 1 ? "" : "s"}: ${booking.service_date} → ${booking.service_end_date}`
+      : `Service date: ${booking.service_date}`;
+    const description =
+      effectiveCreditApplied > 0
+        ? `${baseDesc} · $${(effectiveCreditApplied / 100).toFixed(2)} account credit applied`
+        : baseDesc;
     lineItem = {
       price_data: {
         currency: "usd" as const,
-        product_data: {
-          name: isBoarding
-            ? `Boarding (${dog.name})`
-            : `Day care drop-in (${dog.name})`,
-          description: isBoarding
-            ? `${nightsCovered} night${nightsCovered === 1 ? "" : "s"}: ${booking.service_date} → ${booking.service_end_date}`
-            : `Service date: ${booking.service_date}`,
-        },
-        unit_amount: priceCents,
+        product_data: { name: baseName, description },
+        unit_amount: adjustedUnitAmount,
       },
-      quantity: isBoarding ? nightsCovered : 1,
+      quantity: nightsCovered,
     };
   }
 
@@ -343,8 +412,27 @@ export async function createBookingCheckoutSession(opts: {
       unit_price_cents: priceCents,
       stripe_checkout_session_id: session.id,
       payment_status: "unpaid",
+      credit_applied_cents: effectiveCreditApplied,
     })
     .eq("id", booking.id);
 
   return session.url ?? null;
+}
+
+async function deductAccountCredit(customerId: string, cents: number) {
+  if (cents <= 0) return;
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("profiles")
+    .select("account_credit_cents")
+    .eq("id", customerId)
+    .maybeSingle<{ account_credit_cents: number }>();
+  const current = data?.account_credit_cents ?? 0;
+  const next = Math.max(0, current - cents);
+  if (next !== current) {
+    await svc
+      .from("profiles")
+      .update({ account_credit_cents: next })
+      .eq("id", customerId);
+  }
 }

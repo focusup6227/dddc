@@ -10,7 +10,13 @@ import type {
 import { todayISO } from "@/lib/format";
 import { getEventsInRange, indexEventsByDate } from "@/lib/events.server";
 import { getBlackoutsInRange, indexBlackoutsByDate } from "@/lib/blackouts.server";
+import { StaffSubNav } from "@/components/StaffSubNav";
 import { CalendarClient } from "./CalendarClient";
+
+const SUBNAV = [
+  { href: "/staff/calendar", label: "Calendar", active: true },
+  { href: "/staff/bookings", label: "All bookings" },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +83,7 @@ export default async function StaffCalendarPage({
 
   return (
     <div className="space-y-6">
+      <StaffSubNav items={SUBNAV} />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Calendar</h1>

@@ -1,13 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function signup(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const full_name = String(formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const ref = String(formData.get("ref") ?? "").trim().toUpperCase();
 
   if (password.length < 8) {
     redirect(`/signup?error=${encodeURIComponent("Password must be at least 8 characters.")}`);
@@ -26,14 +27,28 @@ export async function signup(formData: FormData) {
     redirect(`/signup?error=${encodeURIComponent(signUpError?.message ?? "Sign up failed.")}`);
   }
 
-  // Profile row was auto-created by the on_auth_user_created trigger.
-  // Update phone (and refresh full_name in case it didn't pick up).
   await supabase
     .from("profiles")
     .update({ phone, full_name })
     .eq("id", data.user.id);
 
-  // If email confirmations are enabled, the user won't be signed in yet.
-  // The auth helpers will route accordingly; just send them to the next step.
+  if (ref) {
+    // RLS would block the new user from inserting a row whose referrer_id is
+    // someone else, so use the service client. Silently ignore unknown codes.
+    const svc = createServiceClient();
+    const { data: referrer } = await svc
+      .from("profiles")
+      .select("id")
+      .eq("referral_code", ref)
+      .maybeSingle<{ id: string }>();
+    if (referrer && referrer.id !== data.user.id) {
+      await svc.from("referrals").insert({
+        referrer_id: referrer.id,
+        referred_id: data.user.id,
+        status: "pending",
+      });
+    }
+  }
+
   redirect("/waiver");
 }

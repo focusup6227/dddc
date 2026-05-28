@@ -11,6 +11,8 @@ import {
   VACCINE_BUCKET,
   VACCINE_LABEL,
 } from "@/lib/vaccines";
+import { StaffSubNav } from "@/components/StaffSubNav";
+import { getPendingVaccineCount } from "@/lib/vaccines.server";
 import { rejectVaccine, verifyVaccine } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -82,8 +84,16 @@ export default async function StaffVaccinesPage({
     return { ...v, dog, owner, signedUrl: signedUrls[i] };
   });
 
+  const pendingVax = await getPendingVaccineCount();
+  const subnav = [
+    { href: "/staff/dogs", label: "All dogs" },
+    { href: "/staff/vaccines", label: "Vaccines", active: true, badge: pendingVax },
+    { href: "/staff/incidents", label: "Incidents" },
+  ];
+
   return (
     <div className="space-y-6">
+      <StaffSubNav items={subnav} />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Vaccine records</h1>

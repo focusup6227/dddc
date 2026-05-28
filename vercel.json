@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/booking-reminders",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/vaccine-expiry-reminders",
+      "schedule": "0 15 * * *"
     }
   ]
 }

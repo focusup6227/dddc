@@ -21,6 +21,8 @@ export interface Profile {
   address: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  referral_code: string | null;
+  account_credit_cents: number;
   created_at: string;
   updated_at: string;
 }
@@ -114,6 +116,7 @@ export interface Booking {
   stripe_payment_intent_id: string | null;
   stripe_checkout_session_id: string | null;
   payment_status: PaymentStatus;
+  credit_applied_cents: number;
   notes: string | null;
   canceled_at: string | null;
   canceled_by: string | null;
@@ -234,4 +237,48 @@ export interface DogVaccination {
   verified_at: string | null;
   verified_by: string | null;
   rejection_reason: string | null;
+  reminder_sent_at: string | null;
+}
+
+export type ReferralStatus = "pending" | "credited";
+
+export interface Referral {
+  id: string;
+  referrer_id: string;
+  referred_id: string;
+  status: ReferralStatus;
+  credit_cents: number;
+  credited_at: string | null;
+  created_at: string;
+}
+
+export type IncidentKind =
+  | "bite"
+  | "injury"
+  | "escape"
+  | "illness"
+  | "property_damage"
+  | "other";
+
+export type IncidentSeverity = "low" | "medium" | "high";
+
+export interface Incident {
+  id: string;
+  dog_id: string;
+  occurred_on: string;
+  kind: IncidentKind;
+  severity: IncidentSeverity;
+  description: string;
+  reporter_id: string | null;
+  customer_notified_at: string | null;
+  created_at: string;
+}
+
+export interface IncidentPhoto {
+  id: string;
+  incident_id: string;
+  storage_path: string;
+  caption: string | null;
+  uploaded_by: string | null;
+  uploaded_at: string;
 }

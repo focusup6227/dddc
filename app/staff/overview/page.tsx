@@ -12,6 +12,12 @@ import {
   getMaxDogsPerDay,
   getMaxDogsPerNight,
 } from "@/lib/settings";
+import { StaffSubNav } from "@/components/StaffSubNav";
+
+const SUBNAV = [
+  { href: "/staff", label: "Today" },
+  { href: "/staff/overview", label: "Numbers", active: true },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -118,8 +124,9 @@ export default async function StaffOverviewPage() {
 
   return (
     <div className="space-y-8">
+      <StaffSubNav items={SUBNAV} />
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Overview</h1>
+        <h1 className="text-2xl font-bold text-stone-900">Numbers</h1>
         <p className="text-stone-600">
           {monthLabel(today)} so far. Refresh anytime — figures update as
           payments settle.
