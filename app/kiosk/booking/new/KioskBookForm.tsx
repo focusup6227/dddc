@@ -73,7 +73,7 @@ export function KioskBookForm({
       <input type="hidden" name="pickup_time" value={pickupTime} />
 
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-        <h3 className="font-semibold text-stone-900">Dog</h3>
+        <h3 className="font-semibold text-ink-900">Dog</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           {dogs.map((d) => (
             <button
@@ -87,7 +87,7 @@ export function KioskBookForm({
                 "rounded-full border px-4 py-2 text-base " +
                 (dogId === d.id
                   ? "border-brand-600 bg-brand-50 text-brand-700"
-                  : "border-stone-300 text-stone-700 hover:bg-stone-50")
+                  : "border-stone-300 text-ink-700 hover:bg-stone-50")
               }
             >
               {d.name}
@@ -97,13 +97,13 @@ export function KioskBookForm({
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-        <h3 className="font-semibold text-stone-900">Dates</h3>
-        <p className="mt-1 text-sm text-stone-500">
+        <h3 className="font-semibold text-ink-900">Dates</h3>
+        <p className="mt-1 text-sm text-ink-500">
           Red days are at capacity — staff can still book them, but expect a busy day.
         </p>
         <div className="mt-4 grid grid-cols-7 gap-1 text-xs">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-            <div key={i} className="py-1 text-center font-medium text-stone-500">
+            <div key={i} className="py-1 text-center font-medium text-ink-500">
               {d}
             </div>
           ))}
@@ -129,12 +129,12 @@ export function KioskBookForm({
                       ? "border-red-600 bg-red-600 text-white"
                       : "border-brand-600 bg-brand-600 text-white"
                     : isTaken
-                      ? "border-stone-200 bg-stone-100 text-stone-400 line-through"
+                      ? "border-stone-200 bg-stone-100 text-ink-400 line-through"
                       : isPast
-                        ? "border-stone-100 text-stone-300"
+                        ? "border-stone-100 text-ink-400"
                         : isFull
                           ? "border-red-200 bg-red-50 text-red-700 hover:border-red-400"
-                          : "border-stone-200 bg-white text-stone-800 hover:border-brand-400 hover:bg-brand-50")
+                          : "border-stone-200 bg-white text-ink-900 hover:border-brand-400 hover:bg-brand-50")
                 }
                 title={isFull ? `${d.iso} · full` : d.iso}
               >
@@ -146,8 +146,8 @@ export function KioskBookForm({
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-        <h3 className="font-semibold text-stone-900">Times</h3>
-        <p className="mt-1 text-sm text-stone-500">
+        <h3 className="font-semibold text-ink-900">Times</h3>
+        <p className="mt-1 text-sm text-ink-500">
           Drop-off and pickup must be between 6:00 AM and 6:00 PM.
         </p>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -186,25 +186,25 @@ export function KioskBookForm({
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-        <h3 className="font-semibold text-stone-900">Summary</h3>
+        <h3 className="font-semibold text-ink-900">Summary</h3>
         <dl className="mt-3 space-y-1 text-base">
           <div className="flex justify-between">
-            <dt className="text-stone-600">Days selected</dt>
-            <dd className="font-medium text-stone-900">{selectedCount}</dd>
+            <dt className="text-ink-700">Days selected</dt>
+            <dd className="font-medium text-ink-900">{selectedCount}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-stone-600">Covered by package</dt>
-            <dd className="font-medium text-stone-900">{packageDaysUsed}</dd>
+            <dt className="text-ink-700">Covered by package</dt>
+            <dd className="font-medium text-ink-900">{packageDaysUsed}</dd>
           </div>
           {dropInDaysNeeded > 0 && dropInPriceCents && (
             <div className="flex justify-between">
-              <dt className="text-stone-600">Drop-in × {dropInDaysNeeded}</dt>
-              <dd className="font-medium text-stone-900">{formatMoney(dropInTotalCents)}</dd>
+              <dt className="text-ink-700">Drop-in × {dropInDaysNeeded}</dt>
+              <dd className="font-medium text-ink-900">{formatMoney(dropInTotalCents)}</dd>
             </div>
           )}
           <div className="flex justify-between border-t border-stone-200 pt-2 text-lg">
-            <dt className="font-semibold text-stone-900">Due now</dt>
-            <dd className="font-semibold text-stone-900">
+            <dt className="font-semibold text-ink-900">Due now</dt>
+            <dd className="font-semibold text-ink-900">
               {formatMoney(dropInTotalCents)}
             </dd>
           </div>

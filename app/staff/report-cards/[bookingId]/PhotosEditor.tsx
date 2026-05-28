@@ -60,13 +60,13 @@ export function ReportCardPhotosEditor({
 
   return (
     <section className="card">
-      <h2 className="font-semibold text-stone-900">Photos</h2>
-      <p className="mt-1 text-xs text-stone-500">
+      <h2 className="font-semibold text-ink-900">Photos</h2>
+      <p className="mt-1 text-xs text-ink-500">
         Add a photo at a time. Optional caption + date — both show up on the
         customer&apos;s card.
       </p>
 
-      <div className="mt-4 rounded-md border border-stone-200 bg-stone-50 p-3 space-y-3">
+      <div className="mt-4 rounded-md border border-stone-200 bg-cream-50 p-3 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="rc-caption">
@@ -109,14 +109,14 @@ export function ReportCardPhotosEditor({
             className="block text-sm"
           />
           {uploading && (
-            <p className="mt-1 text-xs text-stone-500">Uploading…</p>
+            <p className="mt-1 text-xs text-ink-500">Uploading…</p>
           )}
           {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
       </div>
 
       {photos.length === 0 ? (
-        <p className="mt-4 text-stone-600">No photos yet.</p>
+        <p className="mt-4 text-ink-700">No photos yet.</p>
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {photos.map((p) => {
@@ -139,10 +139,10 @@ export function ReportCardPhotosEditor({
                 )}
                 <div className="space-y-1 p-2">
                   {p.caption && (
-                    <p className="text-sm text-stone-800">{p.caption}</p>
+                    <p className="text-sm text-ink-900">{p.caption}</p>
                   )}
                   {p.photo_date && (
-                    <p className="text-xs text-stone-500">
+                    <p className="text-xs text-ink-500">
                       {formatDateShort(p.photo_date)}
                     </p>
                   )}
@@ -164,7 +164,7 @@ export function ReportCardPhotosEditor({
                     <button
                       type="submit"
                       disabled={pending}
-                      className="text-xs font-medium text-stone-500 hover:text-red-600"
+                      className="text-xs font-medium text-ink-500 hover:text-red-600"
                     >
                       Remove
                     </button>

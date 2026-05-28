@@ -227,13 +227,13 @@ function Section({
               <li key={b.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                  <p className="font-medium text-stone-900">
+                  <p className="font-medium text-ink-900">
                     {b.service_kind === "boarding"
                       ? `${formatDateShort(b.service_date)} → ${formatDateShort(b.service_end_date)}`
                       : formatDateShort(b.service_date)}{" "}
                     — {dog?.name ?? "Dog"}
                   </p>
-                  <p className="text-sm text-stone-500">
+                  <p className="text-sm text-ink-500">
                     {b.service_kind === "boarding"
                       ? `Boarding · ${nightCount(b.service_date, b.service_end_date)} night${nightCount(b.service_date, b.service_end_date) === 1 ? "" : "s"}`
                       : b.payment_kind === "package"
@@ -245,7 +245,7 @@ function Section({
                     )}
                   </p>
                   {(b.drop_off_time || b.pickup_time) && (
-                    <p className="text-xs text-stone-500">
+                    <p className="text-xs text-ink-500">
                       {b.drop_off_time && <>Drop-off {formatTime(b.drop_off_time)}</>}
                       {b.drop_off_time && b.pickup_time && " · "}
                       {b.pickup_time && <>Pickup {formatTime(b.pickup_time)}</>}
@@ -256,7 +256,7 @@ function Section({
                       Past due — please pay to keep your account active.
                     </p>
                   )}
-                  {showCancel && <p className="mt-1 text-xs text-stone-500">{preview}</p>}
+                  {showCancel && <p className="mt-1 text-xs text-ink-500">{preview}</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {showPayNow && (
@@ -330,7 +330,7 @@ function CouponRow({
   }
   return (
     <details className="mt-2 text-sm">
-      <summary className="cursor-pointer text-stone-500 hover:text-stone-700">
+      <summary className="cursor-pointer text-ink-500 hover:text-ink-700">
         Have a coupon code?
       </summary>
       <form action={applyCouponToBooking} className="mt-2 flex gap-2">
@@ -346,7 +346,7 @@ function CouponRow({
         />
         <button
           type="submit"
-          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-stone-50"
         >
           Apply
         </button>

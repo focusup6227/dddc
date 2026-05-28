@@ -60,8 +60,8 @@ export function IncidentPhotosEditor({
 
   return (
     <section className="card">
-      <h2 className="font-semibold text-stone-900">Photos</h2>
-      <p className="mt-1 text-xs text-stone-500">
+      <h2 className="font-semibold text-ink-900">Photos</h2>
+      <p className="mt-1 text-xs text-ink-500">
         Private — only staff can see these. Useful for documenting injuries,
         fence damage, etc.
       </p>
@@ -93,13 +93,13 @@ export function IncidentPhotosEditor({
             disabled={uploading}
             className="block text-sm"
           />
-          {uploading && <p className="mt-1 text-xs text-stone-500">Uploading…</p>}
+          {uploading && <p className="mt-1 text-xs text-ink-500">Uploading…</p>}
           {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
       </div>
 
       {photos.length === 0 ? (
-        <p className="mt-4 text-stone-600">No photos yet.</p>
+        <p className="mt-4 text-ink-700">No photos yet.</p>
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {photos.map((p) => (
@@ -115,13 +115,13 @@ export function IncidentPhotosEditor({
                   className="aspect-square w-full object-cover"
                 />
               ) : (
-                <div className="aspect-square w-full bg-stone-100 text-xs text-stone-500 flex items-center justify-center">
+                <div className="aspect-square w-full bg-stone-100 text-xs text-ink-500 flex items-center justify-center">
                   Unavailable
                 </div>
               )}
               <div className="space-y-1 p-2">
                 {p.caption && (
-                  <p className="text-sm text-stone-800">{p.caption}</p>
+                  <p className="text-sm text-ink-900">{p.caption}</p>
                 )}
                 <form
                   action={(fd) =>
@@ -141,7 +141,7 @@ export function IncidentPhotosEditor({
                   <button
                     type="submit"
                     disabled={pending}
-                    className="text-xs font-medium text-stone-500 hover:text-red-600"
+                    className="text-xs font-medium text-ink-500 hover:text-red-600"
                   >
                     Remove
                   </button>

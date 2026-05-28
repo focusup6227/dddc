@@ -73,7 +73,7 @@ export default async function StaffSettingsPage({
             required
             className="input"
           />
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-ink-500">
             New customer daycare bookings are blocked once a day reaches this
             many dogs. Staff can still book past the limit from the kiosk.
           </p>
@@ -92,7 +92,7 @@ export default async function StaffSettingsPage({
             required
             className="input"
           />
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-ink-500">
             New boarding bookings are blocked once a night reaches this many
             dogs. Tracked separately from daycare capacity.
           </p>
@@ -112,7 +112,7 @@ export default async function StaffSettingsPage({
             required
             className="input"
           />
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-ink-500">
             Per dog, per night. Existing bookings are charged the rate that was
             in effect when they were created.
           </p>
@@ -122,9 +122,9 @@ export default async function StaffSettingsPage({
         </button>
       </form>
 
-      <details className="text-xs text-stone-500">
+      <details className="text-xs text-ink-500">
         <summary className="cursor-pointer">All settings</summary>
-        <pre className="mt-2 overflow-auto rounded-md bg-stone-100 p-3 text-stone-700">
+        <pre className="mt-2 overflow-auto rounded-md bg-stone-100 p-3 text-ink-700">
           {JSON.stringify(rows, null, 2)}
         </pre>
       </details>

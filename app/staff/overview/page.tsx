@@ -161,7 +161,7 @@ export default async function StaffOverviewPage() {
       </div>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Occupancy</h2>
+        <h2 className="text-lg font-semibold text-ink-900">Occupancy</h2>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <OccupancyCard
             title="Daycare today"
@@ -188,22 +188,22 @@ export default async function StaffOverviewPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section>
-          <h2 className="text-lg font-semibold text-stone-900">
+          <h2 className="text-lg font-semibold text-ink-900">
             Top customers (last 90 days)
           </h2>
           {topCustomers.length === 0 ? (
-            <p className="mt-2 text-stone-600">No bookings in this window.</p>
+            <p className="mt-2 text-ink-700">No bookings in this window.</p>
           ) : (
             <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
               {topCustomers.map((t) => (
                 <li key={t.id} className="flex items-center justify-between px-4 py-3 text-sm">
                   <Link
                     href={`/staff/customers/${t.id}`}
-                    className="font-medium text-stone-900 hover:underline"
+                    className="font-medium text-ink-900 hover:underline"
                   >
                     {t.profile?.full_name || t.profile?.email || "—"}
                   </Link>
-                  <span className="text-stone-500">
+                  <span className="text-ink-500">
                     {t.count} booking{t.count === 1 ? "" : "s"}
                   </span>
                 </li>
@@ -213,15 +213,15 @@ export default async function StaffOverviewPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-stone-900">
+          <h2 className="text-lg font-semibold text-ink-900">
             Low package balances
           </h2>
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-ink-500">
             Customers with 2 days or fewer remaining — nudge them before they
             run out.
           </p>
           {lowPackages.length === 0 ? (
-            <p className="mt-2 text-stone-600">Nobody is low right now.</p>
+            <p className="mt-2 text-ink-700">Nobody is low right now.</p>
           ) : (
             <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
               {lowPackages.map((p) => {
@@ -230,11 +230,11 @@ export default async function StaffOverviewPage() {
                   <li key={p.id} className="flex items-center justify-between px-4 py-3 text-sm">
                     <Link
                       href={`/staff/customers/${p.customer_id}`}
-                      className="font-medium text-stone-900 hover:underline"
+                      className="font-medium text-ink-900 hover:underline"
                     >
                       {cust?.full_name || cust?.email || "—"}
                     </Link>
-                    <span className="text-stone-500">
+                    <span className="text-ink-500">
                       {p.days_remaining} day{p.days_remaining === 1 ? "" : "s"} left
                     </span>
                   </li>
@@ -287,8 +287,8 @@ function OccupancyCard({
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-4">
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-stone-700">{title}</p>
-        <p className="text-sm text-stone-500">
+        <p className="text-sm font-medium text-ink-700">{title}</p>
+        <p className="text-sm text-ink-500">
           {count} / {max}
         </p>
       </div>

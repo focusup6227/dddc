@@ -56,7 +56,7 @@ export function KioskBoardForm({
       <input type="hidden" name="pickup_time" value={pickupTime} />
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Dog</h3>
+        <h3 className="font-semibold text-ink-900">Dog</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           {dogs.map((d) => (
             <button
@@ -67,7 +67,7 @@ export function KioskBoardForm({
                 "rounded-full border px-3 py-1.5 text-sm " +
                 (dogId === d.id
                   ? "border-brand-600 bg-brand-50 text-brand-700"
-                  : "border-stone-300 text-stone-700 hover:bg-stone-50")
+                  : "border-stone-300 text-ink-700 hover:bg-stone-50")
               }
             >
               {d.name}
@@ -77,7 +77,7 @@ export function KioskBoardForm({
       </section>
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Dates</h3>
+        <h3 className="font-semibold text-ink-900">Dates</h3>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="label">Check-in</span>
@@ -109,8 +109,8 @@ export function KioskBoardForm({
       </section>
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Times</h3>
-        <p className="mt-1 text-sm text-stone-500">
+        <h3 className="font-semibold text-ink-900">Times</h3>
+        <p className="mt-1 text-sm text-ink-500">
           Drop-off on check-in day, pickup on check-out day. Both 6 AM–6 PM.
         </p>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -149,21 +149,21 @@ export function KioskBoardForm({
       </section>
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Summary</h3>
+        <h3 className="font-semibold text-ink-900">Summary</h3>
         <dl className="mt-3 space-y-1 text-sm">
           <div className="flex justify-between">
-            <dt className="text-stone-600">Nights</dt>
-            <dd className="font-medium text-stone-900">{nights.length}</dd>
+            <dt className="text-ink-700">Nights</dt>
+            <dd className="font-medium text-ink-900">{nights.length}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-stone-600">Rate</dt>
-            <dd className="font-medium text-stone-900">
+            <dt className="text-ink-700">Rate</dt>
+            <dd className="font-medium text-ink-900">
               {formatMoney(rateCents)} / night
             </dd>
           </div>
           <div className="flex justify-between border-t border-stone-200 pt-2">
-            <dt className="font-semibold text-stone-900">Total</dt>
-            <dd className="font-semibold text-stone-900">
+            <dt className="font-semibold text-ink-900">Total</dt>
+            <dd className="font-semibold text-ink-900">
               {formatMoney(totalCents)}
             </dd>
           </div>

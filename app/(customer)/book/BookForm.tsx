@@ -96,7 +96,7 @@ export function BookForm({
       <input type="hidden" name="pickup_time" value={pickupTime} />
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Dog</h3>
+        <h3 className="font-semibold text-ink-900">Dog</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           {dogs.map((d) => {
             const isBlocked = (vaccineBlocks[d.id]?.length ?? 0) > 0;
@@ -114,8 +114,8 @@ export function BookForm({
                   (isSelected
                     ? "border-brand-600 bg-brand-50 text-brand-700"
                     : isBlocked
-                      ? "border-stone-200 bg-stone-50 text-stone-500"
-                      : "border-stone-300 text-stone-700 hover:bg-stone-50")
+                      ? "border-stone-200/80 bg-cream-50 text-ink-500"
+                      : "border-stone-300 text-ink-700 hover:bg-cream-50")
                 }
                 title={isBlocked ? "Missing required vaccine records" : undefined}
               >
@@ -148,13 +148,13 @@ export function BookForm({
       </section>
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Dates</h3>
-        <p className="mt-1 text-sm text-stone-500">
+        <h3 className="font-semibold text-ink-900">Dates</h3>
+        <p className="mt-1 text-sm text-ink-500">
           Pick the days you&apos;d like to drop off. Greyed-out days are already booked.
         </p>
         <div className="mt-4 grid grid-cols-7 gap-1 text-xs">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-            <div key={i} className="py-1 text-center font-medium text-stone-500">
+            <div key={i} className="py-1 text-center font-medium text-ink-500">
               {d}
             </div>
           ))}
@@ -183,14 +183,14 @@ export function BookForm({
                   (isSelected
                     ? "border-brand-600 bg-brand-600 text-white"
                     : isTaken
-                      ? "border-stone-200 bg-stone-100 text-stone-400 line-through"
+                      ? "border-stone-200/80 bg-cream-100 text-ink-400 line-through"
                       : isBlackout
-                        ? "border-stone-300 bg-stone-100 bg-[repeating-linear-gradient(45deg,_rgba(120,113,108,0.18)_0,_rgba(120,113,108,0.18)_3px,_transparent_3px,_transparent_7px)] text-stone-400"
+                        ? "border-stone-300 bg-cream-100 bg-[repeating-linear-gradient(45deg,_rgba(120,113,108,0.18)_0,_rgba(120,113,108,0.18)_3px,_transparent_3px,_transparent_7px)] text-ink-400"
                         : isFull
                           ? "border-red-200 bg-red-50 text-red-400"
                           : isPast
-                            ? "border-stone-100 text-stone-300"
-                            : "border-stone-200 bg-white text-stone-800 hover:border-brand-400 hover:bg-brand-50")
+                            ? "border-stone-100 text-ink-400"
+                            : "border-stone-200/80 bg-white text-ink-900 hover:border-brand-400 hover:bg-brand-50")
                 }
                 title={
                   closedReason
@@ -226,8 +226,8 @@ export function BookForm({
       />
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Times</h3>
-        <p className="mt-1 text-sm text-stone-500">
+        <h3 className="font-semibold text-ink-900">Times</h3>
+        <p className="mt-1 text-sm text-ink-500">
           Drop-off and pickup must be between 6:00 AM and 6:00 PM. Same times
           apply to every selected day.
         </p>
@@ -268,27 +268,27 @@ export function BookForm({
       </section>
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Summary</h3>
+        <h3 className="font-semibold text-ink-900">Summary</h3>
         <dl className="mt-3 space-y-1 text-sm">
           <div className="flex justify-between">
-            <dt className="text-stone-600">Days selected</dt>
-            <dd className="font-medium text-stone-900">{selectedCount}</dd>
+            <dt className="text-ink-700">Days selected</dt>
+            <dd className="font-medium text-ink-900">{selectedCount}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-stone-600">Covered by package</dt>
-            <dd className="font-medium text-stone-900">{packageDaysUsed}</dd>
+            <dt className="text-ink-700">Covered by package</dt>
+            <dd className="font-medium text-ink-900">{packageDaysUsed}</dd>
           </div>
           {dropInDaysNeeded > 0 && dropInPriceCents && (
             <div className="flex justify-between">
-              <dt className="text-stone-600">Drop-in days × {dropInDaysNeeded}</dt>
-              <dd className="font-medium text-stone-900">
+              <dt className="text-ink-700">Drop-in days × {dropInDaysNeeded}</dt>
+              <dd className="font-medium text-ink-900">
                 {formatMoney(dropInTotalCents)}
               </dd>
             </div>
           )}
-          <div className="flex justify-between border-t border-stone-200 pt-2">
-            <dt className="font-semibold text-stone-900">Due today</dt>
-            <dd className="font-semibold text-stone-900">
+          <div className="flex justify-between border-t border-stone-200/80 pt-2">
+            <dt className="font-semibold text-ink-900">Due today</dt>
+            <dd className="font-semibold text-ink-900">
               {formatMoney(dropInTotalCents)}
             </dd>
           </div>

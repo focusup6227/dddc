@@ -65,7 +65,7 @@ export default async function StaffLayout({
                     <Link
                       key={n.href}
                       href={n.href}
-                      className="relative rounded-xl px-2.5 py-1.5 text-sm font-medium text-stone-300 hover:bg-white/5 hover:text-white transition-colors"
+                      className="relative rounded-xl px-2.5 py-1.5 text-sm font-medium text-ink-400 hover:bg-white/5 hover:text-white transition-colors"
                     >
                       {n.label}
                       {count > 0 && (
@@ -78,15 +78,15 @@ export default async function StaffLayout({
                 })}
               </nav>
               <div className="flex items-center gap-2">
-                <span className="hidden text-sm text-stone-400 xl:inline">
+                <span className="hidden text-sm text-ink-400 xl:inline">
                   {session.profile.full_name || session.profile.email}
                 </span>
-                <SignOutButton className="rounded-xl px-3 py-1.5 text-sm font-medium text-stone-300 hover:bg-white/5 hover:text-white" />
+                <SignOutButton className="rounded-xl px-3 py-1.5 text-sm font-medium text-ink-400 hover:bg-white/5 hover:text-white" />
                 <MobileNav
                   items={navWithBadges}
                   variant="dark"
                   trailing={
-                    <span className="block text-sm text-stone-300">
+                    <span className="block text-sm text-ink-400">
                       {session.profile.full_name || session.profile.email}
                     </span>
                   }

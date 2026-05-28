@@ -51,7 +51,7 @@ export function DogForm({
       <input type="hidden" name="photo_path" value={photoPath ?? ""} />
 
       <section className="card">
-        <h3 className="font-semibold text-stone-900">Photo</h3>
+        <h3 className="font-display text-lg font-semibold text-ink-900">Photo</h3>
         <div className="mt-3 flex items-center gap-4">
           <DogAvatar photoPath={photoPath} name={dog?.name ?? "Dog"} size={96} />
           <div>
@@ -62,14 +62,14 @@ export function DogForm({
               className="block text-sm"
               disabled={uploading}
             />
-            {uploading && <p className="mt-1 text-xs text-stone-500">Uploading…</p>}
+            {uploading && <p className="mt-1 text-xs text-ink-500">Uploading…</p>}
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
           </div>
         </div>
       </section>
 
       <section className="card space-y-4">
-        <h3 className="font-semibold text-stone-900">Basics</h3>
+        <h3 className="font-display text-lg font-semibold text-ink-900">Basics</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field name="name" label="Name" required defaultValue={dog?.name} />
           <Field name="breed" label="Breed" defaultValue={dog?.breed ?? ""} />
@@ -96,7 +96,7 @@ export function DogForm({
           />
           <Field name="color" label="Color" defaultValue={dog?.color ?? ""} />
         </div>
-        <label className="flex items-center gap-2 text-sm text-stone-700">
+        <label className="flex items-center gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
             name="spayed_neutered"
@@ -109,8 +109,8 @@ export function DogForm({
       </section>
 
       <section className="card space-y-4">
-        <h3 className="font-semibold text-stone-900">Microchip</h3>
-        <label className="flex items-center gap-2 text-sm text-stone-700">
+        <h3 className="font-display text-lg font-semibold text-ink-900">Microchip</h3>
+        <label className="flex items-center gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
             name="microchipped"
@@ -128,7 +128,7 @@ export function DogForm({
       </section>
 
       <section className="card space-y-4">
-        <h3 className="font-semibold text-stone-900">Health & vet</h3>
+        <h3 className="font-display text-lg font-semibold text-ink-900">Health & vet</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field name="vet_name" label="Vet name" defaultValue={dog?.vet_name ?? ""} />
           <Field name="vet_phone" label="Vet phone" defaultValue={dog?.vet_phone ?? ""} />
@@ -144,7 +144,7 @@ export function DogForm({
           defaultValue={dog?.medications ?? ""}
         />
         {!dog && (
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-900">
             After you save, you&apos;ll be asked to upload your dog&apos;s vaccine
             records (Rabies, DHPP, Bordetella) before booking.
           </p>
@@ -152,7 +152,7 @@ export function DogForm({
       </section>
 
       <section className="card space-y-4">
-        <h3 className="font-semibold text-stone-900">Care notes</h3>
+        <h3 className="font-display text-lg font-semibold text-ink-900">Care notes</h3>
         <Textarea
           name="feeding_notes"
           label="Feeding instructions"

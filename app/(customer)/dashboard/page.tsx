@@ -218,7 +218,7 @@ export default async function CustomerDashboard() {
       {latestCard && latestCardDog && (
         <section>
           <div className="mb-2 flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold text-stone-900">
+            <h2 className="text-lg font-semibold text-ink-900">
               Latest report card
             </h2>
             <Link

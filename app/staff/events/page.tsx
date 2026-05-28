@@ -81,7 +81,7 @@ function EventForm({ event }: { event: Event | null }) {
   const isEdit = !!event;
   return (
     <section className="card">
-      <h2 className="font-semibold text-stone-900">
+      <h2 className="font-semibold text-ink-900">
         {isEdit ? "Edit event" : "Add an event"}
       </h2>
       <form
@@ -170,14 +170,14 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="text-lg font-semibold text-stone-900">
+      <h2 className="text-lg font-semibold text-ink-900">
         {title}{" "}
-        <span className="ml-1 text-sm font-normal text-stone-500">
+        <span className="ml-1 text-sm font-normal text-ink-500">
           ({events.length})
         </span>
       </h2>
       {events.length === 0 ? (
-        <p className="mt-2 text-stone-600">{emptyText}</p>
+        <p className="mt-2 text-ink-700">{emptyText}</p>
       ) : (
         <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
           {events.map((e) => (
@@ -186,14 +186,14 @@ function Section({
               className="flex flex-wrap items-start justify-between gap-3 px-4 py-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-stone-900">{e.title}</p>
-                <p className="text-xs text-stone-500">
+                <p className="font-medium text-ink-900">{e.title}</p>
+                <p className="text-xs text-ink-500">
                   {e.start_date === e.end_date
                     ? formatDateShort(e.start_date)
                     : `${formatDateShort(e.start_date)} → ${formatDateShort(e.end_date)}`}
                 </p>
                 {e.description && (
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">
                     {e.description}
                   </p>
                 )}

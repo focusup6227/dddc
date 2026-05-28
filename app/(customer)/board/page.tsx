@@ -108,14 +108,14 @@ export default async function BoardPage({
   return (
     <div className="max-w-3xl">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Book</h1>
-        <p className="text-stone-600">Day care for the day, or boarding for overnight stays.</p>
+        <h1 className="text-2xl font-bold text-ink-900">Book</h1>
+        <p className="text-ink-700">Day care for the day, or boarding for overnight stays.</p>
       </header>
 
       <KindTabs current="boarding" />
 
       <section className="mt-2">
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-ink-700">
           Overnight stays for your dog. ${(rateCents / 100).toFixed(2)} per night.
         </p>
       </section>
@@ -156,8 +156,8 @@ function Notice({
 }) {
   return (
     <div className="card max-w-xl">
-      <h1 className="text-xl font-bold text-stone-900">{title}</h1>
-      <p className="mt-2 text-stone-700">{body}</p>
+      <h1 className="text-xl font-bold text-ink-900">{title}</h1>
+      <p className="mt-2 text-ink-700">{body}</p>
       <Link href={cta.href} className="btn-primary mt-4 inline-block">
         {cta.label}
       </Link>
@@ -169,7 +169,7 @@ function KindTabs({ current }: { current: "daycare" | "boarding" }) {
   const base =
     "flex-1 rounded-lg px-4 py-2 text-center text-sm font-semibold transition-colors";
   const active = "bg-brand-600 text-white shadow-sm";
-  const inactive = "bg-white text-stone-700 hover:bg-stone-50";
+  const inactive = "bg-white text-ink-700 hover:bg-stone-50";
   return (
     <nav
       role="tablist"

@@ -123,7 +123,7 @@ export default async function RecurringPage({
               {WEEKDAYS.map((w) => (
                 <label
                   key={w.idx}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-700 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700"
                 >
                   <input
                     type="checkbox"
@@ -194,7 +194,7 @@ export default async function RecurringPage({
             </div>
           </div>
 
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-ink-500">
             Days that are already booked, closed, or full will be skipped when
             we generate bookings.
           </p>
@@ -208,9 +208,9 @@ export default async function RecurringPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-stone-900">Your schedules</h2>
+        <h2 className="text-lg font-semibold text-ink-900">Your schedules</h2>
         {schedules.length === 0 ? (
-          <p className="mt-2 text-stone-600">No standing schedules yet.</p>
+          <p className="mt-2 text-ink-700">No standing schedules yet.</p>
         ) : (
           <ul className="mt-3 space-y-3">
             {schedules.map((s) => {
@@ -219,19 +219,19 @@ export default async function RecurringPage({
                 <li key={s.id} className="card">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-stone-900">
+                      <p className="font-medium text-ink-900">
                         {dog?.name ?? "Dog"}
                         {!s.active && (
-                          <span className="ml-2 text-xs font-normal text-stone-400">
+                          <span className="ml-2 text-xs font-normal text-ink-400">
                             (paused)
                           </span>
                         )}
                       </p>
-                      <p className="text-sm text-stone-600">
+                      <p className="text-sm text-ink-700">
                         {weekdaysLabel(s.weekdays)} ·{" "}
                         {formatTimeRange(s.drop_off_time, s.pickup_time)}
                       </p>
-                      <p className="text-xs text-stone-500">
+                      <p className="text-xs text-ink-500">
                         Starts {formatDateShort(s.start_date)}
                         {s.end_date && <> · ends {formatDateShort(s.end_date)}</>}
                       </p>

@@ -185,7 +185,7 @@ export default async function StaffTodayPage() {
                       </form>
                     </>
                   ) : (
-                    <span className="text-xs text-stone-500">
+                    <span className="text-xs text-ink-500">
                       Out at {new Date(ci.checked_out_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                     </span>
                   )}

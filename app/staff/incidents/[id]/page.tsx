@@ -175,7 +175,7 @@ export default async function StaffIncidentDetailPage({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-4">
-          <div className="text-sm text-stone-600">
+          <div className="text-sm text-ink-700">
             {incident.customer_notified_at ? (
               <>
                 <span className="font-medium text-emerald-700">
@@ -192,7 +192,7 @@ export default async function StaffIncidentDetailPage({
               type="submit"
               name="toggle_notified"
               value={incident.customer_notified_at ? "clear" : "set"}
-              className="rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-ink-700 hover:bg-stone-50"
             >
               {incident.customer_notified_at ? "Mark not notified" : "Mark as notified"}
             </button>

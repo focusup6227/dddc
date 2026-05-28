@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Calendar, Plus, UserPlus } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
@@ -81,11 +82,15 @@ export default async function KioskHomePage({
 
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Today</h1>
-          <p className="text-stone-600">
-            {bookings.length} booked · {here.length} on site · {gone.length} gone
-          </p>
-          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-stone-500">
+          <h1 className="font-display text-4xl font-bold tracking-tight text-ink-900">
+            Today
+          </h1>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="pill-warm">{bookings.length} booked</span>
+            <span className="pill-success">{here.length} on site</span>
+            <span className="pill-neutral">{gone.length} gone</span>
+          </div>
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-ink-500">
             <span className="kiosk-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Auto-refreshes every 15 s
           </p>
@@ -93,21 +98,21 @@ export default async function KioskHomePage({
         <div className="flex flex-wrap gap-2">
           <Link
             href="/kiosk/availability"
-            className="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-3 text-base font-semibold text-stone-700 hover:bg-stone-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-base font-semibold text-ink-700 shadow-soft hover:bg-cream-50 hover:border-stone-300"
           >
-            Availability
+            <Calendar size={18} /> Availability
           </Link>
           <Link
             href="/kiosk/booking/new"
-            className="inline-flex items-center gap-2 rounded-xl border border-brand-600 bg-white px-4 py-3 text-base font-semibold text-brand-700 hover:bg-brand-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-300 bg-white px-4 py-3 text-base font-semibold text-brand-700 shadow-soft hover:bg-brand-50"
           >
-            + New booking
+            <Plus size={18} /> New booking
           </Link>
           <Link
             href="/kiosk/walk-in"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-brand-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-base font-semibold text-white shadow-soft hover:bg-brand-700 hover:shadow-glow active:translate-y-px"
           >
-            + Walk-in
+            <UserPlus size={18} /> Walk-in
           </Link>
         </div>
       </div>
@@ -171,10 +176,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className={`rounded-2xl border-l-4 bg-white p-4 shadow-sm ${accent}`}>
-      <h2 className="mb-3 flex items-baseline gap-2 text-lg font-semibold text-stone-900">
+    <section
+      className={`rounded-3xl border-l-4 border border-stone-200/80 bg-white p-5 shadow-soft ${accent}`}
+    >
+      <h2 className="mb-3 flex items-baseline gap-2 font-display text-xl font-semibold text-ink-900">
         {title}{" "}
-        <span className="text-sm font-normal text-stone-500">({count})</span>
+        <span className="text-sm font-normal text-ink-500">({count})</span>
       </h2>
       {children}
     </section>
@@ -190,7 +197,7 @@ function Tiles({ children }: { children: React.ReactNode }) {
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-stone-500">{children}</p>;
+  return <p className="text-sm text-ink-500">{children}</p>;
 }
 
 function DogTile({
@@ -211,10 +218,10 @@ function DogTile({
   tone: "amber" | "emerald" | "red" | "stone";
 }) {
   const toneStyles: Record<typeof tone, string> = {
-    amber: "bg-amber-500 hover:bg-amber-600",
-    emerald: "bg-emerald-600 hover:bg-emerald-700",
-    red: "bg-red-600 hover:bg-red-700",
-    stone: "bg-stone-500 hover:bg-stone-600",
+    amber: "bg-amber-500 hover:bg-amber-600 shadow-soft",
+    emerald: "bg-emerald-600 hover:bg-emerald-700 shadow-soft",
+    red: "bg-red-600 hover:bg-red-700 shadow-soft",
+    stone: "bg-ink-500 hover:bg-ink-700 shadow-soft",
   };
   const dropOff = row.booking.drop_off_time
     ? formatTime(row.booking.drop_off_time)
@@ -225,18 +232,24 @@ function DogTile({
   return (
     <Link
       href={`/kiosk/booking/${row.booking.id}`}
-      className="group flex items-center gap-3 rounded-xl border border-stone-200 bg-white p-3 text-left transition-colors hover:border-stone-300 hover:bg-stone-50"
+      className="group flex items-center gap-3 rounded-2xl border border-stone-200/80 bg-white p-3 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-lift"
     >
-      {row.dog && <DogAvatar photoPath={row.dog.photo_path} name={row.dog.name} size={56} />}
+      {row.dog && (
+        <DogAvatar
+          photoPath={row.dog.photo_path}
+          name={row.dog.name}
+          size={56}
+        />
+      )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-semibold text-stone-900">
+        <p className="truncate font-display text-base font-semibold text-ink-900">
           {row.dog?.name ?? "Dog"}
         </p>
-        <p className="truncate text-sm text-stone-500">
+        <p className="truncate text-sm text-ink-500">
           {row.cust?.full_name || row.cust?.email}
         </p>
         {(dropOff || pickup) && (
-          <p className="truncate text-xs text-stone-500">
+          <p className="truncate text-xs text-ink-500">
             {dropOff && <>↓ {dropOff}</>}
             {dropOff && pickup && " · "}
             {pickup && <>↑ {pickup}</>}
@@ -244,7 +257,7 @@ function DogTile({
         )}
       </div>
       <span
-        className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white ${toneStyles[tone]}`}
+        className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-white ${toneStyles[tone]}`}
       >
         {cta}
       </span>
@@ -261,10 +274,12 @@ function Banner({
 }) {
   const style =
     kind === "success"
-      ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-      : "bg-amber-50 text-amber-900 border-amber-200";
+      ? "bg-emerald-50/70 text-emerald-900 border-emerald-200"
+      : "bg-amber-50/70 text-amber-900 border-amber-200";
   return (
-    <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${style}`}>
+    <div
+      className={`rounded-2xl border px-4 py-3 text-sm font-medium shadow-soft ${style}`}
+    >
       {children}
     </div>
   );

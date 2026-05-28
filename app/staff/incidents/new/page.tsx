@@ -134,7 +134,7 @@ export default async function NewIncidentPage({
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-stone-700">
+        <label className="flex items-center gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
             name="customer_notified"
@@ -148,7 +148,7 @@ export default async function NewIncidentPage({
           <Link href="/staff/incidents" className="btn-ghost">Cancel</Link>
           <button type="submit" className="btn-primary">Save</button>
         </div>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-ink-500">
           You&apos;ll be able to attach photos on the next screen.
         </p>
       </form>

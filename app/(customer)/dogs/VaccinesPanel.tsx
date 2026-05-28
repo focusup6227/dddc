@@ -20,15 +20,17 @@ export function VaccinesPanel({
   return (
     <section className="card space-y-5">
       <header>
-        <h2 className="text-lg font-semibold text-stone-900">Vaccine records</h2>
-        <p className="mt-1 text-sm text-stone-600">
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Vaccine records
+        </h2>
+        <p className="mt-1 text-sm text-ink-500">
           We need a current Rabies, DHPP, and Bordetella record on file before
           you can book. Upload a clear photo or PDF of each certificate from
           your vet. We&apos;ll review within a day.
         </p>
       </header>
 
-      <ul className="divide-y divide-stone-200">
+      <ul className="divide-y divide-stone-200/80">
         {coverage.map((c) => {
           const meta = REQUIRED_VACCINES.find((v) => v.key === c.vaccineType)!;
           return (
@@ -120,12 +122,12 @@ function VaccineRow({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <p className="font-semibold text-stone-900">{label}</p>
+            <p className="font-semibold text-ink-900">{label}</p>
             <StatusPill status={coverage.status} />
           </div>
-          <p className="text-xs text-stone-500">{description}</p>
+          <p className="text-xs text-ink-500">{description}</p>
           {coverage.current && (
-            <p className="mt-1 text-xs text-stone-600">
+            <p className="mt-1 text-xs text-ink-700">
               {coverage.status === "expired"
                 ? "Expired "
                 : coverage.status === "rejected"
@@ -150,7 +152,7 @@ function VaccineRow({
               <button
                 type="submit"
                 disabled={pending}
-                className="text-xs font-medium text-stone-500 hover:text-red-600"
+                className="text-xs font-medium text-ink-500 hover:text-red-600"
               >
                 Remove
               </button>
@@ -159,7 +161,7 @@ function VaccineRow({
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+            className="btn-secondary text-sm"
           >
             {open ? "Cancel" : coverage.status === "missing" ? "Upload" : "Replace"}
           </button>
@@ -169,7 +171,7 @@ function VaccineRow({
       {open && (
         <form
           action={handleSubmit}
-          className="rounded-md border border-stone-200 bg-stone-50 p-3 space-y-3"
+          className="rounded-2xl border border-stone-200/80 bg-cream-50 p-4 space-y-3"
         >
           <div>
             <label className="label" htmlFor={`file-${vaccineType}`}>
@@ -216,31 +218,12 @@ function VaccineRow({
 
 function StatusPill({ status }: { status: VaccineCoverage["status"] }) {
   const map: Record<VaccineCoverage["status"], { label: string; cls: string }> = {
-    verified: {
-      label: "Verified",
-      cls: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    },
-    pending: {
-      label: "Pending review",
-      cls: "bg-amber-100 text-amber-800 border-amber-200",
-    },
-    expired: {
-      label: "Expired",
-      cls: "bg-red-100 text-red-800 border-red-200",
-    },
-    rejected: {
-      label: "Rejected",
-      cls: "bg-red-100 text-red-800 border-red-200",
-    },
-    missing: {
-      label: "Missing",
-      cls: "bg-stone-100 text-stone-700 border-stone-200",
-    },
+    verified: { label: "Verified", cls: "pill-success" },
+    pending: { label: "Pending review", cls: "pill-warn" },
+    expired: { label: "Expired", cls: "pill-danger" },
+    rejected: { label: "Rejected", cls: "pill-danger" },
+    missing: { label: "Missing", cls: "pill-neutral" },
   };
   const { label, cls } = map[status];
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {label}
-    </span>
-  );
+  return <span className={cls}>{label}</span>;
 }

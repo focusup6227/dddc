@@ -74,7 +74,7 @@ export function CalendarClient({
   return (
     <>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-stone-900">{monthLabel}</h2>
+        <h2 className="text-lg font-semibold text-ink-900">{monthLabel}</h2>
         <div className="flex gap-2">
           <Link
             href={prevMonthHref}
@@ -102,7 +102,7 @@ export function CalendarClient({
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <div
             key={i}
-            className="bg-stone-50 px-1 py-1.5 text-center text-xs font-semibold text-stone-600 sm:px-2"
+            className="bg-stone-50 px-1 py-1.5 text-center text-xs font-semibold text-ink-700 sm:px-2"
           >
             <span className="sm:hidden">{d}</span>
             <span className="hidden sm:inline">
@@ -137,7 +137,7 @@ export function CalendarClient({
                     "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold " +
                     (isToday
                       ? "bg-brand-600 text-white"
-                      : "text-stone-700")
+                      : "text-ink-700")
                   }
                 >
                   {d.day}
@@ -151,7 +151,7 @@ export function CalendarClient({
                     />
                   )}
                   {dayBookings.length > 0 && (
-                    <span className="text-xs font-medium text-stone-500">
+                    <span className="text-xs font-medium text-ink-500">
                       <span className="hidden sm:inline">
                         {dayBookings.length} dog
                         {dayBookings.length === 1 ? "" : "s"}
@@ -162,7 +162,7 @@ export function CalendarClient({
                 </div>
               </div>
               {hasBlackout && (
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 sm:text-xs">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500 sm:text-xs">
                   Closed
                 </p>
               )}
@@ -185,14 +185,14 @@ export function CalendarClient({
                       title={`${dog?.name ?? "Dog"} · ${b.status}`}
                     >
                       <StatusDot status={b.status} />
-                      <span className="truncate text-stone-800">
+                      <span className="truncate text-ink-900">
                         {dog?.name ?? "Dog"}
                       </span>
                     </li>
                   );
                 })}
                 {dayBookings.length > (dayEvents.length > 0 ? 2 : 3) && (
-                  <li className="text-stone-500">
+                  <li className="text-ink-500">
                     +{dayBookings.length - (dayEvents.length > 0 ? 2 : 3)} more
                   </li>
                 )}
@@ -265,9 +265,9 @@ function Panel<T>({
 }) {
   return (
     <section>
-      <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
+      <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-500">{empty}</p>
+        <p className="mt-2 text-sm text-ink-500">{empty}</p>
       ) : (
         <ul className="mt-2 space-y-2">{items.map(render)}</ul>
       )}
@@ -291,10 +291,10 @@ function EventInlineRow({
       >
         <span className="mt-0.5 inline-flex h-2 w-2 shrink-0 rounded-full bg-amber-500" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium text-stone-900">
+          <span className="block truncate font-medium text-ink-900">
             {event.title}
           </span>
-          <span className="block text-xs text-stone-500">
+          <span className="block text-xs text-ink-500">
             {rangeLabel(event.start_date, event.end_date)}
           </span>
         </span>
@@ -319,10 +319,10 @@ function BlackoutInlineRow({
       >
         <span className="mt-1 inline-block h-3 w-3 shrink-0 rounded-sm bg-[repeating-linear-gradient(45deg,_#a8a29e_0,_#a8a29e_2px,_transparent_2px,_transparent_4px)]" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium text-stone-900">
+          <span className="block truncate font-medium text-ink-900">
             {blackout.reason ?? "Closed"}
           </span>
-          <span className="block text-xs text-stone-500">
+          <span className="block text-xs text-ink-500">
             {rangeLabel(blackout.start_date, blackout.end_date)}
             {" · "}
             {kindsLabel(blackout)}
@@ -388,10 +388,10 @@ function DayModal({
       >
         <header className="flex items-start justify-between gap-3 border-b border-stone-200 px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-stone-900">
+            <h3 className="text-lg font-semibold text-ink-900">
               {formatDateShort(date)}
             </h3>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-ink-500">
               {bookings.length} booking{bookings.length === 1 ? "" : "s"} ·{" "}
               {events.length} event{events.length === 1 ? "" : "s"} ·{" "}
               {blackouts.length} blackout{blackouts.length === 1 ? "" : "s"}
@@ -401,7 +401,7 @@ function DayModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-500 hover:bg-stone-100"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -418,7 +418,7 @@ function DayModal({
         <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
           <Section title="Bookings">
             {bookings.length === 0 ? (
-              <p className="text-sm text-stone-500">No bookings.</p>
+              <p className="text-sm text-ink-500">No bookings.</p>
             ) : (
               <ul className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
                 {bookings.map((b) => {
@@ -430,13 +430,13 @@ function DayModal({
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-stone-900">
+                        <p className="truncate font-medium text-ink-900">
                           {dog?.name ?? "Dog"}{" "}
-                          <span className="text-stone-500">
+                          <span className="text-ink-500">
                             · {cust?.full_name || cust?.email || "—"}
                           </span>
                         </p>
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-ink-500">
                           {b.service_kind} · {b.status} · {b.payment_status}
                         </p>
                       </div>
@@ -472,7 +472,7 @@ function DayModal({
             }
           >
             {events.length === 0 && !adding && !editingEventId ? (
-              <p className="text-sm text-stone-500">No events.</p>
+              <p className="text-sm text-ink-500">No events.</p>
             ) : (
               <ul className="space-y-2">
                 {events.map((e) =>
@@ -491,12 +491,12 @@ function DayModal({
                       className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-stone-900">{e.title}</p>
-                        <p className="text-xs text-stone-500">
+                        <p className="font-medium text-ink-900">{e.title}</p>
+                        <p className="text-xs text-ink-500">
                           {rangeLabel(e.start_date, e.end_date)}
                         </p>
                         {e.description && (
-                          <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">
                             {e.description}
                           </p>
                         )}
@@ -562,7 +562,7 @@ function DayModal({
             }
           >
             {blackouts.length === 0 && !adding && !editingBlackoutId ? (
-              <p className="text-sm text-stone-500">No blackouts.</p>
+              <p className="text-sm text-ink-500">No blackouts.</p>
             ) : (
               <ul className="space-y-2">
                 {blackouts.map((b) =>
@@ -581,10 +581,10 @@ function DayModal({
                       className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-stone-900">
+                        <p className="font-medium text-ink-900">
                           {b.reason ?? "Closed"}
                         </p>
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-ink-500">
                           {rangeLabel(b.start_date, b.end_date)} ·{" "}
                           {kindsLabel(b)}
                         </p>
@@ -632,7 +632,7 @@ function DayModal({
             )}
           </Section>
 
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-ink-500">
             Currently editing this day in isolation. To edit{" "}
             {editingEvent || editingBlackout ? "elsewhere" : "an event/blackout that started on another day"}, navigate
             from the panels below the calendar.
@@ -655,7 +655,7 @@ function Section({
   return (
     <section>
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-sm font-semibold uppercase tracking-wide text-stone-500">
+        <h4 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
           {title}
         </h4>
         {cta}
@@ -791,7 +791,7 @@ function BlackoutForm({
       </div>
       <fieldset className="space-y-1.5">
         <legend className="label">Block which services?</legend>
-        <label className="flex items-center gap-2 text-sm text-stone-700">
+        <label className="flex items-center gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
             name="blocks_daycare"
@@ -800,7 +800,7 @@ function BlackoutForm({
           />
           Day care
         </label>
-        <label className="flex items-center gap-2 text-sm text-stone-700">
+        <label className="flex items-center gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
             name="blocks_boarding"
@@ -841,7 +841,7 @@ function StatusDot({ status }: { status: string }) {
 
 function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-600">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-700">
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
         Event

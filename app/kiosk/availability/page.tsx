@@ -38,15 +38,20 @@ export default async function KioskAvailabilityPage({
   const otherKind: ServiceKind = kind === "boarding" ? "daycare" : "boarding";
 
   return (
-    <div className="space-y-5">
-      <Link href="/kiosk" className="text-sm font-medium text-stone-600 hover:text-stone-900">
+    <div className="space-y-5 animate-fade-up">
+      <Link
+        href="/kiosk"
+        className="text-sm font-medium text-ink-700 hover:text-ink-900 hover:underline"
+      >
         ← Back to today
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Availability</h1>
-          <p className="text-sm text-stone-600">
+          <h1 className="font-display text-4xl font-bold text-ink-900">
+            Availability
+          </h1>
+          <p className="mt-1 text-sm text-ink-500">
             Capacity {max} {unit} · set in /staff/settings
           </p>
         </div>
@@ -74,14 +79,14 @@ export default async function KioskAvailabilityPage({
         </div>
       </div>
 
-      <div className="inline-flex rounded-lg border border-stone-300 bg-white p-1 text-sm">
+      <div className="inline-flex rounded-2xl border border-stone-200/80 bg-white p-1 text-sm shadow-soft">
         <Link
           href={`/kiosk/availability?month=${thisMonth}&kind=daycare`}
           className={
-            "rounded-md px-3 py-1.5 font-medium " +
+            "rounded-xl px-3.5 py-1.5 font-semibold transition-colors " +
             (kind === "daycare"
-              ? "bg-brand-600 text-white"
-              : "text-stone-700 hover:bg-stone-100")
+              ? "bg-ink-900 text-white shadow-soft"
+              : "text-ink-700 hover:bg-cream-100 hover:text-ink-900")
           }
         >
           Daycare
@@ -89,25 +94,27 @@ export default async function KioskAvailabilityPage({
         <Link
           href={`/kiosk/availability?month=${thisMonth}&kind=boarding`}
           className={
-            "rounded-md px-3 py-1.5 font-medium " +
+            "rounded-xl px-3.5 py-1.5 font-semibold transition-colors " +
             (kind === "boarding"
-              ? "bg-brand-600 text-white"
-              : "text-stone-700 hover:bg-stone-100")
+              ? "bg-ink-900 text-white shadow-soft"
+              : "text-ink-700 hover:bg-cream-100 hover:text-ink-900")
           }
         >
           Boarding
         </Link>
       </div>
 
-      <h2 className="text-lg font-semibold text-stone-900">{monthLabel}</h2>
+      <h2 className="font-display text-xl font-semibold text-ink-900">
+        {monthLabel}
+      </h2>
 
       <Legend />
 
-      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200">
+      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-2xl border border-stone-200/80 bg-stone-200">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div
             key={d}
-            className="bg-stone-50 px-2 py-1.5 text-center text-xs font-semibold text-stone-600"
+            className="bg-cream-100 px-2 py-1.5 text-center text-xs font-semibold text-ink-600"
           >
             {d}
           </div>
@@ -128,12 +135,12 @@ export default async function KioskAvailabilityPage({
                 <span
                   className={
                     "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold " +
-                    (isToday ? "bg-brand-600 text-white" : "text-stone-800")
+                    (isToday ? "bg-brand-600 text-white shadow-soft" : "text-ink-900")
                   }
                 >
                   {d.day}
                 </span>
-                <span className="text-xs font-medium text-stone-700">
+                <span className="text-xs font-semibold text-ink-700">
                   {n}/{max}
                 </span>
               </div>
@@ -148,8 +155,15 @@ export default async function KioskAvailabilityPage({
         })}
       </div>
 
-      <p className="text-xs text-stone-500">
-        Showing {kind} bookings. <Link href={`/kiosk/availability?month=${thisMonth}&kind=${otherKind}`} className="text-brand-700 underline">Switch to {otherKind}</Link>.
+      <p className="text-xs text-ink-500">
+        Showing {kind} bookings.{" "}
+        <Link
+          href={`/kiosk/availability?month=${thisMonth}&kind=${otherKind}`}
+          className="font-semibold text-brand-700 hover:text-brand-900 hover:underline"
+        >
+          Switch to {otherKind}
+        </Link>
+        .
       </p>
     </div>
   );
@@ -179,7 +193,7 @@ function Legend() {
     { label: "Full (≥100%)", bar: "bg-red-500", bg: "bg-red-100" },
   ];
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-stone-700">
+    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-700">
       {items.map((i) => (
         <span key={i.label} className="inline-flex items-center gap-2">
           <span className={`inline-block h-4 w-6 rounded ${i.bg}`}>

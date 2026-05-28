@@ -52,26 +52,46 @@ export default async function KioskBookingPage({
   const isCheckedOut = !!ci?.checked_out_at;
 
   return (
-    <div className="space-y-6">
-      <Link href="/kiosk" className="text-sm font-medium text-stone-600 hover:text-stone-900">
+    <div className="space-y-6 animate-fade-up">
+      <Link
+        href="/kiosk"
+        className="text-sm font-medium text-ink-700 hover:text-ink-900 hover:underline"
+      >
         ← Back to today
       </Link>
 
-      <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-stone-200/80 bg-white shadow-soft">
         <div className="flex flex-wrap items-center gap-5 p-6">
           <DogAvatar photoPath={dog.photo_path} name={dog.name} size={120} />
           <div className="min-w-0 flex-1">
-            <h1 className="text-3xl font-bold text-stone-900">{dog.name}</h1>
-            <p className="text-stone-600">
+            <h1 className="font-display text-4xl font-bold text-ink-900">
+              {dog.name}
+            </h1>
+            <p className="mt-1 text-ink-700">
               {cust.full_name || cust.email}
-              {cust.phone && <span className="ml-2 text-stone-500">· {cust.phone}</span>}
+              {cust.phone && (
+                <span className="ml-2 text-ink-500">· {cust.phone}</span>
+              )}
             </p>
-            <p className="mt-1 text-sm text-stone-500">
-              {booking.payment_kind === "package" ? "Package day" : "Drop-in"} ·{" "}
-              {booking.status} · {booking.payment_status}
-            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="pill-neutral">
+                {booking.payment_kind === "package" ? "Package" : "Drop-in"}
+              </span>
+              <span className="pill-neutral">{booking.status}</span>
+              <span
+                className={
+                  booking.payment_status === "paid"
+                    ? "pill-success"
+                    : booking.payment_status === "unpaid"
+                      ? "pill-warn"
+                      : "pill-neutral"
+                }
+              >
+                {booking.payment_status}
+              </span>
+            </div>
             {(booking.drop_off_time || booking.pickup_time) && (
-              <p className="mt-1 text-sm text-stone-500">
+              <p className="mt-2 text-sm text-ink-500">
                 {booking.drop_off_time && (
                   <>Scheduled drop-off {formatTime(booking.drop_off_time)}</>
                 )}
@@ -84,40 +104,49 @@ export default async function KioskBookingPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 border-t border-stone-200 bg-stone-50 p-6 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 border-t border-stone-200/80 bg-cream-50 p-6 sm:grid-cols-2">
           <Field label="Vaccinations">
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {coverage.map((c) => {
-                const meta = REQUIRED_VACCINES.find((v) => v.key === c.vaccineType)!;
+                const meta = REQUIRED_VACCINES.find(
+                  (v) => v.key === c.vaccineType,
+                )!;
                 return (
-                  <li key={c.vaccineType} className="flex items-center justify-between gap-2">
-                    <span className="text-stone-700">{meta.label}</span>
+                  <li
+                    key={c.vaccineType}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="text-ink-700">{meta.label}</span>
                     <VaccineStatus coverage={c} />
                   </li>
                 );
               })}
             </ul>
           </Field>
-          <Field label="Allergies">{dog.allergies || <em className="text-stone-400">None noted</em>}</Field>
+          <Field label="Allergies">
+            {dog.allergies || <em className="text-ink-400">None noted</em>}
+          </Field>
           <Field label="Medications">
-            {dog.medications || <em className="text-stone-400">None</em>}
+            {dog.medications || <em className="text-ink-400">None</em>}
           </Field>
           <Field label="Feeding">
-            {dog.feeding_notes || <em className="text-stone-400">None</em>}
+            {dog.feeding_notes || <em className="text-ink-400">None</em>}
           </Field>
           <Field label="Behavior">
-            {dog.behavior_notes || <em className="text-stone-400">None noted</em>}
+            {dog.behavior_notes || <em className="text-ink-400">None noted</em>}
           </Field>
           <Field label="Emergency contact">
             {cust.emergency_contact_name ? (
               <>
                 {cust.emergency_contact_name}
                 {cust.emergency_contact_phone && (
-                  <span className="ml-1 text-stone-500">· {cust.emergency_contact_phone}</span>
+                  <span className="ml-1 text-ink-500">
+                    · {cust.emergency_contact_phone}
+                  </span>
                 )}
               </>
             ) : (
-              <em className="text-stone-400">None on file</em>
+              <em className="text-ink-400">None on file</em>
             )}
           </Field>
         </div>
@@ -153,15 +182,23 @@ function VaccineStatus({ coverage }: { coverage: VaccineCoverage }) {
     case "rejected":
       return <span className="text-xs font-medium text-red-700">Rejected</span>;
     default:
-      return <span className="text-xs font-medium text-stone-400">Missing</span>;
+      return <span className="text-xs font-medium text-ink-400">Missing</span>;
   }
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">{label}</p>
-      <div className="mt-0.5 text-sm text-stone-800">{children}</div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+        {label}
+      </p>
+      <div className="mt-1 text-sm text-ink-900">{children}</div>
     </div>
   );
 }
@@ -194,9 +231,9 @@ async function ActionPanel({
   }
   if (isCheckedOut) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-stone-100 p-6 text-center text-stone-700">
-        <p className="text-lg font-semibold">Already checked out</p>
-        <p className="text-sm">
+      <div className="rounded-2xl border border-stone-200/80 bg-cream-100 p-6 text-center text-ink-700 shadow-soft">
+        <p className="font-display text-xl font-semibold">Already checked out</p>
+        <p className="mt-1 text-sm">
           {ci?.checked_out_at &&
             `at ${new Date(ci.checked_out_at).toLocaleTimeString([], {
               hour: "numeric",
@@ -237,7 +274,7 @@ function BigButton({
   return (
     <button
       type="submit"
-      className={`w-full rounded-2xl px-6 py-6 text-2xl font-bold text-white shadow-sm transition-colors ${toneStyles[tone]}`}
+      className={`w-full rounded-3xl px-6 py-6 font-display text-2xl font-bold text-white shadow-soft transition-all hover:shadow-lift active:translate-y-px ${toneStyles[tone]}`}
     >
       {children}
     </button>

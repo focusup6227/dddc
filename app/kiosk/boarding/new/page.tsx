@@ -71,19 +71,24 @@ export default async function KioskNewBoardingPage({
   }
 
   return (
-    <div className="space-y-6">
-      <Link href="/kiosk" className="text-sm font-medium text-stone-600 hover:text-stone-900">
+    <div className="space-y-6 animate-fade-up">
+      <Link
+        href="/kiosk"
+        className="text-sm font-medium text-ink-700 hover:text-ink-900 hover:underline"
+      >
         ← Back to today
       </Link>
 
-      <h1 className="text-3xl font-bold">New booking</h1>
+      <h1 className="font-display text-4xl font-bold text-ink-900">
+        New booking
+      </h1>
 
       {selectedCustomerId && (
         <KindTabs current="boarding" customerId={selectedCustomerId} />
       )}
 
       {params.error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
           {params.error}
         </div>
       )}
@@ -100,36 +105,41 @@ export default async function KioskNewBoardingPage({
               className="input w-full text-lg"
               inputMode="search"
             />
-            <button type="submit" className="btn-primary shrink-0 px-5 text-base">
+            <button
+              type="submit"
+              className="btn-primary shrink-0 px-5 text-base"
+            >
               Search
             </button>
           </form>
 
           {q.length >= 2 && (
             <section>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-500">
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
                 {matches.length} result{matches.length === 1 ? "" : "s"}
               </h2>
               {matches.length === 0 ? (
-                <p className="text-stone-600">No customers found.</p>
+                <p className="text-ink-500">No customers found.</p>
               ) : (
-                <ul className="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
+                <ul className="divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
                   {matches.map((m) => (
                     <li key={m.id}>
                       <Link
                         href={`/kiosk/boarding/new?customer=${m.id}`}
-                        className="flex items-center justify-between p-4 hover:bg-stone-50"
+                        className="flex items-center justify-between p-4 transition-colors hover:bg-cream-50"
                       >
                         <div>
-                          <p className="font-semibold text-stone-900">
+                          <p className="font-semibold text-ink-900">
                             {m.full_name || m.email}
                           </p>
-                          <p className="text-sm text-stone-500">
+                          <p className="text-sm text-ink-500">
                             {m.email}
                             {m.phone && ` · ${m.phone}`}
                           </p>
                         </div>
-                        <span className="text-sm font-medium text-brand-700">Select →</span>
+                        <span className="text-sm font-semibold text-brand-700">
+                          Select →
+                        </span>
                       </Link>
                     </li>
                   ))}
@@ -139,28 +149,28 @@ export default async function KioskNewBoardingPage({
           )}
 
           {q.length < 2 && (
-            <p className="text-sm text-stone-500">
+            <p className="text-sm text-ink-500">
               Type at least 2 characters to search.
             </p>
           )}
         </>
       ) : !customer ? (
-        <p className="text-stone-600">Customer not found.</p>
+        <p className="text-ink-500">Customer not found.</p>
       ) : dogs.length === 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 shadow-soft">
           This customer has no active dogs. Add a dog first.
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between rounded-3xl border border-stone-200/80 bg-white p-5 shadow-soft">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
                 Customer
               </p>
-              <p className="text-lg font-bold text-stone-900">
+              <p className="mt-1 font-display text-xl font-bold text-ink-900">
                 {customer.full_name || customer.email}
               </p>
-              <p className="text-sm text-stone-500">
+              <p className="text-sm text-ink-500">
                 {customer.email}
                 {customer.phone && ` · ${customer.phone}`}
               </p>
@@ -171,7 +181,7 @@ export default async function KioskNewBoardingPage({
           </div>
 
           {!waiverSigned && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 shadow-soft">
               Customer hasn&apos;t signed the active waiver. They need to sign
               at /waiver on their own device before this booking is valid.
             </div>
@@ -198,14 +208,14 @@ function KindTabs({
   customerId: string;
 }) {
   const base =
-    "flex-1 rounded-lg px-4 py-2 text-center text-base font-semibold transition-colors";
-  const active = "bg-brand-600 text-white shadow-sm";
-  const inactive = "bg-white text-stone-700 hover:bg-stone-50";
+    "flex-1 rounded-xl px-4 py-2 text-center text-base font-semibold transition-all";
+  const active = "bg-ink-900 text-white shadow-soft";
+  const inactive = "text-ink-700 hover:bg-cream-100 hover:text-ink-900";
   return (
     <nav
       role="tablist"
       aria-label="Booking type"
-      className="flex gap-2 rounded-xl border border-stone-200 bg-stone-100 p-1"
+      className="flex gap-1 rounded-2xl border border-stone-200/80 bg-white p-1 shadow-soft"
     >
       <Link
         href={`/kiosk/booking/new?customer=${customerId}`}

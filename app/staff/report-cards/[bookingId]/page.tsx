@@ -76,7 +76,7 @@ export default async function StaffReportCardEditorPage({
       <div>
         <Link
           href="/staff/report-cards"
-          className="text-sm text-stone-500 hover:text-stone-800"
+          className="text-sm text-ink-500 hover:text-ink-900"
         >
           ← All report cards
         </Link>
@@ -89,10 +89,10 @@ export default async function StaffReportCardEditorPage({
           size={72}
         />
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-stone-900">
+          <h1 className="text-2xl font-bold text-ink-900">
             {dog?.name ?? "Dog"}&apos;s report card
           </h1>
-          <p className="text-stone-600">
+          <p className="text-ink-700">
             {dateLabel} ·{" "}
             {booking.service_kind === "boarding" ? "Boarding" : "Daycare"}
             {cust && (
@@ -113,7 +113,7 @@ export default async function StaffReportCardEditorPage({
               {cust?.full_name?.split(" ")[0] ?? "the customer"}.
             </p>
           ) : (
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-ink-500">
               Draft — not visible to the customer yet.
             </p>
           )}
@@ -121,8 +121,8 @@ export default async function StaffReportCardEditorPage({
       </header>
 
       <section className="card">
-        <h2 className="font-semibold text-stone-900">Note from us</h2>
-        <p className="mt-1 text-xs text-stone-500">
+        <h2 className="font-semibold text-ink-900">Note from us</h2>
+        <p className="mt-1 text-xs text-ink-500">
           A short, warm message about how {dog?.name ?? "the pup"} did. This is
           what the customer reads first.
         </p>
@@ -147,10 +147,10 @@ export default async function StaffReportCardEditorPage({
 
       <section className="card flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-stone-900">
+          <h2 className="font-semibold text-ink-900">
             {card?.published_at ? "Re-share with customer" : "Send to customer"}
           </h2>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-sm text-ink-700">
             {card?.published_at
               ? "Updating won't re-send the email — only the first publish notifies them."
               : "Publishing makes the card visible on the customer's account and sends them an email."}

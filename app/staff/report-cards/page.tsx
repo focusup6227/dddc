@@ -149,13 +149,13 @@ function Section({
                     size={44}
                   />
                   <div className="min-w-0">
-                    <p className="font-medium text-stone-900">
+                    <p className="font-medium text-ink-900">
                       {dog?.name ?? "Dog"}{" "}
-                      <span className="text-stone-500">
+                      <span className="text-ink-500">
                         · {cust?.full_name || cust?.email}
                       </span>
                     </p>
-                    <p className="text-xs text-stone-500">
+                    <p className="text-xs text-ink-500">
                       {b.service_kind === "boarding"
                         ? `${formatDateShort(b.service_date)} → ${formatDateShort(b.service_end_date)} · Boarding`
                         : `${formatDateShort(b.service_date)} · Daycare`}{" "}

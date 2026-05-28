@@ -27,7 +27,7 @@ export default function StaffCancelButton({
   return (
     <form action={staffCancelBooking} className="flex flex-col items-end gap-1">
       <input type="hidden" name="booking_id" value={bookingId} />
-      <p className="text-xs text-stone-600">{preview}</p>
+      <p className="text-xs text-ink-700">{preview}</p>
       <input
         type="text"
         name="reason"

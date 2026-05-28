@@ -135,7 +135,7 @@ function ViewToggle({
   const base =
     "px-3 py-1.5 text-sm font-medium transition-colors first:rounded-l-md last:rounded-r-md";
   const active = "bg-brand-600 text-white";
-  const idle = "bg-white text-stone-700 hover:bg-stone-50";
+  const idle = "bg-white text-ink-700 hover:bg-stone-50";
   return (
     <div className="inline-flex rounded-md border border-stone-300">
       <Link href={listHref} className={`${base} ${view === "list" ? active : idle}`}>
@@ -177,11 +177,11 @@ function ListView({
       <form className="flex flex-wrap items-end gap-2 text-sm">
         <input type="hidden" name="view" value="list" />
         <label className="block">
-          <span className="block text-xs text-stone-500">From</span>
+          <span className="block text-xs text-ink-500">From</span>
           <input type="date" name="from" defaultValue={from} className="input" />
         </label>
         <label className="block">
-          <span className="block text-xs text-stone-500">To</span>
+          <span className="block text-xs text-ink-500">To</span>
           <input type="date" name="to" defaultValue={to} className="input" />
         </label>
         <button type="submit" className="btn-secondary">
@@ -190,13 +190,13 @@ function ListView({
       </form>
 
       {sortedDates.length === 0 ? (
-        <p className="text-stone-600">No bookings in this range.</p>
+        <p className="text-ink-700">No bookings in this range.</p>
       ) : (
         sortedDates.map((date) => {
           const dayBookings = byDate.get(date)!;
           return (
             <section key={date}>
-              <h2 className="text-lg font-semibold text-stone-900">
+              <h2 className="text-lg font-semibold text-ink-900">
                 {formatDateShort(date)} · {dayBookings.length} dog
                 {dayBookings.length === 1 ? "" : "s"}
               </h2>
@@ -212,14 +212,14 @@ function ListView({
                       <div className="min-w-0 flex-1">
                         <Link
                           href={`/staff/dogs/${b.dog_id}`}
-                          className="font-medium text-stone-900 hover:underline"
+                          className="font-medium text-ink-900 hover:underline"
                         >
                           {dog?.name ?? "Dog"}
                         </Link>{" "}
-                        <span className="text-stone-500">
+                        <span className="text-ink-500">
                           · {cust?.full_name ?? cust?.email}
                         </span>
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-ink-500">
                           {b.payment_kind} · {b.status} · {b.payment_status}
                         </p>
                       </div>
@@ -273,7 +273,7 @@ function CalendarView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-stone-900">{monthLabel}</h2>
+        <h2 className="text-lg font-semibold text-ink-900">{monthLabel}</h2>
         <div className="flex gap-2">
           <Link
             href={`/staff/bookings?view=calendar&month=${prevMonth}`}
@@ -304,7 +304,7 @@ function CalendarView({
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <div
             key={i}
-            className="bg-stone-50 px-1 py-1.5 text-center text-xs font-semibold text-stone-600 sm:px-2"
+            className="bg-stone-50 px-1 py-1.5 text-center text-xs font-semibold text-ink-700 sm:px-2"
           >
             <span className="sm:hidden">{d}</span>
             <span className="hidden sm:inline">
@@ -332,7 +332,7 @@ function CalendarView({
                     "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold " +
                     (isToday
                       ? "bg-brand-600 text-white"
-                      : "text-stone-700")
+                      : "text-ink-700")
                   }
                 >
                   {d.day}
@@ -346,7 +346,7 @@ function CalendarView({
                     />
                   )}
                   {dayBookings.length > 0 && (
-                    <span className="text-xs font-medium text-stone-500">
+                    <span className="text-xs font-medium text-ink-500">
                       <span className="hidden sm:inline">
                         {dayBookings.length} dog{dayBookings.length === 1 ? "" : "s"}
                       </span>
@@ -374,14 +374,14 @@ function CalendarView({
                       title={`${dog?.name ?? "Dog"} · ${b.status}`}
                     >
                       <StatusDot status={b.status} />
-                      <span className="truncate text-stone-800">
+                      <span className="truncate text-ink-900">
                         {dog?.name ?? "Dog"}
                       </span>
                     </li>
                   );
                 })}
                 {dayBookings.length > (dayEvents.length > 0 ? 2 : 3) && (
-                  <li className="text-stone-500">
+                  <li className="text-ink-500">
                     +{dayBookings.length - (dayEvents.length > 0 ? 2 : 3)} more
                   </li>
                 )}
@@ -413,7 +413,7 @@ function StatusDot({ status }: { status: BookingStatus }) {
 
 function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-600">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-700">
       {(["reserved", "checked_in", "checked_out", "no_show"] as BookingStatus[]).map(
         (s) => (
           <span key={s} className="inline-flex items-center gap-1.5">

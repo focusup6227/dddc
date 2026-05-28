@@ -28,12 +28,12 @@ export function ReportCardView({
       <div className="overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-amber-50 p-5">
         <div className="flex items-center gap-2">
           <span aria-hidden className="text-xl">🐾</span>
-          <h3 className="font-semibold text-stone-900">
+          <h3 className="font-semibold text-ink-900">
             New report card for {dogName}
           </h3>
         </div>
         {card.note && (
-          <p className="mt-2 line-clamp-3 text-sm text-stone-700">{card.note}</p>
+          <p className="mt-2 line-clamp-3 text-sm text-ink-700">{card.note}</p>
         )}
         {previewPhotos.length > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2">
@@ -52,7 +52,7 @@ export function ReportCardView({
             })}
           </div>
         )}
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-ink-500">
           Posted {card.published_at && formatDate(card.published_at)}
         </p>
       </div>
@@ -65,11 +65,11 @@ export function ReportCardView({
         <div className="flex items-center gap-2">
           <span aria-hidden className="text-2xl">🐾</span>
           <div>
-            <h3 className="font-semibold text-stone-900">
+            <h3 className="font-semibold text-ink-900">
               {dogName}&apos;s report card
             </h3>
             {card.published_at && (
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-ink-500">
                 Posted {formatDate(card.published_at)}
               </p>
             )}
@@ -77,7 +77,7 @@ export function ReportCardView({
         </div>
 
         {card.note && (
-          <p className="mt-3 whitespace-pre-wrap text-stone-800">
+          <p className="mt-3 whitespace-pre-wrap text-ink-900">
             {card.note}
           </p>
         )}
@@ -88,7 +88,7 @@ export function ReportCardView({
           {dated.map((group) => (
             <div key={group.date ?? "any"}>
               {group.date && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
                   {formatDateShort(group.date)}
                 </p>
               )}
@@ -108,7 +108,7 @@ export function ReportCardView({
                         className="aspect-square w-full object-cover"
                       />
                       {p.caption && (
-                        <figcaption className="px-2 py-1.5 text-xs text-stone-700">
+                        <figcaption className="px-2 py-1.5 text-xs text-ink-700">
                           {p.caption}
                         </figcaption>
                       )}

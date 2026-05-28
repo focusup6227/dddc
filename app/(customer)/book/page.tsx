@@ -203,7 +203,7 @@ export default async function BookPage({
       <KindTabs current="daycare" />
 
       <section className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-ink-700">
           {daysRemaining > 0
             ? `You have ${daysRemaining} package days available — they'll be used first.`
             : dropInPkg
@@ -283,7 +283,7 @@ function KindTabs({ current }: { current: "daycare" | "boarding" }) {
   const base =
     "flex-1 rounded-lg px-4 py-2 text-center text-sm font-semibold transition-colors";
   const active = "bg-brand-600 text-white shadow-sm";
-  const inactive = "bg-white text-stone-700 hover:bg-stone-50";
+  const inactive = "bg-white text-ink-700 hover:bg-stone-50";
   return (
     <nav
       role="tablist"

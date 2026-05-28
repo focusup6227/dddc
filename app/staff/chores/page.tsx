@@ -110,7 +110,7 @@ export default async function StaffChoresPage({
         <form className="flex flex-wrap items-end gap-2 text-sm">
           {showDone && <input type="hidden" name="done" value="1" />}
           <label className="block">
-            <span className="block text-xs text-stone-500">Date</span>
+            <span className="block text-xs text-ink-500">Date</span>
             <input
               type="date"
               name="date"
@@ -148,7 +148,7 @@ export default async function StaffChoresPage({
                   key={dogId}
                   className="rounded-lg border border-stone-200 bg-white p-3"
                 >
-                  <p className="mb-2 font-medium text-stone-900">
+                  <p className="mb-2 font-medium text-ink-900">
                     {dog?.name ?? "Dog"}
                   </p>
                   <ul className="divide-y divide-stone-100">
@@ -228,8 +228,8 @@ export default async function StaffChoresPage({
       </Section>
 
       <section className="card">
-        <h2 className="font-semibold text-stone-900">Add a chore</h2>
-        <p className="mt-1 text-xs text-stone-500">
+        <h2 className="font-semibold text-ink-900">Add a chore</h2>
+        <p className="mt-1 text-xs text-ink-500">
           One-off chore for a specific day, or a recurring task that
           auto-populates daily or weekly.
         </p>
@@ -314,8 +314,8 @@ export default async function StaffChoresPage({
 
       {templates.length > 0 && (
         <section className="card">
-          <h2 className="font-semibold text-stone-900">Recurring chores</h2>
-          <p className="mt-1 text-xs text-stone-500">
+          <h2 className="font-semibold text-ink-900">Recurring chores</h2>
+          <p className="mt-1 text-xs text-ink-500">
             Templates that auto-add an instance to the list.
           </p>
           <ul className="mt-3 divide-y divide-stone-100">
@@ -325,8 +325,8 @@ export default async function StaffChoresPage({
                 className="flex items-center justify-between py-2 text-sm"
               >
                 <div>
-                  <p className="font-medium text-stone-900">{t.title}</p>
-                  <p className="text-xs text-stone-500">
+                  <p className="font-medium text-ink-900">{t.title}</p>
+                  <p className="text-xs text-ink-500">
                     {t.recurrence === "daily"
                       ? "Every day"
                       : `Weekly · ${WEEKDAYS[t.weekday ?? 1]}`}
@@ -336,7 +336,7 @@ export default async function StaffChoresPage({
                   <input type="hidden" name="id" value={t.id} />
                   <button
                     type="submit"
-                    className="text-xs font-medium text-stone-500 hover:text-red-600"
+                    className="text-xs font-medium text-ink-500 hover:text-red-600"
                   >
                     Remove
                   </button>
@@ -359,14 +359,14 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-lg font-semibold text-stone-900">{title}</h2>
+      <h2 className="mb-2 text-lg font-semibold text-ink-900">{title}</h2>
       {children}
     </section>
   );
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="text-sm text-stone-500">{text}</p>;
+  return <p className="text-sm text-ink-500">{text}</p>;
 }
 
 function ChoreRow({
@@ -417,17 +417,17 @@ function ChoreRow({
           <p
             className={
               done
-                ? "text-stone-500 line-through"
-                : "text-stone-900"
+                ? "text-ink-500 line-through"
+                : "text-ink-900"
             }
           >
             {title ?? chore.title}
           </p>
           {chore.description && !done && (
-            <p className="text-xs text-stone-500">{chore.description}</p>
+            <p className="text-xs text-ink-500">{chore.description}</p>
           )}
           {done && completedByName && (
-            <p className="text-xs text-stone-400">
+            <p className="text-xs text-ink-400">
               by {completedByName}
             </p>
           )}
@@ -438,7 +438,7 @@ function ChoreRow({
           <input type="hidden" name="id" value={chore.id} />
           <button
             type="submit"
-            className="text-xs font-medium text-stone-400 hover:text-red-600"
+            className="text-xs font-medium text-ink-400 hover:text-red-600"
             aria-label="Delete chore"
           >
             ✕
