@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/auth";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
-import type { Booking, CustomerPackage } from "@/lib/supabase/types";
+import { createClient } from "@/lib/supabase/server";
+import { cancelBookingWithRefund } from "@/lib/bookings.server";
+import type { Booking } from "@/lib/supabase/types";
 
 export async function cancelBooking(formData: FormData) {
   const { userId } = await requireCustomer();
@@ -17,25 +18,9 @@ export async function cancelBooking(formData: FormData) {
     .eq("id", id)
     .eq("customer_id", userId)
     .maybeSingle<Booking>();
-  if (!booking || booking.status !== "reserved") return;
+  if (!booking) return;
 
-  const svc = createServiceClient();
-  await svc.from("bookings").update({ status: "canceled" }).eq("id", id);
-
-  // Refund the package day if it was funded by a package.
-  if (booking.payment_kind === "package" && booking.customer_package_id) {
-    const { data: pkg } = await svc
-      .from("customer_packages")
-      .select("*")
-      .eq("id", booking.customer_package_id)
-      .maybeSingle<CustomerPackage>();
-    if (pkg && pkg.days_remaining < pkg.days_total) {
-      await svc
-        .from("customer_packages")
-        .update({ days_remaining: pkg.days_remaining + 1 })
-        .eq("id", pkg.id);
-    }
-  }
+  await cancelBookingWithRefund({ booking, actorId: userId, actorRole: "customer" });
 
   revalidatePath("/bookings");
   revalidatePath("/dashboard");

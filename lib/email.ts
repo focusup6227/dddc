@@ -341,6 +341,85 @@ export async function sendPackageLowAlert(args: {
   });
 }
 
+// --- Booking cancellation -------------------------------------------------
+
+export async function sendBookingCancellation(args: {
+  to: string;
+  customerName: string;
+  dogName: string;
+  serviceDate: string;
+  serviceEndDate: string;
+  serviceKind: "daycare" | "boarding";
+  paymentKind: "package" | "drop_in";
+  refundAmountCents: number;
+  packageDayRestored: boolean;
+  refundFraction: 1 | 0.5;
+  actorRole: "customer" | "staff";
+}) {
+  const {
+    to,
+    customerName,
+    dogName,
+    serviceDate,
+    serviceEndDate,
+    serviceKind,
+    paymentKind,
+    refundAmountCents,
+    packageDayRestored,
+    refundFraction,
+    actorRole,
+  } = args;
+
+  const dateLabel =
+    serviceKind === "boarding"
+      ? `${formatDateShort(serviceDate)} → ${formatDateShort(serviceEndDate)}`
+      : formatDateShort(serviceDate);
+
+  let refundLine: { label: string; value: string };
+  if (paymentKind === "package") {
+    refundLine = {
+      label: "Package day",
+      value: packageDayRestored ? "Restored" : "Forfeited (within 24h)",
+    };
+  } else if (refundAmountCents > 0) {
+    refundLine = {
+      label: refundFraction === 1 ? "Refund (100%)" : "Refund (50%, within 24h)",
+      value: formatMoney(refundAmountCents),
+    };
+  } else {
+    refundLine = { label: "Refund", value: "None" };
+  }
+
+  const explainer =
+    actorRole === "staff"
+      ? "We canceled this booking on our end, so you've been refunded in full."
+      : refundFraction === 1
+        ? "Because the cancellation came in more than 24 hours before the booking, you get a full refund."
+        : "Because the cancellation came in within 24 hours of the booking, the refund is 50% per our policy.";
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi ${escape(customerName)},</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">Your booking for <strong style="color:${COLOR.text};">${escape(dogName)}</strong> has been canceled.</p>
+    ${detailCard([
+      { label: serviceKind === "boarding" ? "Stay" : "Day", value: escape(dateLabel) },
+      { label: "Dog", value: escape(dogName) },
+      refundLine,
+    ])}
+    <p style="margin:14px 0 0;font-family:${FONT};font-size:14px;line-height:1.55;color:${COLOR.textMuted};">${explainer}</p>
+    ${button(`${appUrl()}/bookings`, "View your bookings")}
+  `;
+
+  await send({
+    to,
+    subject: `Booking canceled — ${dogName} (${dateLabel})`,
+    html: shell({
+      preheader: `Cancellation confirmed for ${dogName} on ${dateLabel}.`,
+      heading: "Booking canceled",
+      body,
+    }),
+  });
+}
+
 // --- Day-before reminder --------------------------------------------------
 
 export async function sendBookingReminder(args: {

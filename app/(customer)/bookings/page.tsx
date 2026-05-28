@@ -1,8 +1,10 @@
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, Dog } from "@/lib/supabase/types";
-import { formatDateShort, todayISO } from "@/lib/format";
+import { formatDateShort, formatMoney, todayISO } from "@/lib/format";
+import { refundFractionForBooking } from "@/lib/bookings.server";
 import { cancelBooking } from "./actions";
+import ConfirmCancelButton from "./ConfirmCancelButton";
 
 export default async function BookingsPage() {
   const { userId } = await requireCustomer();
@@ -42,6 +44,24 @@ function nightCount(start: string, end: string): number {
   return Math.max(0, Math.round((b - a) / 86400000));
 }
 
+function refundPreview(b: Booking): string {
+  const fraction = refundFractionForBooking(b.service_date, "customer");
+  if (b.payment_kind === "package") {
+    return fraction === 1
+      ? "Full refund: 1 day returned to your package."
+      : "Within 24h: package day will be forfeited (no refund).";
+  }
+  if (b.payment_status !== "paid" || !b.unit_price_cents) {
+    return "No charge to refund.";
+  }
+  const nights = Math.max(1, nightCount(b.service_date, b.service_end_date));
+  const total = b.unit_price_cents * nights;
+  const amount = Math.round(total * fraction);
+  return fraction === 1
+    ? `Full refund of ${formatMoney(amount)}.`
+    : `Within 24h: 50% refund of ${formatMoney(amount)}.`;
+}
+
 function Section({
   title,
   bookings,
@@ -62,9 +82,11 @@ function Section({
         <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
           {bookings.map((b) => {
             const dog = dogs.find((d) => d.id === b.dog_id);
+            const showCancel = cancelable && b.status === "reserved";
+            const preview = showCancel ? refundPreview(b) : "";
             return (
-              <li key={b.id} className="flex items-center justify-between px-4 py-3">
-                <div>
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium text-stone-900">
                     {b.service_kind === "boarding"
                       ? `${formatDateShort(b.service_date)} → ${formatDateShort(b.service_end_date)}`
@@ -78,14 +100,16 @@ function Section({
                         ? "Package day"
                         : "Drop-in"}{" "}
                     · {b.status} · {b.payment_status}
+                    {b.refund_amount_cents != null && b.refund_amount_cents > 0 && (
+                      <> · refunded {formatMoney(b.refund_amount_cents)}</>
+                    )}
                   </p>
+                  {showCancel && <p className="mt-1 text-xs text-stone-500">{preview}</p>}
                 </div>
-                {cancelable && b.status === "reserved" && (
+                {showCancel && (
                   <form action={cancelBooking}>
                     <input type="hidden" name="id" value={b.id} />
-                    <button type="submit" className="btn-secondary text-sm">
-                      Cancel
-                    </button>
+                    <ConfirmCancelButton preview={preview} />
                   </form>
                 )}
               </li>

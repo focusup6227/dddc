@@ -115,6 +115,11 @@ export interface Booking {
   stripe_checkout_session_id: string | null;
   payment_status: PaymentStatus;
   notes: string | null;
+  canceled_at: string | null;
+  canceled_by: string | null;
+  cancellation_reason: string | null;
+  refund_amount_cents: number | null;
+  stripe_refund_id: string | null;
   created_at: string;
   updated_at: string;
 }

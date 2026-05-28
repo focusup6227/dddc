@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { CheckIn } from "@/lib/supabase/types";
+import { cancelBookingWithRefund } from "@/lib/bookings.server";
+import type { Booking, CheckIn } from "@/lib/supabase/types";
 
 export async function checkInBooking(formData: FormData) {
   const { userId } = await requireStaff();
@@ -64,6 +65,28 @@ export async function addDogNote(formData: FormData) {
     booking_id,
   });
   revalidatePath(`/staff/dogs/${dog_id}`);
+}
+
+export async function staffCancelBooking(formData: FormData) {
+  const { userId } = await requireStaff();
+  const id = String(formData.get("booking_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+  if (!id) return;
+
+  const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle<Booking>();
+  if (!booking) return;
+
+  await cancelBookingWithRefund({ booking, actorId: userId, actorRole: "staff", reason });
+
+  revalidatePath("/staff/bookings");
+  revalidatePath("/staff");
+  revalidatePath(`/staff/dogs/${booking.dog_id}`);
+  revalidatePath(`/staff/customers/${booking.customer_id}`);
 }
 
 export async function updateStaffNotes(formData: FormData) {

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, BookingStatus, Dog, Profile } from "@/lib/supabase/types";
-import { addDays, formatDateShort, todayISO } from "@/lib/format";
+import { addDays, formatDateShort, formatMoney, todayISO } from "@/lib/format";
+import StaffCancelButton from "./StaffCancelButton";
 
 type View = "list" | "calendar";
 
@@ -175,9 +176,9 @@ function ListView({
                   return (
                     <li
                       key={b.id}
-                      className="flex items-center justify-between px-4 py-3"
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <Link
                           href={`/staff/dogs/${b.dog_id}`}
                           className="font-medium text-stone-900 hover:underline"
@@ -191,6 +192,12 @@ function ListView({
                           {b.payment_kind} · {b.status} · {b.payment_status}
                         </p>
                       </div>
+                      {b.status === "reserved" && (
+                        <StaffCancelButton
+                          bookingId={b.id}
+                          preview={refundPreviewForStaff(b)}
+                        />
+                      )}
                     </li>
                   );
                 })}
@@ -376,6 +383,26 @@ const STATUS_STYLE: Record<BookingStatus, { dot: string; label: string }> = {
     label: "Canceled",
   },
 };
+
+function refundPreviewForStaff(b: Booking): string {
+  // Staff cancels always refund the customer in full.
+  if (b.payment_kind === "package") {
+    return "Full refund: 1 day returned to package.";
+  }
+  if (b.payment_status !== "paid" || !b.unit_price_cents) {
+    return "Unpaid — no refund.";
+  }
+  const [y1, m1, d1] = b.service_date.split("-").map(Number);
+  const [y2, m2, d2] = b.service_end_date.split("-").map(Number);
+  const nights = Math.max(
+    1,
+    Math.round(
+      (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000,
+    ),
+  );
+  const amount = b.unit_price_cents * nights;
+  return `Full refund: ${formatMoney(amount)}.`;
+}
 
 function firstOfMonth(iso: string): string {
   return `${iso.slice(0, 7)}-01`;
