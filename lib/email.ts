@@ -454,6 +454,42 @@ export async function sendBookingReminder(args: {
   });
 }
 
+// --- Staff invite ---------------------------------------------------------
+
+export async function sendStaffInvite(args: {
+  to: string;
+  inviterName: string;
+  actionUrl: string;
+  resend?: boolean;
+}) {
+  const { to, inviterName, actionUrl, resend } = args;
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi there,</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">
+      <strong style="color:${COLOR.text};">${escape(inviterName)}</strong> ${resend ? "re-sent your invite" : "invited you"} to join the
+      <strong style="color:${COLOR.text};">${escape(BRAND)}</strong> team as a junior staff member.
+    </p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">
+      You&rsquo;ll be able to check dogs in and out, complete chores, and see the day&rsquo;s schedule. Click below to set a password and finish setting up your account.
+    </p>
+    ${button(actionUrl, "Accept invite & set password")}
+    <p style="margin:14px 0 0;font-family:${FONT};font-size:13px;line-height:1.55;color:${COLOR.textFaint};">
+      This link expires in 24 hours. If you weren&rsquo;t expecting this, you can safely ignore the email.
+    </p>
+  `;
+
+  await send({
+    to,
+    subject: `${inviterName} invited you to join Dixon Doggy Day Care`,
+    html: shell({
+      preheader: `Set up your junior-staff account at ${BRAND}.`,
+      heading: "You're invited",
+      body,
+    }),
+  });
+}
+
 // --- Vaccine expiring soon ------------------------------------------------
 
 export async function sendVaccineExpiryReminder(args: {

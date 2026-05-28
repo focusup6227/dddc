@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireFullStaff } from "@/lib/auth";
+import { sendStaffInvite } from "@/lib/email";
 import { createServiceClient } from "@/lib/supabase/server";
 import { appUrl } from "@/lib/stripe";
 
@@ -21,12 +22,15 @@ function err(msg: string): never {
 
 /**
  * Invite a junior_staff member by email. If the email is already a customer,
- * promote them. If they're already on the team, error. Otherwise send a
- * Supabase invite email; the recipient sets a password via /auth/callback →
- * /onboarding/set-password.
+ * promote them in place. If they're already on the team, error.
+ * Otherwise we use Supabase's admin `generateLink` to create the user + mint
+ * a magic link, then deliver the invite ourselves via Resend so it looks
+ * like the rest of our transactional email.
  */
 export async function inviteJuniorStaff(formData: FormData) {
-  await requireFullStaff();
+  const session = await requireFullStaff();
+  const inviterName =
+    session.profile.full_name?.trim() || session.profile.email;
   const emailRaw = str(formData.get("email"))?.toLowerCase();
   if (!emailRaw) err("Email is required.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) err("Invalid email.");
@@ -44,7 +48,8 @@ export async function inviteJuniorStaff(formData: FormData) {
     if (existing.role === "staff" || existing.role === "junior_staff") {
       err("That email is already on the team.");
     }
-    // Promote existing customer to junior_staff in place.
+    // Promote existing customer to junior_staff in place — they already
+    // have a password and can sign in normally.
     const { error } = await svc
       .from("profiles")
       .update({ role: "junior_staff" })
@@ -54,13 +59,16 @@ export async function inviteJuniorStaff(formData: FormData) {
     redirect("/staff/team?saved=" + encodeURIComponent("Account promoted to junior staff."));
   }
 
-  // New email — send a Supabase invite.
+  // New email — mint a magic link via the admin API (this creates the user
+  // but does NOT send an email), then deliver via Resend.
   const redirectTo = `${appUrl()}/auth/callback?next=${encodeURIComponent("/onboarding/set-password")}`;
-  const { data, error } = await svc.auth.admin.inviteUserByEmail(emailRaw, {
-    redirectTo,
+  const { data, error } = await svc.auth.admin.generateLink({
+    type: "invite",
+    email: emailRaw,
+    options: { redirectTo },
   });
-  if (error || !data.user) {
-    err(error?.message ?? "Failed to send invite.");
+  if (error || !data?.user || !data.properties?.action_link) {
+    err(error?.message ?? "Failed to create invite.");
   }
 
   // Promote the freshly-minted profile.
@@ -69,6 +77,12 @@ export async function inviteJuniorStaff(formData: FormData) {
     .update({ role: "junior_staff" })
     .eq("id", data.user.id);
   if (roleErr) err(roleErr.message);
+
+  await sendStaffInvite({
+    to: emailRaw,
+    inviterName,
+    actionUrl: data.properties.action_link,
+  });
 
   revalidatePath("/staff/team");
   redirect("/staff/team?saved=" + encodeURIComponent("Invite sent."));
@@ -114,16 +128,31 @@ export async function changeUserRole(formData: FormData) {
 }
 
 export async function resendInvite(formData: FormData) {
-  await requireFullStaff();
+  const session = await requireFullStaff();
+  const inviterName =
+    session.profile.full_name?.trim() || session.profile.email;
   const email = str(formData.get("email"))?.toLowerCase();
   if (!email) err("Email is required.");
 
   const svc = createServiceClient();
+  // The user already exists, so 'magiclink' is the right type — it gives
+  // them a fresh login link without trying to re-create the account.
   const redirectTo = `${appUrl()}/auth/callback?next=${encodeURIComponent("/onboarding/set-password")}`;
-  const { error } = await svc.auth.admin.inviteUserByEmail(email, {
-    redirectTo,
+  const { data, error } = await svc.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: { redirectTo },
   });
-  if (error) err(error.message);
+  if (error || !data?.properties?.action_link) {
+    err(error?.message ?? "Failed to generate link.");
+  }
+
+  await sendStaffInvite({
+    to: email,
+    inviterName,
+    actionUrl: data.properties.action_link,
+    resend: true,
+  });
 
   revalidatePath("/staff/team");
   redirect("/staff/team?saved=" + encodeURIComponent("Invite re-sent."));
