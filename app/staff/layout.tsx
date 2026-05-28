@@ -9,6 +9,7 @@ const NAV = [
   { href: "/staff/customers", label: "Customers" },
   { href: "/staff/dogs", label: "Dogs" },
   { href: "/staff/packages", label: "Packages" },
+  { href: "/kiosk", label: "Kiosk" },
 ];
 
 export default async function StaffLayout({
