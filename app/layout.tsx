@@ -52,10 +52,14 @@ export default function RootLayout({
           position="top-right"
           richColors
           closeButton
+          expand
+          duration={4500}
           toastOptions={{
             classNames: {
               toast:
-                "rounded-2xl border border-stone-200 shadow-lift font-sans",
+                "!rounded-2xl !border !shadow-lift !font-sans !text-sm",
+              title: "!font-semibold",
+              description: "!text-ink-700",
             },
           }}
         />

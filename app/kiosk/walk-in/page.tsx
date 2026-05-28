@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatMoney } from "@/lib/format";
 import type { Dog, Package, Profile } from "@/lib/supabase/types";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { kioskWalkInCharge } from "../actions";
+
+const ERROR_TOAST = [{ param: "error", tone: "error" as const }];
 
 export const dynamic = "force-dynamic";
 
@@ -87,11 +90,7 @@ export default async function WalkInPage({
         New walk-in
       </h1>
 
-      {params.error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={ERROR_TOAST} />
 
       {!selectedCustomerId ? (
         <>

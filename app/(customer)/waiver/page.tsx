@@ -4,16 +4,14 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Waiver, WaiverSignature } from "@/lib/supabase/types";
 import { formatDate } from "@/lib/format";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { signWaiver } from "./actions";
 
-export default async function WaiverPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+const TOASTS = [{ param: "error", tone: "error" as const }];
+
+export default async function WaiverPage() {
   const { userId, profile } = await requireCustomer();
   const supabase = await createClient();
-  const params = await searchParams;
 
   const { data: waiver } = await supabase
     .from("waivers")
@@ -81,6 +79,8 @@ export default async function WaiverPage({
         <ReactMarkdown>{waiver.body_markdown}</ReactMarkdown>
       </article>
 
+      <ToastNotifier toasts={TOASTS} />
+
       <form action={signWaiver} className="card mt-6 space-y-5">
         <input type="hidden" name="waiver_id" value={waiver.id} />
         <div>
@@ -110,11 +110,6 @@ export default async function WaiverPage({
             signature.
           </span>
         </label>
-        {params.error && (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-            {params.error}
-          </p>
-        )}
         <button type="submit" className="btn-primary">
           Sign waiver
         </button>

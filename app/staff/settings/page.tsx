@@ -6,6 +6,7 @@ import {
   getMaxDogsPerNight,
 } from "@/lib/settings";
 import { StaffSubNav } from "@/components/StaffSubNav";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { saveSettings } from "./actions";
 
 const SUBNAV = [
@@ -15,15 +16,15 @@ const SUBNAV = [
   { href: "/staff/events", label: "Events" },
 ];
 
+const TOASTS = [
+  { param: "saved", message: "Settings saved." },
+  { param: "error", tone: "error" as const },
+];
+
 export const dynamic = "force-dynamic";
 
-export default async function StaffSettingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ saved?: string; error?: string }>;
-}) {
+export default async function StaffSettingsPage() {
   await requireStaff();
-  const params = await searchParams;
   const [maxDay, maxNight, boardingCents] = await Promise.all([
     getMaxDogsPerDay(),
     getMaxDogsPerNight(),
@@ -47,16 +48,7 @@ export default async function StaffSettingsPage({
         </p>
       </div>
 
-      {params.saved && (
-        <p className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-emerald-900 shadow-soft">
-          Saved.
-        </p>
-      )}
-      {params.error && (
-        <p className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
-          {params.error}
-        </p>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <form action={saveSettings} className="card space-y-4">
         <div>

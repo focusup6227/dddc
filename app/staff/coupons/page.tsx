@@ -3,7 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import type { Coupon } from "@/lib/supabase/types";
 import { formatDate, formatMoney } from "@/lib/format";
 import { StaffSubNav } from "@/components/StaffSubNav";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { createCoupon, deleteCoupon, toggleCoupon } from "./actions";
+
+const TOASTS = [
+  { param: "saved", message: "Saved." },
+  { param: "error", tone: "error" as const },
+];
 
 const SUBNAV = [
   { href: "/staff/settings", label: "General" },
@@ -14,13 +20,8 @@ const SUBNAV = [
 
 export const dynamic = "force-dynamic";
 
-export default async function StaffCouponsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ saved?: string; error?: string }>;
-}) {
+export default async function StaffCouponsPage() {
   await requireStaff();
-  const params = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase
     .from("coupons")
@@ -43,16 +44,7 @@ export default async function StaffCouponsPage({
         </p>
       </header>
 
-      {params.saved && (
-        <p className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm font-medium text-emerald-900 shadow-soft">
-          Saved.
-        </p>
-      )}
-      {params.error && (
-        <p className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
-          {params.error}
-        </p>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <section className="card">
         <h2 className="font-display text-lg font-semibold text-ink-900">

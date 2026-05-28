@@ -6,8 +6,14 @@ import type { Referral } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
 import { appUrl } from "@/lib/stripe";
 import { HeartPaw } from "@/components/illustrations";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { saveProfile } from "./actions";
 import { ReferralShare } from "./ReferralShare";
+
+const TOASTS = [
+  { param: "saved", message: "Saved." },
+  { param: "error", tone: "error" as const },
+];
 
 export default async function AccountPage({
   searchParams,
@@ -40,16 +46,7 @@ export default async function AccountPage({
         </p>
       </div>
 
-      {params.saved && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Saved.
-        </div>
-      )}
-      {params.error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <section className="card relative overflow-hidden">
         <div className="flex items-start justify-between gap-4">

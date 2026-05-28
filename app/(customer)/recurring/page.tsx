@@ -10,6 +10,7 @@ import {
   LATEST_TIME,
 } from "@/lib/hours";
 import { materializeForCustomer } from "@/lib/recurring.server";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import {
   createRecurring,
   deleteRecurring,
@@ -28,13 +29,8 @@ const WEEKDAYS = [
   { idx: 6, label: "Sat" },
 ];
 
-export default async function RecurringPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ saved?: string; created?: string; error?: string }>;
-}) {
+export default async function RecurringPage() {
   const { userId } = await requireCustomer();
-  const params = await searchParams;
   const supabase = await createClient();
 
   // Refresh materialization so the list stays ~28 days ahead.
@@ -54,6 +50,21 @@ export default async function RecurringPage({
 
   const today = todayISO();
   const horizon = addDays(today, 28);
+
+  const toasts = [
+    {
+      param: "saved",
+      message: "Schedule saved.",
+      alsoStrip: ["created"],
+      format: (_v: string, sp: URLSearchParams) => {
+        const n = Number(sp.get("created") ?? 0);
+        return n > 0
+          ? `Schedule saved. Created ${n} booking${n === 1 ? "" : "s"} through ${formatDateShort(horizon)}.`
+          : "Schedule saved.";
+      },
+    },
+    { param: "error", tone: "error" as const },
+  ];
 
   if (dogs.length === 0) {
     return (
@@ -83,23 +94,7 @@ export default async function RecurringPage({
         </p>
       </header>
 
-      {params.saved && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Schedule saved.
-          {params.created && Number(params.created) > 0 && (
-            <>
-              {" "}
-              Created {params.created} booking{params.created === "1" ? "" : "s"}{" "}
-              through {formatDateShort(horizon)}.
-            </>
-          )}
-        </div>
-      )}
-      {params.error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={toasts} />
 
       <section className="card">
         <h2 className="font-display text-lg font-semibold text-ink-900">

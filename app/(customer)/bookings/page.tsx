@@ -11,6 +11,7 @@ import { formatTime } from "@/lib/hours";
 import { isPastDueUnpaid, refundFractionForBooking } from "@/lib/bookings.server";
 import { materializeForCustomer } from "@/lib/recurring.server";
 import { ReportCardView } from "@/components/ReportCardView";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import {
   applyCouponToBooking,
   cancelBooking,
@@ -19,6 +20,17 @@ import {
   removeCouponFromBooking,
 } from "./actions";
 import ConfirmCancelButton from "./ConfirmCancelButton";
+
+const TOASTS = [
+  { param: "paid", message: "Payment received — your booking is confirmed." },
+  {
+    param: "canceled",
+    tone: "info" as const,
+    message: "Payment canceled. You can try again whenever you're ready.",
+  },
+  { param: "coupon", message: "Coupon applied." },
+  { param: "error", tone: "error" as const },
+];
 
 export default async function BookingsPage({
   searchParams,
@@ -99,26 +111,7 @@ export default async function BookingsPage({
         </p>
       </div>
 
-      {params.paid && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Payment received — your booking is confirmed.
-        </div>
-      )}
-      {params.canceled && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 shadow-soft">
-          Payment canceled. You can try again whenever you&apos;re ready.
-        </div>
-      )}
-      {params.coupon && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Coupon applied.
-        </div>
-      )}
-      {params.error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       {unpaidBookings.length > 0 && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 shadow-soft">

@@ -11,12 +11,15 @@ import { todayISO } from "@/lib/format";
 import { getEventsInRange, indexEventsByDate } from "@/lib/events.server";
 import { getBlackoutsInRange, indexBlackoutsByDate } from "@/lib/blackouts.server";
 import { StaffSubNav } from "@/components/StaffSubNav";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { CalendarClient } from "./CalendarClient";
 
 const SUBNAV = [
   { href: "/staff/calendar", label: "Calendar", active: true },
   { href: "/staff/bookings", label: "All bookings" },
 ];
+
+const TOASTS = [{ param: "error", tone: "error" as const }];
 
 export const dynamic = "force-dynamic";
 
@@ -95,11 +98,7 @@ export default async function StaffCalendarPage({
         </div>
       </header>
 
-      {params.error && (
-        <p className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
-          {params.error}
-        </p>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <CalendarClient
         monthAnchor={monthAnchor}

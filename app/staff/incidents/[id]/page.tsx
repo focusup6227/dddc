@@ -14,21 +14,21 @@ import {
   INCIDENT_KINDS,
   INCIDENT_SEVERITIES,
 } from "@/lib/incidents";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { IncidentPhotosEditor } from "./PhotosEditor";
 import { deleteIncident, updateIncident } from "../actions";
+
+const TOASTS = [{ param: "saved", message: "Saved." }];
 
 export const dynamic = "force-dynamic";
 
 export default async function StaffIncidentDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string }>;
 }) {
   await requireStaff();
   const { id } = await params;
-  const { saved } = await searchParams;
   const supabase = await createClient();
 
   const { data: incident } = await supabase
@@ -123,11 +123,7 @@ export default async function StaffIncidentDetailPage({
         </Link>
       </header>
 
-      {saved && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Saved.
-        </div>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <form action={updateIncident} className="card space-y-4">
         <input type="hidden" name="id" value={incident.id} />

@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
 import { INCIDENT_KINDS, INCIDENT_SEVERITIES } from "@/lib/incidents";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { createIncident } from "../actions";
+
+const TOASTS = [{ param: "error", tone: "error" as const }];
 
 export default async function NewIncidentPage({
   searchParams,
@@ -55,11 +58,7 @@ export default async function NewIncidentPage({
         </Link>
       </header>
 
-      {params.error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <form action={createIncident} className="card space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

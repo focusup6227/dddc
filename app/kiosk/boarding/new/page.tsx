@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { addDays, todayISO } from "@/lib/format";
 import { getBoardingRateCents, getFullDates } from "@/lib/settings";
 import type { Dog, Profile } from "@/lib/supabase/types";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { KioskBoardForm } from "./KioskBoardForm";
+
+const ERROR_TOAST = [{ param: "error", tone: "error" as const }];
 
 export const dynamic = "force-dynamic";
 
@@ -87,11 +90,7 @@ export default async function KioskNewBoardingPage({
         <KindTabs current="boarding" customerId={selectedCustomerId} />
       )}
 
-      {params.error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm font-medium text-red-900 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={ERROR_TOAST} />
 
       {!selectedCustomerId ? (
         <>

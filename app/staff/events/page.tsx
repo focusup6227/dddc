@@ -3,7 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import type { Event } from "@/lib/supabase/types";
 import { formatDateShort, todayISO } from "@/lib/format";
 import { StaffSubNav } from "@/components/StaffSubNav";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { createEvent, deleteEvent, updateEvent } from "./actions";
+
+const TOASTS = [
+  { param: "saved", message: "Saved." },
+  { param: "error", tone: "error" as const },
+];
 
 const SUBNAV = [
   { href: "/staff/settings", label: "General" },
@@ -58,16 +64,7 @@ export default async function StaffEventsPage({
         </p>
       </header>
 
-      {params.saved && (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">
-          Saved.
-        </p>
-      )}
-      {params.error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-900">
-          {params.error}
-        </p>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <EventForm event={editing} />
 

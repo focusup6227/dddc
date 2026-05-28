@@ -6,19 +6,24 @@ import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
 import { DogAvatar } from "@/components/DogAvatar";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { AutoRefresh } from "./AutoRefresh";
+
+const TOASTS = [
+  { param: "paid", message: "Payment received — all set!" },
+  {
+    param: "canceled",
+    tone: "info" as const,
+    message: "Checkout canceled.",
+  },
+];
 
 export const dynamic = "force-dynamic";
 
-export default async function KioskHomePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ paid?: string; canceled?: string }>;
-}) {
+export default async function KioskHomePage() {
   await requireStaff();
   const supabase = await createClient();
   const today = todayISO();
-  const params = await searchParams;
 
   const { data: bookingsData } = await supabase
     .from("bookings")
@@ -73,12 +78,7 @@ export default async function KioskHomePage({
   return (
     <div className="space-y-6">
       <AutoRefresh />
-      {params.paid && (
-        <Banner kind="success">Payment received — all set!</Banner>
-      )}
-      {params.canceled && (
-        <Banner kind="warning">Checkout canceled.</Banner>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
@@ -265,22 +265,3 @@ function DogTile({
   );
 }
 
-function Banner({
-  kind,
-  children,
-}: {
-  kind: "success" | "warning";
-  children: React.ReactNode;
-}) {
-  const style =
-    kind === "success"
-      ? "bg-emerald-50/70 text-emerald-900 border-emerald-200"
-      : "bg-amber-50/70 text-amber-900 border-amber-200";
-  return (
-    <div
-      className={`rounded-2xl border px-4 py-3 text-sm font-medium shadow-soft ${style}`}
-    >
-      {children}
-    </div>
-  );
-}

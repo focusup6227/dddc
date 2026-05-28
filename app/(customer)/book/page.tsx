@@ -19,7 +19,22 @@ import {
   summarizeCoverage,
   VACCINE_LABEL,
 } from "@/lib/vaccines";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { BookForm } from "./BookForm";
+
+const TOASTS = [
+  {
+    param: "status",
+    whenValue: "package_redeemed",
+    message: "Booked! We've set aside a package day.",
+  },
+  {
+    param: "status",
+    whenValue: "success",
+    message: "Payment received — your booking is confirmed.",
+  },
+  { param: "error", tone: "error" as const },
+];
 
 export default async function BookPage({
   searchParams,
@@ -218,21 +233,7 @@ export default async function BookPage({
         </Link>
       </section>
 
-      {params.status === "package_redeemed" && (
-        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Booked! We&apos;ve set aside a package day.
-        </div>
-      )}
-      {params.status === "success" && (
-        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Payment received — your booking is confirmed.
-        </div>
-      )}
-      {params.error && (
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       {allDogsBlocked && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 shadow-soft">

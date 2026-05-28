@@ -3,7 +3,24 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { CustomerPackage, Package } from "@/lib/supabase/types";
 import { formatDate, formatMoney } from "@/lib/format";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { buyPackage } from "./actions";
+
+const TOASTS = [
+  {
+    param: "status",
+    whenValue: "success",
+    message:
+      "Thanks! Your purchase is being processed. Your days will appear here once Stripe confirms the payment.",
+  },
+  {
+    param: "status",
+    whenValue: "canceled",
+    tone: "info" as const,
+    message: "Checkout canceled. No charge was made.",
+  },
+  { param: "error", tone: "error" as const },
+];
 
 export default async function PackagesPage({
   searchParams,
@@ -37,22 +54,7 @@ export default async function PackagesPage({
         </p>
       </header>
 
-      {params.status === "success" && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
-          Thanks! Your purchase is being processed. Your days will appear here
-          once Stripe confirms the payment.
-        </div>
-      )}
-      {params.status === "canceled" && (
-        <div className="rounded-2xl border border-stone-200 bg-cream-100 px-4 py-3 text-sm text-ink-700 shadow-soft">
-          Checkout canceled. No charge was made.
-        </div>
-      )}
-      {params.error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <section>
         <h2 className="font-display text-xl font-semibold text-ink-900">

@@ -12,7 +12,17 @@ import {
   summarizeCoverage,
   VACCINE_LABEL,
 } from "@/lib/vaccines";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import { BoardForm } from "./BoardForm";
+
+const TOASTS = [
+  {
+    param: "status",
+    whenValue: "success",
+    message: "Payment received — boarding is confirmed.",
+  },
+  { param: "error", tone: "error" as const },
+];
 
 export default async function BoardPage({
   searchParams,
@@ -120,16 +130,7 @@ export default async function BoardPage({
         </p>
       </section>
 
-      {params.status === "success" && (
-        <div className="mt-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Payment received — boarding is confirmed.
-        </div>
-      )}
-      {params.error && (
-        <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {params.error}
-        </div>
-      )}
+      <ToastNotifier toasts={TOASTS} />
 
       <BoardForm
         dogs={dogs}
