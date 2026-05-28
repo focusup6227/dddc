@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireCustomer } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
+import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -79,6 +80,8 @@ export async function createBooking(formData: FormData) {
   const svc = createServiceClient();
 
   // Insert package-funded bookings + decrement package balances.
+  const confirmedPackageDates: string[] = [];
+  const touchedPackageIds = new Set<string>();
   for (const a of packageAllocs) {
     const pkg = a.pkg!;
     const { error: insErr } = await svc.from("bookings").insert({
@@ -97,16 +100,45 @@ export async function createBooking(formData: FormData) {
       }
       continue;
     }
+    confirmedPackageDates.push(a.date);
+    touchedPackageIds.add(pkg.id);
     await svc
       .from("customer_packages")
       .update({ days_remaining: pkg.days_remaining })
       .eq("id", pkg.id);
   }
 
-  // If no drop-in days, we're done.
+  // If no drop-in days, the booking is fully confirmed now — send the email.
   if (dropInAllocs.length === 0) {
+    if (confirmedPackageDates.length > 0) {
+      await sendBookingConfirmation({
+        to: profile.email,
+        customerName: profile.full_name ?? profile.email,
+        dogName: dog.name,
+        dates: confirmedPackageDates,
+        paidByPackageCount: confirmedPackageDates.length,
+        dropInCount: 0,
+        dropInTotalCents: 0,
+      });
+    }
+    await maybeSendPackageLowAlerts(svc, userId, profile.email, profile.full_name, touchedPackageIds);
     redirect("/book?status=package_redeemed");
   }
+
+  // Mixed booking: confirm the package-funded portion now; drop-in confirmation
+  // will be sent by the webhook once Stripe confirms payment.
+  if (confirmedPackageDates.length > 0) {
+    await sendBookingConfirmation({
+      to: profile.email,
+      customerName: profile.full_name ?? profile.email,
+      dogName: dog.name,
+      dates: confirmedPackageDates,
+      paidByPackageCount: confirmedPackageDates.length,
+      dropInCount: 0,
+      dropInTotalCents: 0,
+    });
+  }
+  await maybeSendPackageLowAlerts(svc, userId, profile.email, profile.full_name, touchedPackageIds);
 
   // Otherwise: create Stripe checkout for the drop-in days, with a "pending" booking row each.
   const stripe = getStripe();
@@ -152,4 +184,34 @@ export async function createBooking(formData: FormData) {
 
   if (!session.url) redirect("/book?error=Stripe+session+failed");
   redirect(session.url);
+}
+
+async function maybeSendPackageLowAlerts(
+  svc: ReturnType<typeof createServiceClient>,
+  customerId: string,
+  email: string,
+  customerName: string | null,
+  touchedPackageIds: Set<string>,
+) {
+  if (touchedPackageIds.size === 0) return;
+  const ids = Array.from(touchedPackageIds);
+  const { data: rows } = await svc
+    .from("customer_packages")
+    .select("id, days_remaining, package_id")
+    .in("id", ids);
+  const lowOnes = (rows ?? []).filter((r) => r.days_remaining === 1);
+  if (lowOnes.length === 0) return;
+
+  const pkgIds = Array.from(new Set(lowOnes.map((r) => r.package_id)));
+  const { data: catalog } = await svc.from("packages").select("id, name").in("id", pkgIds);
+  const nameById = new Map((catalog ?? []).map((p) => [p.id, p.name]));
+
+  for (const r of lowOnes) {
+    await sendPackageLowAlert({
+      to: email,
+      customerName: customerName ?? email,
+      packageName: nameById.get(r.package_id) ?? "Day care package",
+      daysRemaining: r.days_remaining,
+    });
+  }
 }

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
+import { sendBookingConfirmation, sendPaymentReceipt } from "@/lib/email";
 
 // Stripe sends raw bodies; opt out of body parsing.
 export const runtime = "nodejs";
@@ -80,24 +81,75 @@ async function handleCheckoutSucceeded(
       : session.payment_intent?.id ?? null;
 
   if (kind === "package") {
-    await svc
+    const { data: pkgRows } = await svc
       .from("customer_packages")
       .update({
         payment_status: "paid",
         stripe_payment_intent_id: paymentIntentId,
       })
-      .eq("stripe_checkout_session_id", session.id);
+      .eq("stripe_checkout_session_id", session.id)
+      .select("id, customer_id, package_id, amount_paid_cents");
+    const pkg = pkgRows?.[0];
+    if (pkg) {
+      const [{ data: profile }, { data: catalog }] = await Promise.all([
+        svc.from("profiles").select("email, full_name").eq("id", pkg.customer_id).maybeSingle(),
+        svc.from("packages").select("name").eq("id", pkg.package_id).maybeSingle(),
+      ]);
+      if (profile?.email) {
+        await sendPaymentReceipt({
+          to: profile.email,
+          customerName: profile.full_name ?? profile.email,
+          description: catalog?.name ?? "Day care package",
+          amountCents: pkg.amount_paid_cents ?? session.amount_total ?? 0,
+          paidAt: new Date(),
+        });
+      }
+    }
     return;
   }
 
   if (kind === "drop_in") {
-    await svc
+    const { data: bookingRows } = await svc
       .from("bookings")
       .update({
         payment_status: "paid",
         stripe_payment_intent_id: paymentIntentId,
       })
-      .eq("stripe_checkout_session_id", session.id);
+      .eq("stripe_checkout_session_id", session.id)
+      .select("id, customer_id, dog_id, service_date, drop_in_price_cents");
+    const bookings = bookingRows ?? [];
+    if (bookings.length === 0) return;
+
+    const customerId = bookings[0].customer_id;
+    const dogId = bookings[0].dog_id;
+    const [{ data: profile }, { data: dog }] = await Promise.all([
+      svc.from("profiles").select("email, full_name").eq("id", customerId).maybeSingle(),
+      svc.from("dogs").select("name").eq("id", dogId).maybeSingle(),
+    ]);
+    if (!profile?.email || !dog) return;
+
+    const dates = bookings.map((b) => b.service_date).sort();
+    const totalCents = bookings.reduce(
+      (sum, b) => sum + (b.drop_in_price_cents ?? 0),
+      0,
+    );
+
+    await sendBookingConfirmation({
+      to: profile.email,
+      customerName: profile.full_name ?? profile.email,
+      dogName: dog.name,
+      dates,
+      paidByPackageCount: 0,
+      dropInCount: bookings.length,
+      dropInTotalCents: totalCents,
+    });
+    await sendPaymentReceipt({
+      to: profile.email,
+      customerName: profile.full_name ?? profile.email,
+      description: `Drop-in for ${dog.name} × ${bookings.length} day${bookings.length === 1 ? "" : "s"}`,
+      amountCents: totalCents || session.amount_total || 0,
+      paidAt: new Date(),
+    });
     return;
   }
 }

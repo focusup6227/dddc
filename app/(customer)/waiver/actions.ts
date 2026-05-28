@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { sendWaiverSignedReceipt } from "@/lib/email";
+import type { Waiver } from "@/lib/supabase/types";
 
 export async function signWaiver(formData: FormData) {
-  const { userId } = await requireCustomer();
+  const { userId, profile } = await requireCustomer();
   const waiver_id = String(formData.get("waiver_id") ?? "");
   const signed_full_name = String(formData.get("signed_full_name") ?? "").trim();
   const agree = formData.get("agree") === "yes";
@@ -33,6 +35,22 @@ export async function signWaiver(formData: FormData) {
   if (error) {
     redirect(`/waiver?error=${encodeURIComponent(error.message)}`);
   }
+
+  const { data: waiver } = await supabase
+    .from("waivers")
+    .select("title, version")
+    .eq("id", waiver_id)
+    .maybeSingle<Pick<Waiver, "title" | "version">>();
+
+  await sendWaiverSignedReceipt({
+    to: profile.email,
+    customerName: profile.full_name ?? profile.email,
+    signedFullName: signed_full_name,
+    signedAt: new Date(),
+    ip,
+    waiverTitle: waiver?.title ?? "Liability Waiver",
+    waiverVersion: waiver?.version ?? "1",
+  });
 
   redirect("/dogs/new");
 }
