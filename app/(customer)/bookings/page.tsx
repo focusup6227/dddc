@@ -2,6 +2,7 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, Dog } from "@/lib/supabase/types";
 import { formatDateShort, formatMoney, todayISO } from "@/lib/format";
+import { formatTime } from "@/lib/hours";
 import { refundFractionForBooking } from "@/lib/bookings.server";
 import { cancelBooking } from "./actions";
 import ConfirmCancelButton from "./ConfirmCancelButton";
@@ -104,6 +105,13 @@ function Section({
                       <> · refunded {formatMoney(b.refund_amount_cents)}</>
                     )}
                   </p>
+                  {(b.drop_off_time || b.pickup_time) && (
+                    <p className="text-xs text-stone-500">
+                      {b.drop_off_time && <>Drop-off {formatTime(b.drop_off_time)}</>}
+                      {b.drop_off_time && b.pickup_time && " · "}
+                      {b.pickup_time && <>Pickup {formatTime(b.pickup_time)}</>}
+                    </p>
+                  )}
                   {showCancel && <p className="mt-1 text-xs text-stone-500">{preview}</p>}
                 </div>
                 {showCancel && (

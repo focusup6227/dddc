@@ -11,6 +11,7 @@ import {
   getBoardingRateCents,
   getFullDates,
 } from "@/lib/settings";
+import { isTimeInWindow } from "@/lib/hours";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import type { Dog } from "@/lib/supabase/types";
@@ -23,12 +24,19 @@ export async function createBoarding(formData: FormData) {
   const dog_id = String(formData.get("dog_id") ?? "");
   const checkIn = String(formData.get("check_in") ?? "");
   const checkOut = String(formData.get("check_out") ?? "");
+  const drop_off_time = String(formData.get("drop_off_time") ?? "");
+  const pickup_time = String(formData.get("pickup_time") ?? "");
 
   if (!dog_id || !ISO_RE.test(checkIn) || !ISO_RE.test(checkOut)) {
     redirect("/board?error=Pick+a+dog+and+valid+dates");
   }
   if (checkOut <= checkIn) {
     redirect("/board?error=Check-out+must+be+after+check-in");
+  }
+  if (!isTimeInWindow(drop_off_time) || !isTimeInWindow(pickup_time)) {
+    redirect(
+      "/board?error=Pick+a+drop-off+and+pickup+between+6+AM+and+6+PM",
+    );
   }
 
   const nights: string[] = [];
@@ -114,6 +122,8 @@ export async function createBoarding(formData: FormData) {
     dog_id,
     service_date: checkIn,
     service_end_date: checkOut,
+    drop_off_time,
+    pickup_time,
     service_kind: "boarding",
     status: "reserved",
     payment_kind: "drop_in",

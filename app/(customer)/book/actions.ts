@@ -7,6 +7,7 @@ import { appUrl, getStripe } from "@/lib/stripe";
 import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
 import { addDays } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
+import { isTimeInWindow } from "@/lib/hours";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
@@ -20,9 +21,20 @@ export async function createBooking(formData: FormData) {
   const dates = Array.from(new Set(
     datesRaw.split(",").map((s) => s.trim()).filter((s) => ISO_RE.test(s))
   )).sort();
+  const drop_off_time = String(formData.get("drop_off_time") ?? "");
+  const pickup_time = String(formData.get("pickup_time") ?? "");
 
   if (!dog_id || dates.length === 0) {
     redirect("/book?error=Pick+a+dog+and+at+least+one+day");
+  }
+  if (
+    !isTimeInWindow(drop_off_time) ||
+    !isTimeInWindow(pickup_time) ||
+    pickup_time <= drop_off_time
+  ) {
+    redirect(
+      "/book?error=Pick+a+drop-off+and+pickup+between+6+AM+and+6+PM",
+    );
   }
 
   const supabase = await createClient();
@@ -119,6 +131,8 @@ export async function createBooking(formData: FormData) {
       dog_id,
       service_date: a.date,
       service_end_date: addDays(a.date, 1),
+      drop_off_time,
+      pickup_time,
       status: "reserved",
       payment_kind: "package",
       customer_package_id: pkg.id,
@@ -207,6 +221,8 @@ export async function createBooking(formData: FormData) {
       dog_id,
       service_date: a.date,
       service_end_date: addDays(a.date, 1),
+      drop_off_time,
+      pickup_time,
       status: "reserved",
       payment_kind: "drop_in",
       unit_price_cents: dropInPriceCents,

@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
+import { formatTime } from "@/lib/hours";
 import { DogAvatar } from "@/components/DogAvatar";
 import { AutoRefresh } from "./AutoRefresh";
 
@@ -204,7 +205,11 @@ function DogTile({
   tone,
 }: {
   row: {
-    booking: { id: string };
+    booking: {
+      id: string;
+      drop_off_time: string | null;
+      pickup_time: string | null;
+    };
     dog: { id: string; name: string; photo_path: string | null } | undefined;
     cust: { full_name: string | null; email: string } | undefined;
   };
@@ -217,6 +222,12 @@ function DogTile({
     red: "bg-red-600 hover:bg-red-700",
     stone: "bg-stone-500 hover:bg-stone-600",
   };
+  const dropOff = row.booking.drop_off_time
+    ? formatTime(row.booking.drop_off_time)
+    : null;
+  const pickup = row.booking.pickup_time
+    ? formatTime(row.booking.pickup_time)
+    : null;
   return (
     <Link
       href={`/kiosk/booking/${row.booking.id}`}
@@ -230,6 +241,13 @@ function DogTile({
         <p className="truncate text-sm text-stone-500">
           {row.cust?.full_name || row.cust?.email}
         </p>
+        {(dropOff || pickup) && (
+          <p className="truncate text-xs text-stone-500">
+            {dropOff && <>↓ {dropOff}</>}
+            {dropOff && pickup && " · "}
+            {pickup && <>↑ {pickup}</>}
+          </p>
+        )}
       </div>
       <span
         className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white ${toneStyles[tone]}`}

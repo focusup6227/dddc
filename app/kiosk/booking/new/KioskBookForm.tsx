@@ -3,6 +3,12 @@
 import { useMemo, useState } from "react";
 import type { Dog } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
+import {
+  DEFAULT_DROP_OFF_TIME,
+  DEFAULT_PICKUP_TIME,
+  EARLIEST_TIME,
+  LATEST_TIME,
+} from "@/lib/hours";
 import { kioskCreateBooking } from "../../actions";
 
 export function KioskBookForm({
@@ -24,6 +30,14 @@ export function KioskBookForm({
 }) {
   const [dogId, setDogId] = useState(dogs[0]?.id ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [dropOffTime, setDropOffTime] = useState(DEFAULT_DROP_OFF_TIME);
+  const [pickupTime, setPickupTime] = useState(DEFAULT_PICKUP_TIME);
+  const timesValid =
+    dropOffTime >= EARLIEST_TIME &&
+    dropOffTime <= LATEST_TIME &&
+    pickupTime >= EARLIEST_TIME &&
+    pickupTime <= LATEST_TIME &&
+    pickupTime > dropOffTime;
 
   const taken = useMemo(() => {
     const s = new Set<string>();
@@ -55,6 +69,8 @@ export function KioskBookForm({
       <input type="hidden" name="customer_id" value={customerId} />
       <input type="hidden" name="dog_id" value={dogId} />
       <input type="hidden" name="service_dates" value={Array.from(selected).sort().join(",")} />
+      <input type="hidden" name="drop_off_time" value={dropOffTime} />
+      <input type="hidden" name="pickup_time" value={pickupTime} />
 
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <h3 className="font-semibold text-stone-900">Dog</h3>
@@ -130,6 +146,46 @@ export function KioskBookForm({
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+        <h3 className="font-semibold text-stone-900">Times</h3>
+        <p className="mt-1 text-sm text-stone-500">
+          Drop-off and pickup must be between 6:00 AM and 6:00 PM.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">Drop-off</span>
+            <input
+              type="time"
+              min={EARLIEST_TIME}
+              max={LATEST_TIME}
+              step={900}
+              value={dropOffTime}
+              onChange={(e) => setDropOffTime(e.target.value)}
+              className="input"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="label">Pickup</span>
+            <input
+              type="time"
+              min={EARLIEST_TIME}
+              max={LATEST_TIME}
+              step={900}
+              value={pickupTime}
+              onChange={(e) => setPickupTime(e.target.value)}
+              className="input"
+              required
+            />
+          </label>
+        </div>
+        {!timesValid && (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Pickup must be after drop-off and both within 6 AM–6 PM.
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <h3 className="font-semibold text-stone-900">Summary</h3>
         <dl className="mt-3 space-y-1 text-base">
           <div className="flex justify-between">
@@ -163,7 +219,12 @@ export function KioskBookForm({
 
       <button
         type="submit"
-        disabled={selectedCount === 0 || !dogId || (dropInDaysNeeded > 0 && !dropInPriceCents)}
+        disabled={
+          selectedCount === 0 ||
+          !dogId ||
+          !timesValid ||
+          (dropInDaysNeeded > 0 && !dropInPriceCents)
+        }
         className="w-full rounded-2xl bg-brand-600 px-6 py-5 text-xl font-bold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
       >
         {dropInDaysNeeded > 0

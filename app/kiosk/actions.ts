@@ -13,6 +13,7 @@ import {
   BOARDING_STRIPE_PRICE_ID,
   getBoardingRateCents,
 } from "@/lib/settings";
+import { isTimeInWindow } from "@/lib/hours";
 import type {
   Booking,
   CheckIn,
@@ -208,10 +209,21 @@ export async function kioskCreateBooking(formData: FormData) {
         .filter((s) => ISO_RE.test(s)),
     ),
   ).sort();
+  const drop_off_time = String(formData.get("drop_off_time") ?? "");
+  const pickup_time = String(formData.get("pickup_time") ?? "");
 
   if (!customer_id || !dog_id || dates.length === 0) {
     redirect(
       `/kiosk/booking/new?customer=${customer_id}&error=${encodeURIComponent("Pick a dog and at least one day.")}`,
+    );
+  }
+  if (
+    !isTimeInWindow(drop_off_time) ||
+    !isTimeInWindow(pickup_time) ||
+    pickup_time <= drop_off_time
+  ) {
+    redirect(
+      `/kiosk/booking/new?customer=${customer_id}&error=${encodeURIComponent("Pick a drop-off and pickup between 6 AM and 6 PM.")}`,
     );
   }
 
@@ -283,6 +295,8 @@ export async function kioskCreateBooking(formData: FormData) {
       dog_id,
       service_date: a.date,
       service_end_date: addDays(a.date, 1),
+      drop_off_time,
+      pickup_time,
       status: "reserved",
       payment_kind: "package",
       customer_package_id: pkg.id,
@@ -357,6 +371,8 @@ export async function kioskCreateBooking(formData: FormData) {
       dog_id,
       service_date: a.date,
       service_end_date: addDays(a.date, 1),
+      drop_off_time,
+      pickup_time,
       status: "reserved",
       payment_kind: "drop_in",
       unit_price_cents: dropInPriceCents,
@@ -509,6 +525,8 @@ export async function kioskCreateBoarding(formData: FormData) {
   const dog_id = String(formData.get("dog_id") ?? "");
   const checkIn = String(formData.get("check_in") ?? "");
   const checkOut = String(formData.get("check_out") ?? "");
+  const drop_off_time = String(formData.get("drop_off_time") ?? "");
+  const pickup_time = String(formData.get("pickup_time") ?? "");
 
   if (
     !customer_id ||
@@ -519,6 +537,11 @@ export async function kioskCreateBoarding(formData: FormData) {
   ) {
     redirect(
       `/kiosk/boarding/new?customer=${customer_id}&error=Pick+a+dog+and+valid+dates`,
+    );
+  }
+  if (!isTimeInWindow(drop_off_time) || !isTimeInWindow(pickup_time)) {
+    redirect(
+      `/kiosk/boarding/new?customer=${customer_id}&error=${encodeURIComponent("Pick a drop-off and pickup between 6 AM and 6 PM.")}`,
     );
   }
 
@@ -584,6 +607,8 @@ export async function kioskCreateBoarding(formData: FormData) {
     dog_id,
     service_date: checkIn,
     service_end_date: checkOut,
+    drop_off_time,
+    pickup_time,
     service_kind: "boarding",
     status: "reserved",
     payment_kind: "drop_in",

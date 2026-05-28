@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
+import { formatTime } from "@/lib/hours";
 import { DogAvatar } from "@/components/DogAvatar";
 import { getPendingVaccineCount } from "@/lib/vaccines.server";
 import { checkInBooking, checkOutBooking } from "./actions";
@@ -92,6 +93,13 @@ export default async function StaffTodayPage() {
                     {b.payment_kind === "package" ? "Package day" : "Drop-in"} · {b.status} ·{" "}
                     {b.payment_status}
                   </p>
+                  {(b.drop_off_time || b.pickup_time) && (
+                    <p className="text-xs text-stone-500">
+                      {b.drop_off_time && <>Drop-off {formatTime(b.drop_off_time)}</>}
+                      {b.drop_off_time && b.pickup_time && " · "}
+                      {b.pickup_time && <>Pickup {formatTime(b.pickup_time)}</>}
+                    </p>
+                  )}
                   {dog && (
                     <Link
                       href={`/staff/dogs/${dog.id}`}

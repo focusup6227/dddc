@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateShort, formatMoney } from "@/lib/format";
+import { formatTime } from "@/lib/hours";
 import { DogAvatar } from "@/components/DogAvatar";
 import type {
   Booking,
@@ -69,6 +70,17 @@ export default async function KioskBookingPage({
               {booking.payment_kind === "package" ? "Package day" : "Drop-in"} ·{" "}
               {booking.status} · {booking.payment_status}
             </p>
+            {(booking.drop_off_time || booking.pickup_time) && (
+              <p className="mt-1 text-sm text-stone-500">
+                {booking.drop_off_time && (
+                  <>Scheduled drop-off {formatTime(booking.drop_off_time)}</>
+                )}
+                {booking.drop_off_time && booking.pickup_time && " · "}
+                {booking.pickup_time && (
+                  <>pickup {formatTime(booking.pickup_time)}</>
+                )}
+              </p>
+            )}
           </div>
         </div>
 

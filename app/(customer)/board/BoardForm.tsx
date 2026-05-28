@@ -4,6 +4,12 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Dog, VaccineType } from "@/lib/supabase/types";
 import { addDays, formatDateShort, formatMoney } from "@/lib/format";
+import {
+  DEFAULT_DROP_OFF_TIME,
+  DEFAULT_PICKUP_TIME,
+  EARLIEST_TIME,
+  LATEST_TIME,
+} from "@/lib/hours";
 import { createBoarding } from "./actions";
 
 export function BoardForm({
@@ -25,6 +31,13 @@ export function BoardForm({
   const [dogId, setDogId] = useState(firstReady?.id ?? dogs[0]?.id ?? "");
   const [checkIn, setCheckIn] = useState(startDate);
   const [checkOut, setCheckOut] = useState(addDays(startDate, 1));
+  const [dropOffTime, setDropOffTime] = useState(DEFAULT_DROP_OFF_TIME);
+  const [pickupTime, setPickupTime] = useState(DEFAULT_PICKUP_TIME);
+  const timesValid =
+    dropOffTime >= EARLIEST_TIME &&
+    dropOffTime <= LATEST_TIME &&
+    pickupTime >= EARLIEST_TIME &&
+    pickupTime <= LATEST_TIME;
   const blockedMissing = vaccineBlocks[dogId] ?? [];
   const dogBlocked = blockedMissing.length > 0;
 
@@ -39,13 +52,16 @@ export function BoardForm({
   const totalCents = nights.length * rateCents;
   const validRange = nights.length > 0;
   const hasFullNights = overlappingFull.length > 0;
-  const canSubmit = !!dogId && validRange && !hasFullNights && !dogBlocked;
+  const canSubmit =
+    !!dogId && validRange && !hasFullNights && !dogBlocked && timesValid;
 
   return (
     <form action={createBoarding} className="mt-6 space-y-6">
       <input type="hidden" name="dog_id" value={dogId} />
       <input type="hidden" name="check_in" value={checkIn} />
       <input type="hidden" name="check_out" value={checkOut} />
+      <input type="hidden" name="drop_off_time" value={dropOffTime} />
+      <input type="hidden" name="pickup_time" value={pickupTime} />
 
       <section className="card">
         <h3 className="font-semibold text-stone-900">Dog</h3>
@@ -126,6 +142,47 @@ export function BoardForm({
             />
           </label>
         </div>
+      </section>
+
+      <section className="card">
+        <h3 className="font-semibold text-stone-900">Times</h3>
+        <p className="mt-1 text-sm text-stone-500">
+          Drop-off on check-in day, pickup on check-out day. Both must be
+          between 6:00 AM and 6:00 PM.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">Drop-off time</span>
+            <input
+              type="time"
+              min={EARLIEST_TIME}
+              max={LATEST_TIME}
+              step={900}
+              value={dropOffTime}
+              onChange={(e) => setDropOffTime(e.target.value)}
+              className="input"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="label">Pickup time</span>
+            <input
+              type="time"
+              min={EARLIEST_TIME}
+              max={LATEST_TIME}
+              step={900}
+              value={pickupTime}
+              onChange={(e) => setPickupTime(e.target.value)}
+              className="input"
+              required
+            />
+          </label>
+        </div>
+        {!timesValid && (
+          <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Drop-off and pickup must be between 6:00 AM and 6:00 PM.
+          </p>
+        )}
       </section>
 
       <section className="card">
