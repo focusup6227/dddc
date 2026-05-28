@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
 import { DogAvatar } from "@/components/DogAvatar";
+import { AutoRefresh } from "./AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,7 @@ export default async function KioskHomePage({
 
   return (
     <div className="space-y-6">
+      <AutoRefresh />
       {params.paid && (
         <Banner kind="success">Payment received — all set!</Banner>
       )}
