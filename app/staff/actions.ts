@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cancelBookingWithRefund } from "@/lib/bookings.server";
-import type { Booking, CheckIn } from "@/lib/supabase/types";
+import { notifyWaitlistForOpening } from "@/lib/waitlist.server";
+import type {
+  Booking,
+  CheckIn,
+  DogLogKind,
+} from "@/lib/supabase/types";
 
 export async function checkInBooking(formData: FormData) {
   const { userId } = await requireStaff();
@@ -83,6 +88,12 @@ export async function staffCancelBooking(formData: FormData) {
 
   await cancelBookingWithRefund({ booking, actorId: userId, actorRole: "staff", reason });
 
+  await notifyWaitlistForOpening({
+    serviceDate: booking.service_date,
+    serviceEndDate: booking.service_end_date,
+    serviceKind: booking.service_kind,
+  });
+
   revalidatePath("/staff/bookings");
   revalidatePath("/staff");
   revalidatePath(`/staff/dogs/${booking.dog_id}`);
@@ -98,4 +109,43 @@ export async function updateStaffNotes(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("dogs").update({ staff_notes }).eq("id", dog_id);
   revalidatePath(`/staff/dogs/${dog_id}`);
+}
+
+const DOG_LOG_KINDS_ALLOWED: DogLogKind[] = [
+  "meal",
+  "medication",
+  "potty",
+  "water",
+  "rest",
+];
+
+export async function addDogLogEntry(formData: FormData) {
+  const { userId } = await requireStaff();
+  const dog_id = String(formData.get("dog_id") ?? "");
+  const kindRaw = String(formData.get("kind") ?? "") as DogLogKind;
+  const detail = String(formData.get("detail") ?? "").trim() || null;
+  const booking_id = String(formData.get("booking_id") ?? "") || null;
+  if (!dog_id || !DOG_LOG_KINDS_ALLOWED.includes(kindRaw)) return;
+
+  const supabase = await createClient();
+  await supabase.from("dog_log_entries").insert({
+    dog_id,
+    kind: kindRaw,
+    detail,
+    booking_id,
+    given_by: userId,
+  });
+  revalidatePath(`/staff/dogs/${dog_id}`);
+  if (booking_id) revalidatePath(`/kiosk/booking/${booking_id}`);
+}
+
+export async function deleteDogLogEntry(formData: FormData) {
+  await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const dog_id = String(formData.get("dog_id") ?? "");
+  if (!id) return;
+
+  const supabase = await createClient();
+  await supabase.from("dog_log_entries").delete().eq("id", id);
+  if (dog_id) revalidatePath(`/staff/dogs/${dog_id}`);
 }

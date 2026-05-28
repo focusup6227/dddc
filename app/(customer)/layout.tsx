@@ -27,6 +27,7 @@ export default async function CustomerLayout({
     { href: "/book", label: "Book" },
     { href: "/packages", label: "Packages" },
     { href: "/bookings", label: "Bookings" },
+    { href: "/waitlist", label: "Waitlist" },
     { href: "/account", label: "Account" },
   ];
 

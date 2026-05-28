@@ -11,6 +11,7 @@ const NAV: { href: string; label: string; badgeKey?: "vaccines" }[] = [
   { href: "/staff/customers", label: "Customers" },
   { href: "/staff/dogs", label: "Dogs", badgeKey: "vaccines" },
   { href: "/staff/chores", label: "Chores" },
+  { href: "/staff/waitlist", label: "Waitlist" },
   { href: "/staff/report-cards", label: "Report cards" },
   { href: "/staff/settings", label: "Settings" },
   { href: "/kiosk", label: "Kiosk" },

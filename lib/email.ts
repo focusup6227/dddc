@@ -534,6 +534,65 @@ export async function sendReportCardReady(args: {
   });
 }
 
+// --- Waitlist opening ----------------------------------------------------
+
+export async function sendWaitlistOpening(args: {
+  to: string;
+  customerName: string;
+  dogName: string;
+  serviceDate: string;
+  serviceKind: "daycare" | "boarding";
+}) {
+  const { to, customerName, dogName, serviceDate, serviceKind } = args;
+  const label = serviceKind === "boarding" ? "boarding" : "daycare";
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi ${escape(customerName)},</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">Great news — a ${escape(label)} spot just opened for <strong style="color:${COLOR.text};">${escape(dogName)}</strong> on <strong style="color:${COLOR.text};">${escape(formatDateShort(serviceDate))}</strong>.</p>
+    ${detailCard([
+      { label: "Dog", value: escape(dogName) },
+      { label: "Date", value: escape(formatDateShort(serviceDate)) },
+      { label: "Service", value: escape(label === "boarding" ? "Boarding" : "Day care") },
+    ])}
+    <p style="margin:16px 0 8px;font-family:${FONT};font-size:15px;line-height:1.55;color:${COLOR.textMuted};">Tap below to book it before someone else grabs the slot. The spot is held for 12 hours.</p>
+    ${button(`${appUrl()}/${serviceKind === "boarding" ? "board" : "book"}`, "Book the spot")}
+  `;
+
+  await send({
+    to,
+    subject: `A ${label} spot just opened for ${dogName}`,
+    html: shell({
+      preheader: `${dogName} can take ${formatDateShort(serviceDate)} — held for 12h.`,
+      heading: "A spot opened up",
+      body,
+    }),
+  });
+}
+
+// --- Pickup ready --------------------------------------------------------
+
+export async function sendPickupReady(args: {
+  to: string;
+  customerName: string;
+  dogName: string;
+}) {
+  const { to, customerName, dogName } = args;
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi ${escape(customerName)},</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};"><strong style="color:${COLOR.text};">${escape(dogName)}</strong> is ready for pickup whenever you are.</p>
+    ${button(`${appUrl()}/bookings`, "View bookings")}
+  `;
+  await send({
+    to,
+    subject: `${dogName} is ready for pickup`,
+    html: shell({
+      preheader: `${dogName} is ready to head home.`,
+      heading: "Ready for pickup",
+      body,
+    }),
+  });
+}
+
 function escape(s: string): string {
   return s
     .replace(/&/g, "&amp;")

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendReportCardReady } from "@/lib/email";
+import { sendPushToUser } from "@/lib/push.server";
+import { appUrl } from "@/lib/stripe";
 import type { Booking, Dog, Profile, ReportCard } from "@/lib/supabase/types";
 
 const BUCKET = "report-card-photos";
@@ -142,6 +144,12 @@ export async function publishReportCard(formData: FormData) {
           serviceKind: booking.service_kind,
           serviceDate: booking.service_date,
           serviceEndDate: booking.service_end_date,
+        });
+        await sendPushToUser(booking.customer_id, {
+          title: `${dog.name}'s report card is ready`,
+          body: "Tap to see today's note and photos.",
+          url: `${appUrl()}/bookings`,
+          tag: `report-${booking.id}`,
         });
       }
     }

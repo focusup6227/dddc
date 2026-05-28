@@ -10,6 +10,7 @@ import {
   createBookingCheckoutSession,
   isPastDueUnpaid,
 } from "@/lib/bookings.server";
+import { notifyWaitlistForOpening } from "@/lib/waitlist.server";
 import { calcCouponDiscount, lookupCoupon } from "@/lib/coupons.server";
 import { appUrl, getStripe } from "@/lib/stripe";
 import type { Booking, Dog } from "@/lib/supabase/types";
@@ -111,6 +112,12 @@ export async function cancelBooking(formData: FormData) {
   }
 
   await cancelBookingWithRefund({ booking, actorId: userId, actorRole: "customer" });
+
+  await notifyWaitlistForOpening({
+    serviceDate: booking.service_date,
+    serviceEndDate: booking.service_end_date,
+    serviceKind: booking.service_kind,
+  });
 
   revalidatePath("/bookings");
   revalidatePath("/dashboard");

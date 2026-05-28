@@ -1,13 +1,19 @@
 import Link from "next/link";
-import { Heart, Sparkles, Wallet } from "lucide-react";
+import { Bell, Heart, Sparkles, Trash2, Wallet } from "lucide-react";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Referral } from "@/lib/supabase/types";
+import type { AuthorizedPickup, Referral } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
 import { appUrl } from "@/lib/stripe";
+import { vapidPublicKey } from "@/lib/push.server";
 import { HeartPaw } from "@/components/illustrations";
-import { saveProfile } from "./actions";
+import {
+  addAuthorizedPickup,
+  removeAuthorizedPickup,
+  saveProfile,
+} from "./actions";
 import { ReferralShare } from "./ReferralShare";
+import { PushToggle } from "./PushToggle";
 
 export default async function AccountPage({
   searchParams,
@@ -18,18 +24,27 @@ export default async function AccountPage({
   const params = await searchParams;
   const supabase = await createClient();
 
-  const { data: referralsData } = await supabase
-    .from("referrals")
-    .select("*")
-    .eq("referrer_id", userId)
-    .order("created_at", { ascending: false });
+  const [{ data: referralsData }, { data: pickupsData }] = await Promise.all([
+    supabase
+      .from("referrals")
+      .select("*")
+      .eq("referrer_id", userId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("authorized_pickups")
+      .select("*")
+      .eq("customer_id", userId)
+      .order("created_at"),
+  ]);
   const referrals = (referralsData ?? []) as Referral[];
+  const pickups = (pickupsData ?? []) as AuthorizedPickup[];
   const credited = referrals.filter((r) => r.status === "credited").length;
   const pending = referrals.filter((r) => r.status === "pending").length;
 
   const shareUrl = profile.referral_code
     ? `${appUrl()}/signup?ref=${profile.referral_code}`
     : "";
+  const pubKey = vapidPublicKey();
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -116,6 +131,90 @@ export default async function AccountPage({
             Your referral code will appear here shortly. Reload the page.
           </p>
         )}
+      </section>
+
+      <section className="card">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              Notifications
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-semibold text-ink-900">
+              Push to this device
+            </h2>
+            <p className="mt-1 text-sm text-ink-500">
+              We&apos;ll buzz you when there&apos;s a pickup-ready note, a new
+              report card, or a waitlist spot opens.
+            </p>
+          </div>
+          <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 sm:flex">
+            <Bell size={22} />
+          </span>
+        </div>
+        <div className="mt-4">
+          <PushToggle vapidPublicKey={pubKey} />
+        </div>
+      </section>
+
+      <section className="card">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+            Authorized pickup
+          </p>
+          <h2 className="mt-2 font-display text-2xl font-semibold text-ink-900">
+            Who else can pick up your dog?
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
+            Anyone on this list can take your dog home. Staff sees this list at
+            the kiosk.
+          </p>
+        </div>
+
+        {pickups.length > 0 && (
+          <ul className="mt-4 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80">
+            {pickups.map((p) => (
+              <li
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-ink-900">{p.name}</p>
+                  <p className="text-xs text-ink-500">
+                    {[p.relation, p.phone].filter(Boolean).join(" · ") || "—"}
+                  </p>
+                  {p.notes && (
+                    <p className="mt-1 text-xs text-ink-500">{p.notes}</p>
+                  )}
+                </div>
+                <form action={removeAuthorizedPickup}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                  >
+                    <Trash2 size={12} /> Remove
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form action={addAuthorizedPickup} className="mt-4 space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field name="name" label="Name" required />
+            <Field name="phone" label="Phone" type="tel" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field name="relation" label="Relation (e.g. partner)" />
+            <Field name="notes" label="Notes (e.g. weekdays only)" />
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" className="btn-secondary">
+              Add pickup
+            </button>
+          </div>
+        </form>
       </section>
 
       <form action={saveProfile} className="card space-y-5">

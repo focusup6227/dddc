@@ -7,7 +7,9 @@ import type {
   DogVaccination,
   Package,
   VaccineType,
+  WaitlistEntry,
 } from "@/lib/supabase/types";
+import { joinWaitlist } from "../waitlist/actions";
 import { addDays, formatMoney, todayISO } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
@@ -24,7 +26,7 @@ import { BookForm } from "./BookForm";
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{ status?: string; error?: string; waitlisted?: string }>;
 }) {
   const { userId } = await requireCustomer();
   const supabase = await createClient();
@@ -124,6 +126,19 @@ export default async function BookPage({
   const allDogsBlocked =
     dogs.length > 0 && dogs.every((d) => vaccineBlocks[d.id]?.length);
 
+  const { data: waitlistData } = await supabase
+    .from("waitlist_entries")
+    .select("*")
+    .eq("customer_id", userId)
+    .in("status", ["pending", "notified"])
+    .gte("service_date", startDate);
+  const waitlistEntries = (waitlistData ?? []) as WaitlistEntry[];
+  const waitlistDates = new Set(
+    waitlistEntries
+      .filter((e) => e.service_kind === "daycare")
+      .map((e) => e.service_date),
+  );
+
   const [{ data: daycareRows }, { data: boardingStays }, fullDatesSet] = await Promise.all([
     supabase
       .from("bookings")
@@ -217,6 +232,75 @@ export default async function BookPage({
           Set up a standing weekly schedule →
         </Link>
       </section>
+
+      {params.waitlisted && (
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
+          You&apos;re on the waitlist — we&apos;ll ping you the moment a spot
+          opens.{" "}
+          <Link href="/waitlist" className="font-semibold underline">
+            See your list →
+          </Link>
+        </div>
+      )}
+
+      {fullDates.length > 0 && dogs.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-soft">
+          <p className="text-sm font-semibold text-amber-900">
+            Some days are full
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            Join the waitlist — we&apos;ll notify you (push + email) the moment
+            a slot opens.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {fullDates.slice(0, 6).map((date) => {
+              const already = waitlistDates.has(date);
+              return (
+                <li
+                  key={date}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200/70 bg-white px-3 py-2"
+                >
+                  <span className="text-sm font-medium text-stone-900">
+                    {date}
+                  </span>
+                  {already ? (
+                    <span className="text-xs font-medium text-emerald-700">
+                      ✓ On the list
+                    </span>
+                  ) : (
+                    <form
+                      action={joinWaitlist}
+                      className="flex items-center gap-2"
+                    >
+                      <input type="hidden" name="service_date" value={date} />
+                      <input type="hidden" name="service_kind" value="daycare" />
+                      <input type="hidden" name="back" value="/book" />
+                      <select
+                        name="dog_id"
+                        required
+                        defaultValue={dogs[0]?.id}
+                        className="input text-xs"
+                      >
+                        {dogs.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                      >
+                        Join
+                      </button>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {params.status === "package_redeemed" && (
         <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">

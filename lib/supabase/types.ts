@@ -294,3 +294,70 @@ export interface IncidentPhoto {
   uploaded_by: string | null;
   uploaded_at: string;
 }
+
+export interface PushSubscription {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth_secret: string;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export type DogLogKind = "meal" | "medication" | "potty" | "water" | "rest";
+
+export interface DogLogEntry {
+  id: string;
+  dog_id: string;
+  booking_id: string | null;
+  kind: DogLogKind;
+  detail: string | null;
+  given_at: string;
+  given_by: string | null;
+  created_at: string;
+}
+
+export type WaitlistStatus =
+  | "pending"
+  | "notified"
+  | "claimed"
+  | "expired"
+  | "canceled";
+
+export interface WaitlistEntry {
+  id: string;
+  customer_id: string;
+  dog_id: string;
+  service_date: string;
+  service_kind: "daycare" | "boarding";
+  status: WaitlistStatus;
+  notified_at: string | null;
+  expires_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BookingBelonging {
+  id: string;
+  booking_id: string;
+  item: string;
+  notes: string | null;
+  brought_in_at: string | null;
+  brought_in_by: string | null;
+  returned_at: string | null;
+  returned_by: string | null;
+  added_by: string | null;
+  created_at: string;
+}
+
+export interface AuthorizedPickup {
+  id: string;
+  customer_id: string;
+  name: string;
+  phone: string | null;
+  relation: string | null;
+  notes: string | null;
+  active: boolean;
+  created_at: string;
+}

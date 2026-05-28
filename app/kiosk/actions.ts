@@ -6,7 +6,12 @@ import { requireStaff } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
 import { addDays, todayISO } from "@/lib/format";
-import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
+import {
+  sendBookingConfirmation,
+  sendPackageLowAlert,
+  sendPickupReady,
+} from "@/lib/email";
+import { sendPushToUser } from "@/lib/push.server";
 import {
   BOARDING_STRIPE_PRICE_AMOUNT_CENTS,
   BOARDING_STRIPE_PRICE_ID,
@@ -53,6 +58,56 @@ export async function kioskCheckIn(formData: FormData) {
 
   revalidatePath("/kiosk");
   redirect("/kiosk");
+}
+
+/**
+ * Ping the owner that their dog is ready for pickup. Sends a Web Push to any
+ * subscribed device and falls back to email so they get a notification one
+ * way or another.
+ */
+export async function kioskMarkReady(formData: FormData) {
+  await requireStaff();
+  const booking_id = String(formData.get("booking_id") ?? "");
+  if (!booking_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  const { data: booking } = await svc
+    .from("bookings")
+    .select("id, customer_id, dog_id")
+    .eq("id", booking_id)
+    .maybeSingle<{ id: string; customer_id: string; dog_id: string }>();
+  if (!booking) redirect("/kiosk");
+
+  const [{ data: profile }, { data: dog }] = await Promise.all([
+    svc
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", booking.customer_id)
+      .maybeSingle<{ email: string; full_name: string | null }>(),
+    svc
+      .from("dogs")
+      .select("name")
+      .eq("id", booking.dog_id)
+      .maybeSingle<{ name: string }>(),
+  ]);
+
+  const dogName = dog?.name ?? "Your dog";
+  await sendPushToUser(booking.customer_id, {
+    title: `${dogName} is ready for pickup`,
+    body: "Stop by whenever you're ready.",
+    url: `${appUrl()}/bookings`,
+    tag: `ready-${booking.id}`,
+  });
+  if (profile?.email) {
+    await sendPickupReady({
+      to: profile.email,
+      customerName: profile.full_name ?? profile.email,
+      dogName,
+    });
+  }
+
+  revalidatePath(`/kiosk/booking/${booking_id}`);
+  redirect(`/kiosk/booking/${booking_id}`);
 }
 
 export async function kioskCheckOut(formData: FormData) {

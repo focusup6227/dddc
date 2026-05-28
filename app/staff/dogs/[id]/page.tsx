@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
   Dog,
+  DogLogEntry,
   DogNote,
   DogVaccination,
   Incident,
@@ -21,7 +22,13 @@ import {
   INCIDENT_KIND_LABEL,
   INCIDENT_SEVERITY_LABEL,
 } from "@/lib/incidents";
-import { addDogNote, updateStaffNotes } from "../../actions";
+import { DOG_LOG_EMOJI, DOG_LOG_KINDS, DOG_LOG_LABEL } from "@/lib/dogLog";
+import {
+  addDogLogEntry,
+  addDogNote,
+  deleteDogLogEntry,
+  updateStaffNotes,
+} from "../../actions";
 
 export default async function StaffDogDetailPage({
   params,
@@ -39,33 +46,41 @@ export default async function StaffDogDetailPage({
     .maybeSingle<Dog>();
   if (!dog) notFound();
 
-  const [ownerRes, notesRes, bookingsRes, vaxRes, incidentRes] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", dog.owner_id).maybeSingle<Profile>(),
-    supabase
-      .from("dog_notes")
-      .select("*")
-      .eq("dog_id", id)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
-      .from("bookings")
-      .select("*")
-      .eq("dog_id", id)
-      .order("service_date", { ascending: false })
-      .limit(20),
-    supabase.from("dog_vaccinations").select("*").eq("dog_id", id),
-    supabase
-      .from("incidents")
-      .select("*")
-      .eq("dog_id", id)
-      .order("occurred_on", { ascending: false })
-      .limit(10),
-  ]);
+  const [ownerRes, notesRes, bookingsRes, vaxRes, incidentRes, logRes] =
+    await Promise.all([
+      supabase.from("profiles").select("*").eq("id", dog.owner_id).maybeSingle<Profile>(),
+      supabase
+        .from("dog_notes")
+        .select("*")
+        .eq("dog_id", id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("bookings")
+        .select("*")
+        .eq("dog_id", id)
+        .order("service_date", { ascending: false })
+        .limit(20),
+      supabase.from("dog_vaccinations").select("*").eq("dog_id", id),
+      supabase
+        .from("incidents")
+        .select("*")
+        .eq("dog_id", id)
+        .order("occurred_on", { ascending: false })
+        .limit(10),
+      supabase
+        .from("dog_log_entries")
+        .select("*")
+        .eq("dog_id", id)
+        .order("given_at", { ascending: false })
+        .limit(30),
+    ]);
   const owner = ownerRes.data ?? null;
   const notes = (notesRes.data ?? []) as DogNote[];
   const bookings = (bookingsRes.data ?? []) as Booking[];
   const coverage = summarizeCoverage((vaxRes.data ?? []) as DogVaccination[]);
   const incidents = (incidentRes.data ?? []) as Incident[];
+  const logEntries = (logRes.data ?? []) as DogLogEntry[];
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -166,6 +181,71 @@ export default async function StaffDogDetailPage({
             <button type="submit" className="btn-primary">Save</button>
           </div>
         </form>
+      </section>
+
+      <section>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Care log
+        </h2>
+        <p className="text-sm text-ink-500">
+          Meals, meds, potty. Owner can see these entries.
+        </p>
+        <form action={addDogLogEntry} className="card mt-3 space-y-2">
+          <input type="hidden" name="dog_id" value={dog.id} />
+          <div className="flex flex-wrap gap-1.5">
+            {DOG_LOG_KINDS.map((k) => (
+              <button
+                key={k.key}
+                type="submit"
+                name="kind"
+                value={k.key}
+                className="rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                {k.emoji} {k.label}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            name="detail"
+            placeholder="Optional detail (e.g. '1 cup kibble', 'gabapentin 100mg')"
+            className="input w-full text-sm"
+          />
+        </form>
+
+        {logEntries.length === 0 ? (
+          <p className="mt-3 text-sm text-ink-500">No entries yet.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
+            {logEntries.map((e) => (
+              <li
+                key={e.id}
+                className="flex items-start justify-between gap-3 px-5 py-3 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="text-ink-900">
+                    {DOG_LOG_EMOJI[e.kind]} {DOG_LOG_LABEL[e.kind]}
+                    {e.detail && (
+                      <span className="text-ink-700"> — {e.detail}</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-ink-500">{formatDate(e.given_at)}</p>
+                </div>
+                <form action={deleteDogLogEntry}>
+                  <input type="hidden" name="id" value={e.id} />
+                  <input type="hidden" name="dog_id" value={dog.id} />
+                  <button
+                    type="submit"
+                    aria-label="Delete entry"
+                    className="rounded-md border border-stone-300 px-2 py-0.5 text-xs text-stone-500 hover:bg-stone-50"
+                  >
+                    ✕
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section>

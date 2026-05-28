@@ -2,10 +2,15 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
+  BookingBelonging,
   Dog,
   ReportCard,
   ReportCardPhoto,
 } from "@/lib/supabase/types";
+import {
+  customerAddBelonging,
+  customerDeleteBelonging,
+} from "./belongings-actions";
 import { formatDateShort, formatMoney, todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
 import { isPastDueUnpaid, refundFractionForBooking } from "@/lib/bookings.server";
@@ -53,7 +58,7 @@ export default async function BookingsPage({
   // RLS only returns cards that are published AND on the customer's bookings,
   // so a simple "any card on these bookings" select is safe.
   const bookingIds = bookings.map((b) => b.id);
-  const [cardsRes, photosRes] = bookingIds.length
+  const [cardsRes, photosRes, belongingsRes] = bookingIds.length
     ? await Promise.all([
         supabase
           .from("report_cards")
@@ -64,10 +69,22 @@ export default async function BookingsPage({
           .select("*")
           .order("sort_order")
           .order("uploaded_at"),
+        supabase
+          .from("booking_belongings")
+          .select("*")
+          .in("booking_id", bookingIds)
+          .order("created_at"),
       ])
-    : [{ data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }];
   const cards = (cardsRes.data ?? []) as ReportCard[];
   const allPhotos = (photosRes.data ?? []) as ReportCardPhoto[];
+  const allBelongings = (belongingsRes.data ?? []) as BookingBelonging[];
+  const belongingsByBooking = new Map<string, BookingBelonging[]>();
+  for (const b of allBelongings) {
+    const arr = belongingsByBooking.get(b.booking_id) ?? [];
+    arr.push(b);
+    belongingsByBooking.set(b.booking_id, arr);
+  }
 
   const cardByBooking = new Map(cards.map((c) => [c.booking_id, c]));
   const photosByCard = new Map<string, ReportCardPhoto[]>();
@@ -147,6 +164,7 @@ export default async function BookingsPage({
         today={today}
         cardByBooking={cardByBooking}
         photosByCard={photosByCard}
+        belongingsByBooking={belongingsByBooking}
         cancelable
       />
       <Section
@@ -156,6 +174,7 @@ export default async function BookingsPage({
         today={today}
         cardByBooking={cardByBooking}
         photosByCard={photosByCard}
+        belongingsByBooking={belongingsByBooking}
       />
     </div>
   );
@@ -194,6 +213,7 @@ function Section({
   today,
   cardByBooking,
   photosByCard,
+  belongingsByBooking,
   cancelable,
 }: {
   title: string;
@@ -202,6 +222,7 @@ function Section({
   today: string;
   cardByBooking: Map<string, ReportCard>;
   photosByCard: Map<string, ReportCardPhoto[]>;
+  belongingsByBooking: Map<string, BookingBelonging[]>;
   cancelable?: boolean;
 }) {
   return (
@@ -223,6 +244,8 @@ function Section({
             const preview = showCancel ? refundPreview(b) : "";
             const card = cardByBooking.get(b.id);
             const cardPhotos = card ? photosByCard.get(card.id) ?? [] : [];
+            const belongings = belongingsByBooking.get(b.id) ?? [];
+            const upcomingBooking = b.service_date >= today && b.status !== "canceled";
             return (
               <li key={b.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -293,12 +316,93 @@ function Section({
                     />
                   </div>
                 )}
+                {(upcomingBooking || belongings.length > 0) && (
+                  <BelongingsRow
+                    bookingId={b.id}
+                    items={belongings}
+                    allowEdit={upcomingBooking}
+                  />
+                )}
               </li>
             );
           })}
         </ul>
       )}
     </section>
+  );
+}
+
+function BelongingsRow({
+  bookingId,
+  items,
+  allowEdit,
+}: {
+  bookingId: string;
+  items: BookingBelonging[];
+  allowEdit: boolean;
+}) {
+  return (
+    <details className="mt-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium text-stone-700">
+        Belongings checklist ({items.length})
+      </summary>
+      {items.length > 0 && (
+        <ul className="mt-2 divide-y divide-stone-200">
+          {items.map((b) => (
+            <li
+              key={b.id}
+              className="flex flex-wrap items-center justify-between gap-2 py-1.5"
+            >
+              <div className="min-w-0">
+                <span className="font-medium text-ink-900">{b.item}</span>
+                {b.notes && (
+                  <span className="ml-2 text-xs text-stone-500">— {b.notes}</span>
+                )}
+                <p className="text-xs text-stone-500">
+                  {b.brought_in_at ? "✓ Received by staff" : "Not yet received"}
+                  {b.returned_at && " · Returned"}
+                </p>
+              </div>
+              {allowEdit && !b.brought_in_at && (
+                <form action={customerDeleteBelonging}>
+                  <input type="hidden" name="id" value={b.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-stone-300 px-2 py-0.5 text-xs text-stone-600 hover:bg-stone-50"
+                  >
+                    Remove
+                  </button>
+                </form>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {allowEdit && (
+        <form
+          action={customerAddBelonging}
+          className="mt-2 flex flex-wrap items-end gap-2 border-t border-stone-200 pt-2"
+        >
+          <input type="hidden" name="booking_id" value={bookingId} />
+          <input
+            type="text"
+            name="item"
+            placeholder="Bed, leash, food bag…"
+            required
+            className="input flex-1 text-sm sm:min-w-[10rem]"
+          />
+          <input
+            type="text"
+            name="notes"
+            placeholder="Notes (optional)"
+            className="input flex-1 text-sm sm:min-w-[10rem]"
+          />
+          <button type="submit" className="btn-secondary text-sm">
+            Add
+          </button>
+        </form>
+      )}
+    </details>
   );
 }
 
