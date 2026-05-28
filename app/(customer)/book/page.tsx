@@ -192,10 +192,12 @@ export default async function BookPage({
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl animate-fade-up">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Book</h1>
-        <p className="text-stone-600">Day care for the day, or boarding for overnight stays.</p>
+        <h1 className="font-display text-3xl font-bold text-ink-900">Book</h1>
+        <p className="mt-1 text-sm text-ink-500">
+          Day care for the day, or boarding for overnight stays.
+        </p>
       </header>
 
       <KindTabs current="daycare" />
@@ -217,23 +219,23 @@ export default async function BookPage({
       </section>
 
       {params.status === "package_redeemed" && (
-        <div className="mt-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
           Booked! We&apos;ve set aside a package day.
         </div>
       )}
       {params.status === "success" && (
-        <div className="mt-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
           Payment received — your booking is confirmed.
         </div>
       )}
       {params.error && (
-        <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
           {params.error}
         </div>
       )}
 
       {allDogsBlocked && (
-        <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 shadow-soft">
           All your dogs are missing required vaccine records. Open a dog&apos;s
           profile to upload them — once we verify, you can book.
         </div>
@@ -267,10 +269,10 @@ function Notice({
   cta: { href: string; label: string };
 }) {
   return (
-    <div className="card max-w-xl">
-      <h1 className="text-xl font-bold text-stone-900">{title}</h1>
-      <p className="mt-2 text-stone-700">{body}</p>
-      <Link href={cta.href} className="btn-primary mt-4 inline-block">
+    <div className="card max-w-xl animate-fade-up">
+      <h1 className="font-display text-xl font-bold text-ink-900">{title}</h1>
+      <p className="mt-2 text-ink-700">{body}</p>
+      <Link href={cta.href} className="btn-primary mt-4">
         {cta.label}
       </Link>
     </div>

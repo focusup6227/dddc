@@ -1,4 +1,12 @@
 import Link from "next/link";
+import {
+  ArrowRight,
+  CalendarPlus,
+  CreditCard,
+  Dog as DogIcon,
+  Sparkles,
+  Ticket,
+} from "lucide-react";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, formatDateShort, formatMoney, todayISO } from "@/lib/format";
@@ -12,6 +20,9 @@ import type {
 } from "@/lib/supabase/types";
 import { ReportCardView } from "@/components/ReportCardView";
 import { EventList } from "@/components/EventList";
+import { EmptyState } from "@/components/EmptyState";
+import { EmptyCalendar, MascotFace } from "@/components/illustrations";
+import { firstName, getGreeting } from "@/lib/greeting";
 import { payAllUnpaid } from "../bookings/actions";
 
 export default async function CustomerDashboard() {
@@ -108,33 +119,57 @@ export default async function CustomerDashboard() {
     if (dogId) latestCardDog = dogs.find((d) => d.id === dogId) ?? null;
   }
 
+  const greeting = getGreeting();
+  const first = firstName(profile.full_name) || "there";
+
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold text-stone-900">
-          Hi {profile.full_name?.split(" ")[0] || "there"} 👋
+    <div className="space-y-8 animate-fade-up">
+      <header className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-warm-fade px-6 py-8 shadow-soft sm:px-10 sm:py-12">
+        <div className="absolute -right-6 -top-6 hidden h-44 w-44 text-brand-200 sm:block">
+          <MascotFace className="h-full w-full" />
+        </div>
+        <p className="text-sm font-semibold uppercase tracking-wide text-brand-700">
+          {greeting}
+        </p>
+        <h1 className="mt-2 font-display text-4xl font-bold text-ink-900 sm:text-5xl">
+          {first} 🐾
         </h1>
-        <p className="text-stone-600">Here&apos;s what&apos;s happening.</p>
+        <p className="mt-3 max-w-md text-ink-700">
+          Here&apos;s the latest on your pups and bookings.
+        </p>
       </header>
 
       {profile.account_credit_cents > 0 && (
-        <section className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-emerald-900">
-            You have {formatMoney(profile.account_credit_cents)} in account credit
-          </p>
-          <p className="text-xs text-emerald-800">
-            Applied automatically at checkout.{" "}
-            <Link href="/account" className="font-semibold underline">
-              See referrals
-            </Link>
-          </p>
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-5 py-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <Sparkles size={18} />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-emerald-900">
+                {formatMoney(profile.account_credit_cents)} in account credit
+              </p>
+              <p className="text-xs text-emerald-800">
+                Applied automatically at checkout.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/account"
+            className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 hover:underline"
+          >
+            See referrals →
+          </Link>
         </section>
       )}
 
       {unpaid.length > 0 && (
-        <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <CreditCard size={18} />
+            </span>
+            <div>
               <p className="text-sm font-semibold text-amber-900">
                 Outstanding balance: {formatMoney(balanceCents)}
               </p>
@@ -142,12 +177,12 @@ export default async function CustomerDashboard() {
                 {unpaid.length} unpaid booking{unpaid.length === 1 ? "" : "s"}.
               </p>
             </div>
-            <form action={payAllUnpaid}>
-              <button type="submit" className="btn-primary">
-                Pay {formatMoney(balanceCents)}
-              </button>
-            </form>
           </div>
+          <form action={payAllUnpaid}>
+            <button type="submit" className="btn-primary">
+              Pay {formatMoney(balanceCents)}
+            </button>
+          </form>
         </section>
       )}
 
@@ -155,16 +190,19 @@ export default async function CustomerDashboard() {
         <StatCard
           title="Dogs"
           value={String(dogs.length)}
+          icon={<DogIcon size={20} />}
           cta={dogs.length ? { href: "/dogs", label: "Manage" } : { href: "/dogs/new", label: "Add a dog" }}
         />
         <StatCard
           title="Days remaining"
           value={String(totalDays)}
+          icon={<Ticket size={20} />}
           cta={{ href: "/packages", label: totalDays ? "Buy more" : "Buy a package" }}
         />
         <StatCard
           title="Upcoming bookings"
           value={String(bookings.length)}
+          icon={<CalendarPlus size={20} />}
           cta={{ href: "/book", label: "Book a day" }}
         />
       </div>
@@ -199,26 +237,43 @@ export default async function CustomerDashboard() {
         </section>
       )}
 
-      <section className="card">
-        <h2 className="text-lg font-semibold text-stone-900">Upcoming bookings</h2>
+      <section>
+        <h2 className="font-display text-xl font-semibold text-ink-900">Upcoming bookings</h2>
         {bookings.length === 0 ? (
-          <p className="mt-2 text-stone-600">No upcoming bookings yet.</p>
+          <div className="mt-4">
+            <EmptyState
+              illustration={<EmptyCalendar className="h-full w-auto" />}
+              title="No upcoming bookings"
+              description="Quiet calendar over here — book a day to get on the schedule."
+              action={
+                <Link href="/book" className="btn-primary">
+                  <CalendarPlus size={16} /> Book a day
+                </Link>
+              }
+            />
+          </div>
         ) : (
-          <ul className="mt-4 divide-y divide-stone-200">
+          <ul className="mt-4 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
             {bookings.map((b) => {
               const dog = dogs.find((d) => d.id === b.dog_id);
               return (
-                <li key={b.id} className="flex items-center justify-between py-3">
+                <li
+                  key={b.id}
+                  className="flex items-center justify-between gap-3 px-5 py-4"
+                >
                   <div>
-                    <p className="font-medium text-stone-900">
+                    <p className="font-semibold text-ink-900">
                       {formatDateShort(b.service_date)} — {dog?.name ?? "Dog"}
                     </p>
-                    <p className="text-sm text-stone-500">
+                    <p className="mt-0.5 text-sm text-ink-500">
                       {b.payment_kind === "package" ? "Package day" : "Drop-in"} · {b.status}
                     </p>
                   </div>
-                  <Link href="/bookings" className="text-sm font-medium text-brand-700 hover:underline">
-                    Details
+                  <Link
+                    href="/bookings"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-900 hover:underline"
+                  >
+                    Details <ArrowRight size={14} />
                   </Link>
                 </li>
               );
@@ -233,19 +288,30 @@ export default async function CustomerDashboard() {
 function StatCard({
   title,
   value,
+  icon,
   cta,
 }: {
   title: string;
   value: string;
+  icon?: React.ReactNode;
   cta: { href: string; label: string };
 }) {
   return (
-    <div className="card">
-      <p className="text-sm font-medium text-stone-500">{title}</p>
-      <p className="mt-2 text-3xl font-bold text-stone-900">{value}</p>
-      <Link href={cta.href} className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
-        {cta.label} →
-      </Link>
-    </div>
+    <Link href={cta.href} className="card-lift block group">
+      <div className="flex items-start justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+          {title}
+        </p>
+        {icon && (
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+            {icon}
+          </span>
+        )}
+      </div>
+      <p className="mt-3 font-display text-4xl font-bold text-ink-900">{value}</p>
+      <p className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 group-hover:gap-1.5 transition-all">
+        {cta.label} <ArrowRight size={14} />
+      </p>
+    </Link>
   );
 }

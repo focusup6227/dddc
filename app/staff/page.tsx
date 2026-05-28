@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertTriangle, ArrowRight, PawPrint } from "lucide-react";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
@@ -6,7 +7,10 @@ import { todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
 import { DogAvatar } from "@/components/DogAvatar";
 import { StaffSubNav } from "@/components/StaffSubNav";
+import { EmptyState } from "@/components/EmptyState";
+import { SleepingDog } from "@/components/illustrations";
 import { getPendingVaccineCount } from "@/lib/vaccines.server";
+import { firstName, getGreeting } from "@/lib/greeting";
 import { checkInBooking, checkOutBooking } from "./actions";
 
 const SUBNAV = [
@@ -15,7 +19,7 @@ const SUBNAV = [
 ];
 
 export default async function StaffTodayPage() {
-  await requireStaff();
+  const { profile } = await requireStaff();
   const supabase = await createClient();
   const today = todayISO();
 
@@ -55,33 +59,62 @@ export default async function StaffTodayPage() {
 
   const pendingVaccines = await getPendingVaccineCount();
 
+  const greeting = getGreeting();
+  const first = firstName(profile.full_name) || "team";
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
-      <header className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-900">Today</h1>
-          <p className="text-stone-600">
-            {bookings.length} booked · {onSite.length} on site
-          </p>
+      <header className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-white px-6 py-7 shadow-soft sm:px-10 sm:py-9">
+        <div className="absolute -right-6 -bottom-6 text-brand-100">
+          <PawPrint size={140} strokeWidth={1} />
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+          {greeting}, {first}
+        </p>
+        <h1 className="mt-2 font-display text-4xl font-bold text-ink-900 sm:text-5xl">
+          Today
+        </h1>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="pill-warm">{bookings.length} booked</span>
+          <span className="pill-success">{onSite.length} on site</span>
+          {pendingVaccines > 0 && (
+            <span className="pill-warn">
+              {pendingVaccines} vaccine review{pendingVaccines === 1 ? "" : "s"}
+            </span>
+          )}
         </div>
       </header>
 
       {pendingVaccines > 0 && (
         <Link
           href="/staff/vaccines"
-          className="block rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-sm shadow-soft transition-shadow hover:shadow-lift"
         >
-          <span className="font-semibold">
-            {pendingVaccines} vaccine record
-            {pendingVaccines === 1 ? "" : "s"} pending review
-          </span>
-          <span className="ml-2 text-amber-800">— customers can&apos;t book until you approve.</span>
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <AlertTriangle size={18} />
+            </span>
+            <div>
+              <p className="font-semibold text-amber-900">
+                {pendingVaccines} vaccine record
+                {pendingVaccines === 1 ? "" : "s"} pending review
+              </p>
+              <p className="text-xs text-amber-800">
+                Customers can&apos;t book until you approve.
+              </p>
+            </div>
+          </div>
+          <ArrowRight size={18} className="text-amber-700" />
         </Link>
       )}
 
       {bookings.length === 0 ? (
-        <p className="text-stone-600">No bookings today.</p>
+        <EmptyState
+          illustration={<SleepingDog className="h-full w-auto" />}
+          title="A quiet day"
+          description="No bookings on the schedule for today. Catch your breath."
+        />
       ) : (
         <ul className="space-y-3">
           {bookings.map((b) => {
@@ -89,19 +122,34 @@ export default async function StaffTodayPage() {
             const cust = custs.find((c) => c.id === b.customer_id);
             const ci = checkIns.find((c) => c.booking_id === b.id);
             return (
-              <li key={b.id} className="card flex flex-wrap items-center gap-4">
+              <li key={b.id} className="card-lift flex flex-wrap items-center gap-4">
                 {dog && <DogAvatar photoPath={dog.photo_path} name={dog.name} size={56} />}
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-stone-900">
+                  <p className="font-display text-lg font-semibold text-ink-900">
                     {dog?.name ?? "Dog"}{" "}
-                    <span className="text-stone-500">· {cust?.full_name || cust?.email}</span>
+                    <span className="font-sans text-sm font-normal text-ink-500">
+                      · {cust?.full_name || cust?.email}
+                    </span>
                   </p>
-                  <p className="text-sm text-stone-500">
-                    {b.payment_kind === "package" ? "Package day" : "Drop-in"} · {b.status} ·{" "}
-                    {b.payment_status}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="pill-neutral">
+                      {b.payment_kind === "package" ? "Package" : "Drop-in"}
+                    </span>
+                    <span className="pill-neutral">{b.status}</span>
+                    <span
+                      className={
+                        b.payment_status === "paid"
+                          ? "pill-success"
+                          : b.payment_status === "unpaid"
+                            ? "pill-warn"
+                            : "pill-neutral"
+                      }
+                    >
+                      {b.payment_status}
+                    </span>
+                  </div>
                   {(b.drop_off_time || b.pickup_time) && (
-                    <p className="text-xs text-stone-500">
+                    <p className="mt-1.5 text-xs text-ink-500">
                       {b.drop_off_time && <>Drop-off {formatTime(b.drop_off_time)}</>}
                       {b.drop_off_time && b.pickup_time && " · "}
                       {b.pickup_time && <>Pickup {formatTime(b.pickup_time)}</>}
@@ -110,9 +158,9 @@ export default async function StaffTodayPage() {
                   {dog && (
                     <Link
                       href={`/staff/dogs/${dog.id}`}
-                      className="text-xs font-medium text-brand-700 hover:underline"
+                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 hover:underline"
                     >
-                      Open profile →
+                      Open profile <ArrowRight size={12} />
                     </Link>
                   )}
                 </div>

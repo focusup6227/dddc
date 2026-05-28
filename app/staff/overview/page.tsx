@@ -123,13 +123,17 @@ export default async function StaffOverviewPage() {
   const boardingTomorrow = boardingCounts.get(addDays(today, 1)) ?? 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-up">
       <StaffSubNav items={SUBNAV} />
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Numbers</h1>
-        <p className="text-stone-600">
-          {monthLabel(today)} so far. Refresh anytime — figures update as
-          payments settle.
+        <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+          {monthLabel(today)}
+        </p>
+        <h1 className="mt-2 font-display text-4xl font-bold text-ink-900">
+          Numbers
+        </h1>
+        <p className="mt-2 text-ink-500">
+          Month-to-date. Refresh anytime — figures update as payments settle.
         </p>
       </header>
 
@@ -254,10 +258,12 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="card">
-      <p className="text-sm font-medium text-stone-500">{title}</p>
-      <p className="mt-2 text-2xl font-bold text-stone-900">{value}</p>
-      {hint && <p className="mt-1 text-xs text-stone-500">{hint}</p>}
+    <div className="card-lift">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+        {title}
+      </p>
+      <p className="mt-2 font-display text-3xl font-bold text-ink-900">{value}</p>
+      {hint && <p className="mt-1.5 text-xs text-ink-500">{hint}</p>}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Menu, X } from "lucide-react";
 
 export type MobileNavItem = {
   href: string;
@@ -37,18 +38,13 @@ export function MobileNav({
 
   const buttonStyle =
     variant === "dark"
-      ? "text-stone-200 hover:bg-stone-800 hover:text-white"
-      : "text-stone-700 hover:bg-stone-100";
+      ? "text-stone-200 hover:bg-white/5 hover:text-white"
+      : "text-ink-700 hover:bg-cream-100";
 
   const panelStyle =
     variant === "dark"
-      ? "bg-stone-900 text-stone-100 border-stone-800"
-      : "bg-white text-stone-900 border-stone-200";
-
-  const linkStyle =
-    variant === "dark"
-      ? "text-stone-200 hover:bg-stone-800 hover:text-white"
-      : "text-stone-700 hover:bg-stone-100";
+      ? "bg-ink-900 text-stone-100 border-ink-900/40"
+      : "bg-white text-ink-900 border-stone-200/80";
 
   return (
     <div className="md:hidden">
@@ -57,64 +53,46 @@ export function MobileNav({
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex h-10 w-10 items-center justify-center rounded-md ${buttonStyle}`}
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${buttonStyle}`}
       >
-        {open ? (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="h-5 w-5"
-            aria-hidden="true"
-          >
-            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-          </svg>
-        ) : (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="h-5 w-5"
-            aria-hidden="true"
-          >
-            <path
-              fillRule="evenodd"
-              d="M3 5.75A.75.75 0 0 1 3.75 5h12.5a.75.75 0 0 1 0 1.5H3.75A.75.75 0 0 1 3 5.75ZM3 10a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75A.75.75 0 0 1 3 10Zm0 4.25a.75.75 0 0 1 .75-.75h12.5a.75.75 0 0 1 0 1.5H3.75A.75.75 0 0 1 3 14.25Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        )}
+        {open ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       {open && (
         <div
-          className={`absolute inset-x-0 top-full z-40 border-t shadow-lg ${panelStyle}`}
+          className={`absolute inset-x-0 top-full z-40 border-t shadow-lift ${panelStyle} animate-fade-in`}
         >
-          <nav className="flex flex-col px-3 py-2">
+          <nav className="flex flex-col gap-0.5 px-3 py-3">
             {items.map((n) => {
               const active = pathname === n.href;
+              const activeStyle =
+                variant === "dark"
+                  ? active
+                    ? "bg-white/10 text-white"
+                    : "text-stone-200 hover:bg-white/5 hover:text-white"
+                  : active
+                    ? "bg-cream-100 text-ink-900"
+                    : "text-ink-700 hover:bg-cream-100";
               return (
                 <Link
                   key={n.href}
                   href={n.href}
-                  className={`flex items-center justify-between rounded-md px-3 py-3 text-base font-medium ${linkStyle} ${
-                    active
-                      ? variant === "dark"
-                        ? "bg-stone-800 text-white"
-                        : "bg-stone-100 text-stone-900"
-                      : ""
-                  }`}
+                  className={`flex items-center justify-between rounded-xl px-3 py-3 text-base font-medium transition-colors ${activeStyle}`}
                 >
                   <span>{n.label}</span>
                   {n.badge && n.badge > 0 ? (
-                    <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-stone-900">
+                    <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-brand-500 px-2 py-0.5 text-xs font-semibold text-white">
                       {n.badge}
                     </span>
                   ) : null}
                 </Link>
               );
             })}
-            {trailing && <div className="mt-1 border-t border-current/10 px-3 py-3">{trailing}</div>}
+            {trailing && (
+              <div className="mt-1 border-t border-current/10 px-3 py-3">
+                {trailing}
+              </div>
+            )}
           </nav>
         </div>
       )}

@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { Heart, Sparkles, Wallet } from "lucide-react";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Referral } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
 import { appUrl } from "@/lib/stripe";
+import { HeartPaw } from "@/components/illustrations";
 import { saveProfile } from "./actions";
 import { ReferralShare } from "./ReferralShare";
 
@@ -30,61 +32,101 @@ export default async function AccountPage({
     : "";
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-stone-900">Account</h1>
+    <div className="space-y-8 animate-fade-up">
+      <div>
+        <h1 className="font-display text-3xl font-bold text-ink-900">Account</h1>
+        <p className="mt-1 text-sm text-ink-500">
+          Your contact details, account credit, and referral link.
+        </p>
+      </div>
 
       {params.saved && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
           Saved.
         </div>
       )}
       {params.error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
           {params.error}
         </div>
       )}
 
-      <section className="card">
-        <h2 className="font-semibold text-stone-900">Account credit</h2>
-        <p className="mt-1 text-3xl font-bold text-stone-900">
-          {formatMoney(profile.account_credit_cents)}
-        </p>
-        <p className="mt-1 text-sm text-stone-500">
-          Credit is applied automatically when you pay for a booking.
-        </p>
+      <section className="card relative overflow-hidden">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              Account credit
+            </p>
+            <p className="mt-2 font-display text-4xl font-bold text-ink-900">
+              {formatMoney(profile.account_credit_cents)}
+            </p>
+            <p className="mt-2 max-w-md text-sm text-ink-500">
+              Credit is applied automatically when you pay for a booking. We&apos;ll
+              use whichever saves you more — credit or coupon.
+            </p>
+          </div>
+          <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 sm:flex">
+            <Wallet size={22} />
+          </span>
+        </div>
       </section>
 
       <section className="card">
-        <h2 className="font-semibold text-stone-900">Refer a friend</h2>
-        <p className="mt-1 text-sm text-stone-600">
-          You get $10 in credit for every friend who signs up with your link and
-          completes their first booking. They get $10 off too.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              Refer a friend
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-semibold text-ink-900">
+              Give $10, get $10
+            </h2>
+            <p className="mt-1 text-sm text-ink-700">
+              When a friend signs up with your link and completes their first
+              booking, you both get $10 in credit.
+            </p>
+          </div>
+          <span className="hidden h-16 w-16 shrink-0 text-brand-400 sm:block">
+            <HeartPaw className="h-full w-full" />
+          </span>
+        </div>
         {profile.referral_code ? (
-          <div className="mt-4 space-y-3">
+          <div className="mt-5 space-y-3">
             <ReferralShare code={profile.referral_code} url={shareUrl} />
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="rounded-md bg-stone-50 px-3 py-2">
-                <p className="text-xs text-stone-500">Friends credited</p>
-                <p className="text-xl font-semibold text-stone-900">{credited}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-cream-100 px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  <Heart size={12} /> Credited
+                </div>
+                <p className="mt-1 font-display text-2xl font-semibold text-ink-900">
+                  {credited}
+                </p>
               </div>
-              <div className="rounded-md bg-stone-50 px-3 py-2">
-                <p className="text-xs text-stone-500">Pending</p>
-                <p className="text-xl font-semibold text-stone-900">{pending}</p>
+              <div className="rounded-xl bg-cream-100 px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-500">
+                  <Sparkles size={12} /> Pending
+                </div>
+                <p className="mt-1 font-display text-2xl font-semibold text-ink-900">
+                  {pending}
+                </p>
               </div>
             </div>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-stone-500">
+          <p className="mt-4 text-sm text-ink-500">
             Your referral code will appear here shortly. Reload the page.
           </p>
         )}
       </section>
 
-      <form action={saveProfile} className="card space-y-4">
+      <form action={saveProfile} className="card space-y-5">
         <div>
-          <h2 className="font-semibold text-stone-900">Your details</h2>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+            Your details
+          </p>
+          <h2 className="mt-2 font-display text-2xl font-semibold text-ink-900">
+            Contact info
+          </h2>
+          <p className="mt-1 text-sm text-ink-500">
             Used for booking confirmations and account contact.
           </p>
         </div>
@@ -103,9 +145,11 @@ export default async function AccountPage({
           defaultValue={profile.address ?? ""}
         />
 
-        <div className="border-t border-stone-200 pt-4">
-          <h3 className="font-semibold text-stone-900">Emergency contact</h3>
-          <p className="mt-1 text-xs text-stone-500">
+        <div className="border-t border-stone-200/80 pt-5">
+          <h3 className="font-display text-lg font-semibold text-ink-900">
+            Emergency contact
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
             Who should we call if we can&apos;t reach you while your dog is with us?
           </p>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -128,7 +172,7 @@ export default async function AccountPage({
         </div>
       </form>
 
-      <p className="text-sm text-stone-500">
+      <p className="text-sm text-ink-500">
         Need to update your email or password?{" "}
         <Link href="/login" className="text-brand-700 hover:underline">
           Sign out and reset

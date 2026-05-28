@@ -89,49 +89,54 @@ export default async function BookingsPage({
   }, 0);
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-stone-900">Bookings</h1>
+    <div className="space-y-8 animate-fade-up">
+      <div>
+        <h1 className="font-display text-3xl font-bold text-ink-900">
+          Bookings
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">
+          Upcoming days, past stays, report cards, and payments — all here.
+        </p>
+      </div>
 
       {params.paid && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
           Payment received — your booking is confirmed.
         </div>
       )}
       {params.canceled && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 shadow-soft">
           Payment canceled. You can try again whenever you&apos;re ready.
         </div>
       )}
       {params.coupon && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800 shadow-soft">
           Coupon applied.
         </div>
       )}
       {params.error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800 shadow-soft">
           {params.error}
         </div>
       )}
 
       {unpaidBookings.length > 0 && (
-        <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-amber-900">
-                Outstanding balance: {formatMoney(balanceCents)}
-              </p>
-              <p className="text-xs text-amber-800">
-                {unpaidBookings.length} unpaid booking
-                {unpaidBookings.length === 1 ? "" : "s"} — pay everything in one
-                checkout.
-              </p>
-            </div>
-            <form action={payAllUnpaid}>
-              <button type="submit" className="btn-primary">
-                Pay {formatMoney(balanceCents)}
-              </button>
-            </form>
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 shadow-soft">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">
+              Outstanding balance: {formatMoney(balanceCents)}
+            </p>
+            <p className="text-xs text-amber-800">
+              {unpaidBookings.length} unpaid booking
+              {unpaidBookings.length === 1 ? "" : "s"} — pay everything in one
+              checkout.
+            </p>
           </div>
+          <form action={payAllUnpaid}>
+            <button type="submit" className="btn-primary">
+              Pay {formatMoney(balanceCents)}
+            </button>
+          </form>
         </section>
       )}
 
@@ -201,11 +206,11 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="text-lg font-semibold text-stone-900">{title}</h2>
+      <h2 className="font-display text-xl font-semibold text-ink-900">{title}</h2>
       {bookings.length === 0 ? (
-        <p className="mt-2 text-stone-600">None.</p>
+        <p className="mt-2 text-sm text-ink-500">None.</p>
       ) : (
-        <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+        <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
           {bookings.map((b) => {
             const dog = dogs.find((d) => d.id === b.dog_id);
             const isUnpaid =

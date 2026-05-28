@@ -25,9 +25,6 @@ export default async function StaffLayout({
   const isStaff = session?.profile.role === "staff";
   const pendingVaccines = isStaff ? await getPendingVaccineCount() : 0;
 
-  // Login page lives at /staff/login. Don't gate the whole tree —
-  // pages call requireStaff() themselves so the login page can render.
-
   const navWithBadges = NAV.map((n) => ({
     href: n.href,
     label: n.label,
@@ -35,37 +32,44 @@ export default async function StaffLayout({
   }));
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <header className="relative border-b border-stone-200 bg-stone-900 text-white">
+    <div className="min-h-screen bg-cream-50 bg-paw-pattern">
+      <header className="sticky top-0 z-40 border-b border-ink-900/30 bg-ink-900 text-white shadow-lg shadow-ink-900/20">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
-          <Link href="/staff" className="flex min-w-0 items-center gap-2">
-            <Image
-              src="/logo.jpg"
-              alt=""
-              width={36}
-              height={36}
-              className="h-9 w-9 shrink-0 rounded-full ring-2 ring-stone-700"
-            />
-            <span className="truncate text-base font-bold sm:text-lg">
+          <Link
+            href="/staff"
+            className="flex min-w-0 items-center gap-2.5 group"
+          >
+            <span className="relative inline-flex h-10 w-10 shrink-0 overflow-hidden rounded-2xl ring-1 ring-brand-400/50 shadow-glow transition-transform group-hover:scale-105">
+              <Image
+                src="/logo.jpg"
+                alt=""
+                width={40}
+                height={40}
+                className="h-10 w-10 object-cover"
+              />
+            </span>
+            <span className="truncate font-display text-base font-bold sm:text-lg">
               <span className="hidden sm:inline">Dixon Doggy Day Care</span>
               <span className="sm:hidden">DDDC</span>
-              {" · Operator"}
+            </span>
+            <span className="hidden rounded-full bg-brand-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand-300 sm:inline">
+              Operator
             </span>
           </Link>
           {isStaff && (
             <>
-              <nav className="hidden gap-1 md:flex">
+              <nav className="hidden gap-0.5 md:flex">
                 {NAV.map((n) => {
                   const count = n.badgeKey === "vaccines" ? pendingVaccines : 0;
                   return (
                     <Link
                       key={n.href}
                       href={n.href}
-                      className="relative rounded-md px-3 py-1.5 text-sm text-stone-200 hover:bg-stone-800 hover:text-white"
+                      className="relative rounded-xl px-2.5 py-1.5 text-sm font-medium text-stone-300 hover:bg-white/5 hover:text-white transition-colors"
                     >
                       {n.label}
                       {count > 0 && (
-                        <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-stone-900">
+                        <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-brand-500 px-1.5 py-0.5 text-xs font-semibold text-white">
                           {count}
                         </span>
                       )}
@@ -74,10 +78,10 @@ export default async function StaffLayout({
                 })}
               </nav>
               <div className="flex items-center gap-2">
-                <span className="hidden text-sm text-stone-300 sm:inline">
+                <span className="hidden text-sm text-stone-400 xl:inline">
                   {session.profile.full_name || session.profile.email}
                 </span>
-                <SignOutButton className="rounded-md px-3 py-1.5 text-sm text-stone-200 hover:bg-stone-800" />
+                <SignOutButton className="rounded-xl px-3 py-1.5 text-sm font-medium text-stone-300 hover:bg-white/5 hover:text-white" />
                 <MobileNav
                   items={navWithBadges}
                   variant="dark"
@@ -92,7 +96,9 @@ export default async function StaffLayout({
           )}
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10 animate-fade-in">
+        {children}
+      </main>
     </div>
   );
 }
