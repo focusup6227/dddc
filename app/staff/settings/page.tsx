@@ -11,6 +11,7 @@ import { saveSettings } from "./actions";
 const SUBNAV = [
   { href: "/staff/settings", label: "General", active: true },
   { href: "/staff/packages", label: "Packages" },
+  { href: "/staff/coupons", label: "Coupons" },
   { href: "/staff/events", label: "Events" },
 ];
 

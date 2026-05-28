@@ -8,6 +8,7 @@ import { savePackage, togglePackage } from "./actions";
 const SUBNAV = [
   { href: "/staff/settings", label: "General" },
   { href: "/staff/packages", label: "Packages", active: true },
+  { href: "/staff/coupons", label: "Coupons" },
   { href: "/staff/events", label: "Events" },
 ];
 

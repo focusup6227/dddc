@@ -11,13 +11,24 @@ import { formatTime } from "@/lib/hours";
 import { isPastDueUnpaid, refundFractionForBooking } from "@/lib/bookings.server";
 import { materializeForCustomer } from "@/lib/recurring.server";
 import { ReportCardView } from "@/components/ReportCardView";
-import { cancelBooking, payAllUnpaid, payBooking } from "./actions";
+import {
+  applyCouponToBooking,
+  cancelBooking,
+  payAllUnpaid,
+  payBooking,
+  removeCouponFromBooking,
+} from "./actions";
 import ConfirmCancelButton from "./ConfirmCancelButton";
 
 export default async function BookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string; canceled?: string; error?: string }>;
+  searchParams: Promise<{
+    paid?: string;
+    canceled?: string;
+    error?: string;
+    coupon?: string;
+  }>;
 }) {
   const { userId } = await requireCustomer();
   const supabase = await createClient();
@@ -89,6 +100,11 @@ export default async function BookingsPage({
       {params.canceled && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Payment canceled. You can try again whenever you&apos;re ready.
+        </div>
+      )}
+      {params.coupon && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Coupon applied.
         </div>
       )}
       {params.error && (
@@ -244,7 +260,7 @@ function Section({
                       <button type="submit" className="btn-primary text-sm">
                         Pay now
                         {b.unit_price_cents
-                          ? ` · ${formatMoney(b.unit_price_cents * Math.max(1, nightCount(b.service_date, b.service_end_date)))}`
+                          ? ` · ${formatMoney(Math.max(0, b.unit_price_cents * Math.max(1, nightCount(b.service_date, b.service_end_date)) - (b.coupon_discount_cents ?? 0)))}`
                           : ""}
                       </button>
                     </form>
@@ -257,6 +273,12 @@ function Section({
                   )}
                 </div>
                 </div>
+                {showPayNow && (
+                  <CouponRow
+                    bookingId={b.id}
+                    couponDiscountCents={b.coupon_discount_cents}
+                  />
+                )}
                 {card && card.published_at && (
                   <div className="mt-3">
                     <ReportCardView
@@ -272,5 +294,58 @@ function Section({
         </ul>
       )}
     </section>
+  );
+}
+
+function CouponRow({
+  bookingId,
+  couponDiscountCents,
+}: {
+  bookingId: string;
+  couponDiscountCents: number;
+}) {
+  if (couponDiscountCents > 0) {
+    return (
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <span>
+          Coupon applied —{" "}
+          <strong>−{formatMoney(couponDiscountCents)}</strong> off
+        </span>
+        <form action={removeCouponFromBooking}>
+          <input type="hidden" name="id" value={bookingId} />
+          <button
+            type="submit"
+            className="text-xs font-medium text-emerald-800 underline hover:text-emerald-900"
+          >
+            Remove
+          </button>
+        </form>
+      </div>
+    );
+  }
+  return (
+    <details className="mt-2 text-sm">
+      <summary className="cursor-pointer text-stone-500 hover:text-stone-700">
+        Have a coupon code?
+      </summary>
+      <form action={applyCouponToBooking} className="mt-2 flex gap-2">
+        <input type="hidden" name="id" value={bookingId} />
+        <input
+          type="text"
+          name="code"
+          required
+          placeholder="Enter code"
+          className="input flex-1 text-sm uppercase sm:max-w-xs"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+        >
+          Apply
+        </button>
+      </form>
+    </details>
   );
 }

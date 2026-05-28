@@ -8,6 +8,7 @@ import { createEvent, deleteEvent, updateEvent } from "./actions";
 const SUBNAV = [
   { href: "/staff/settings", label: "General" },
   { href: "/staff/packages", label: "Packages" },
+  { href: "/staff/coupons", label: "Coupons" },
   { href: "/staff/events", label: "Events", active: true },
 ];
 

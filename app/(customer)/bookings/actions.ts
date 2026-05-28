@@ -10,8 +10,80 @@ import {
   createBookingCheckoutSession,
   isPastDueUnpaid,
 } from "@/lib/bookings.server";
+import { calcCouponDiscount, lookupCoupon } from "@/lib/coupons.server";
 import { appUrl, getStripe } from "@/lib/stripe";
 import type { Booking, Dog } from "@/lib/supabase/types";
+
+export async function applyCouponToBooking(formData: FormData) {
+  const { userId } = await requireCustomer();
+  const id = String(formData.get("id") ?? "");
+  const codeRaw = String(formData.get("code") ?? "").trim();
+  if (!id) redirect("/bookings");
+  if (!codeRaw) {
+    redirect("/bookings?error=" + encodeURIComponent("Enter a code."));
+  }
+
+  const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("id", id)
+    .eq("customer_id", userId)
+    .maybeSingle<Booking>();
+  if (!booking) redirect("/bookings");
+  if (booking.payment_status !== "unpaid") {
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent("That booking is already paid."),
+    );
+  }
+
+  const coupon = await lookupCoupon(codeRaw);
+  if (!coupon) {
+    redirect("/bookings?error=" + encodeURIComponent("That code isn't valid."));
+  }
+
+  const nights = Math.max(
+    1,
+    booking.service_kind === "boarding"
+      ? Math.round(
+          (new Date(booking.service_end_date).getTime() -
+            new Date(booking.service_date).getTime()) /
+            86400000,
+        )
+      : 1,
+  );
+  const totalCents = (booking.unit_price_cents ?? 0) * nights;
+  const discount = calcCouponDiscount(coupon, booking, totalCents);
+
+  await supabase
+    .from("bookings")
+    .update({
+      coupon_id: coupon.id,
+      coupon_discount_cents: discount,
+    })
+    .eq("id", id)
+    .eq("customer_id", userId);
+
+  revalidatePath("/bookings");
+  redirect("/bookings?coupon=1");
+}
+
+export async function removeCouponFromBooking(formData: FormData) {
+  const { userId } = await requireCustomer();
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/bookings");
+
+  const supabase = await createClient();
+  await supabase
+    .from("bookings")
+    .update({ coupon_id: null, coupon_discount_cents: 0 })
+    .eq("id", id)
+    .eq("customer_id", userId);
+
+  revalidatePath("/bookings");
+  redirect("/bookings");
+}
 
 export async function cancelBooking(formData: FormData) {
   const { userId } = await requireCustomer();

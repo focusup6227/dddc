@@ -296,13 +296,20 @@ export async function createBookingCheckoutSession(opts: {
     (isBoarding ? BOARDING_STRIPE_PRICE_AMOUNT_CENTS : dropInPkg.price_cents);
   const totalCents = priceCents * nightsCovered;
 
-  // Apply any account credit the customer has up front. If credit fully
-  // covers the booking we skip Stripe entirely; otherwise we discount the
-  // line item and let the webhook burn the credit down on payment success.
-  const creditToApply = Math.min(cust.account_credit_cents ?? 0, totalCents);
-  const chargeAfterCredit = totalCents - creditToApply;
+  // Customer can have BOTH a coupon stamped on the booking AND account
+  // credit available — we apply whichever gives the bigger discount (never
+  // both). Coupon discount is frozen at apply-time; credit is read live.
+  const couponDiscount = Math.min(
+    booking.coupon_discount_cents ?? 0,
+    totalCents,
+  );
+  const creditAvailable = Math.min(cust.account_credit_cents ?? 0, totalCents);
+  const useCoupon = couponDiscount > 0 && couponDiscount >= creditAvailable;
+  const discountCents = useCoupon ? couponDiscount : creditAvailable;
+  const creditToApply = useCoupon ? 0 : creditAvailable;
+  const chargeAfterCredit = totalCents - discountCents;
 
-  if (chargeAfterCredit === 0 && creditToApply > 0) {
+  if (chargeAfterCredit === 0 && discountCents > 0) {
     await svc
       .from("bookings")
       .update({
@@ -313,7 +320,9 @@ export async function createBookingCheckoutSession(opts: {
         stripe_checkout_session_id: null,
       })
       .eq("id", booking.id);
-    await deductAccountCredit(cust.id, creditToApply);
+    if (creditToApply > 0) {
+      await deductAccountCredit(cust.id, creditToApply);
+    }
 
     const dates: string[] = [];
     let cur = booking.service_date;
@@ -321,6 +330,7 @@ export async function createBookingCheckoutSession(opts: {
       dates.push(cur);
       cur = addDays(cur, 1);
     }
+    const payMethod = useCoupon ? "coupon" : "account credit";
     await sendBookingConfirmation({
       to: cust.email,
       customerName: cust.full_name || cust.email,
@@ -333,36 +343,37 @@ export async function createBookingCheckoutSession(opts: {
     await sendPaymentReceipt({
       to: cust.email,
       customerName: cust.full_name || cust.email,
-      description: `${isBoarding ? "Boarding" : "Drop-in"} for ${dog.name} × ${dates.length} ${isBoarding ? "night" : "day"}${dates.length === 1 ? "" : "s"} (account credit)`,
+      description: `${isBoarding ? "Boarding" : "Drop-in"} for ${dog.name} × ${dates.length} ${isBoarding ? "night" : "day"}${dates.length === 1 ? "" : "s"} (${payMethod})`,
       amountCents: totalCents,
       paidAt: new Date(),
     });
     return opts.successUrl;
   }
 
-  // Stripe rejects unit_amount < 50¢ on most accounts. If a partial credit
+  // Stripe rejects unit_amount < 50¢ on most accounts. If a partial discount
   // would push us under that, round up so we still collect a token charge.
   const adjustedUnitAmount = Math.max(
     50,
     Math.ceil(chargeAfterCredit / nightsCovered),
   );
-  const effectiveCreditApplied =
-    creditToApply > 0
+  const effectiveDiscountApplied =
+    discountCents > 0
       ? Math.max(0, totalCents - adjustedUnitAmount * nightsCovered)
       : 0;
+  const effectiveCreditApplied = useCoupon ? 0 : effectiveDiscountApplied;
 
   // Reuse the matching pre-made Stripe price when the saved booking rate
-  // still matches AND no credit is being applied — otherwise fall back to
+  // still matches AND no discount is being applied — otherwise fall back to
   // ad-hoc price_data so we can encode the discounted amount.
   let lineItem: Stripe.Checkout.SessionCreateParams.LineItem;
   if (
-    effectiveCreditApplied === 0 &&
+    effectiveDiscountApplied === 0 &&
     isBoarding &&
     priceCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS
   ) {
     lineItem = { price: BOARDING_STRIPE_PRICE_ID, quantity: nightsCovered };
   } else if (
-    effectiveCreditApplied === 0 &&
+    effectiveDiscountApplied === 0 &&
     !isBoarding &&
     dropInPkg.stripe_price_id &&
     priceCents === dropInPkg.price_cents
@@ -375,10 +386,11 @@ export async function createBookingCheckoutSession(opts: {
     const baseDesc = isBoarding
       ? `${nightsCovered} night${nightsCovered === 1 ? "" : "s"}: ${booking.service_date} → ${booking.service_end_date}`
       : `Service date: ${booking.service_date}`;
-    const description =
-      effectiveCreditApplied > 0
-        ? `${baseDesc} · $${(effectiveCreditApplied / 100).toFixed(2)} account credit applied`
-        : baseDesc;
+    let description = baseDesc;
+    if (effectiveDiscountApplied > 0) {
+      const label = useCoupon ? "coupon" : "account credit";
+      description = `${baseDesc} · $${(effectiveDiscountApplied / 100).toFixed(2)} ${label} applied`;
+    }
     lineItem = {
       price_data: {
         currency: "usd" as const,

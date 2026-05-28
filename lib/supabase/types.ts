@@ -117,6 +117,8 @@ export interface Booking {
   stripe_checkout_session_id: string | null;
   payment_status: PaymentStatus;
   credit_applied_cents: number;
+  coupon_id: string | null;
+  coupon_discount_cents: number;
   notes: string | null;
   canceled_at: string | null;
   canceled_by: string | null;
@@ -271,6 +273,16 @@ export interface Incident {
   description: string;
   reporter_id: string | null;
   customer_notified_at: string | null;
+  created_at: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  description: string | null;
+  discount_per_day_cents: number;
+  active: boolean;
+  expires_on: string | null;
   created_at: string;
 }
 
