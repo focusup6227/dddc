@@ -95,11 +95,17 @@ export default async function BoardPage({
   return (
     <div className="max-w-3xl">
       <header>
-        <h1 className="text-2xl font-bold text-stone-900">Book boarding</h1>
-        <p className="text-stone-600">
+        <h1 className="text-2xl font-bold text-stone-900">Book</h1>
+        <p className="text-stone-600">Day care for the day, or boarding for overnight stays.</p>
+      </header>
+
+      <KindTabs current="boarding" />
+
+      <section className="mt-2">
+        <p className="text-sm text-stone-600">
           Overnight stays for your dog. ${(rateCents / 100).toFixed(2)} per night.
         </p>
-      </header>
+      </section>
 
       {params.status === "success" && (
         <div className="mt-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -141,5 +147,36 @@ function Notice({
         {cta.label}
       </Link>
     </div>
+  );
+}
+
+function KindTabs({ current }: { current: "daycare" | "boarding" }) {
+  const base =
+    "flex-1 rounded-lg px-4 py-2 text-center text-sm font-semibold transition-colors";
+  const active = "bg-brand-600 text-white shadow-sm";
+  const inactive = "bg-white text-stone-700 hover:bg-stone-50";
+  return (
+    <nav
+      role="tablist"
+      aria-label="Booking type"
+      className="mt-6 flex gap-2 rounded-xl border border-stone-200 bg-stone-100 p-1"
+    >
+      <Link
+        href="/book"
+        role="tab"
+        aria-selected={current === "daycare"}
+        className={`${base} ${current === "daycare" ? active : inactive}`}
+      >
+        Day Care
+      </Link>
+      <Link
+        href="/board"
+        role="tab"
+        aria-selected={current === "boarding"}
+        className={`${base} ${current === "boarding" ? active : inactive}`}
+      >
+        Boarding
+      </Link>
+    </nav>
   );
 }

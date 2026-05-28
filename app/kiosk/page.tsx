@@ -101,13 +101,7 @@ export default async function KioskHomePage({
             href="/kiosk/booking/new"
             className="inline-flex items-center gap-2 rounded-xl border border-brand-600 bg-white px-4 py-3 text-base font-semibold text-brand-700 hover:bg-brand-50"
           >
-            + Daycare
-          </Link>
-          <Link
-            href="/kiosk/boarding/new"
-            className="inline-flex items-center gap-2 rounded-xl border border-brand-600 bg-white px-4 py-3 text-base font-semibold text-brand-700 hover:bg-brand-50"
-          >
-            + Boarding
+            + New booking
           </Link>
           <Link
             href="/kiosk/walk-in"

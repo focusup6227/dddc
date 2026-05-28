@@ -76,7 +76,11 @@ export default async function KioskNewBoardingPage({
         ← Back to today
       </Link>
 
-      <h1 className="text-3xl font-bold">New boarding</h1>
+      <h1 className="text-3xl font-bold">New booking</h1>
+
+      {selectedCustomerId && (
+        <KindTabs current="boarding" customerId={selectedCustomerId} />
+      )}
 
       {params.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">
@@ -183,5 +187,42 @@ export default async function KioskNewBoardingPage({
         </>
       )}
     </div>
+  );
+}
+
+function KindTabs({
+  current,
+  customerId,
+}: {
+  current: "daycare" | "boarding";
+  customerId: string;
+}) {
+  const base =
+    "flex-1 rounded-lg px-4 py-2 text-center text-base font-semibold transition-colors";
+  const active = "bg-brand-600 text-white shadow-sm";
+  const inactive = "bg-white text-stone-700 hover:bg-stone-50";
+  return (
+    <nav
+      role="tablist"
+      aria-label="Booking type"
+      className="flex gap-2 rounded-xl border border-stone-200 bg-stone-100 p-1"
+    >
+      <Link
+        href={`/kiosk/booking/new?customer=${customerId}`}
+        role="tab"
+        aria-selected={current === "daycare"}
+        className={`${base} ${current === "daycare" ? active : inactive}`}
+      >
+        Day Care
+      </Link>
+      <Link
+        href={`/kiosk/boarding/new?customer=${customerId}`}
+        role="tab"
+        aria-selected={current === "boarding"}
+        className={`${base} ${current === "boarding" ? active : inactive}`}
+      >
+        Boarding
+      </Link>
+    </nav>
   );
 }
