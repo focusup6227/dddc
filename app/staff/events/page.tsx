@@ -16,6 +16,7 @@ const SUBNAV = [
   { href: "/staff/packages", label: "Packages" },
   { href: "/staff/coupons", label: "Coupons" },
   { href: "/staff/events", label: "Events", active: true },
+  { href: "/staff/team", label: "Team" },
 ];
 
 export const dynamic = "force-dynamic";

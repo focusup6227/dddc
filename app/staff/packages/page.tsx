@@ -10,6 +10,7 @@ const SUBNAV = [
   { href: "/staff/packages", label: "Packages", active: true },
   { href: "/staff/coupons", label: "Coupons" },
   { href: "/staff/events", label: "Events" },
+  { href: "/staff/team", label: "Team" },
 ];
 
 export default async function StaffPackagesPage() {
