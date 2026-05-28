@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateShort, todayISO } from "@/lib/format";
+import { addDays, formatDateShort, todayISO } from "@/lib/format";
 import type {
   Booking,
   CustomerPackage,
   Dog,
+  Event,
   ReportCard,
   ReportCardPhoto,
 } from "@/lib/supabase/types";
 import { ReportCardView } from "@/components/ReportCardView";
+import { EventList } from "@/components/EventList";
 
 export default async function CustomerDashboard() {
   const { userId, profile } = await requireCustomer();
@@ -43,6 +45,17 @@ export default async function CustomerDashboard() {
   const bookings = (bookingsRes.data ?? []) as Booking[];
   const packages = (packagesRes.data ?? []) as CustomerPackage[];
   const totalDays = packages.reduce((s, p) => s + p.days_remaining, 0);
+
+  const today = todayISO();
+  const horizon = addDays(today, 90);
+  const { data: eventsData } = await supabase
+    .from("events")
+    .select("*")
+    .gte("end_date", today)
+    .lte("start_date", horizon)
+    .order("start_date")
+    .limit(3);
+  const upcomingEvents = (eventsData ?? []) as Event[];
 
   // Latest published report card across all of the customer's bookings.
   // RLS filters to published + owned, so we can just take the newest.
@@ -102,6 +115,14 @@ export default async function CustomerDashboard() {
           cta={{ href: "/book", label: "Book a day" }}
         />
       </div>
+
+      {upcomingEvents.length > 0 && (
+        <EventList
+          events={upcomingEvents}
+          title="Upcoming events"
+          emptyText="Nothing scheduled."
+        />
+      )}
 
       {latestCard && latestCardDog && (
         <section>

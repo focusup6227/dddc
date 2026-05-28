@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Booking, BookingStatus, Dog, Profile } from "@/lib/supabase/types";
+import type {
+  Booking,
+  BookingStatus,
+  Dog,
+  Event,
+  Profile,
+} from "@/lib/supabase/types";
 import { addDays, formatDateShort, formatMoney, todayISO } from "@/lib/format";
+import { EventList } from "@/components/EventList";
+import { getEventsInRange, indexEventsByDate } from "@/lib/events.server";
 import StaffCancelButton from "./StaffCancelButton";
 
 type View = "list" | "calendar";
@@ -62,6 +70,9 @@ export default async function StaffBookingsPage({
 
   const dogById = new Map(dogs.map((d) => [d.id, d]));
 
+  const events = await getEventsInRange(from, to);
+  const eventsByDate = indexEventsByDate(events, from, to);
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -70,11 +81,17 @@ export default async function StaffBookingsPage({
       </header>
 
       {view === "calendar" ? (
-        <CalendarView
-          monthAnchor={monthAnchor}
-          bookings={bookings}
-          dogById={dogById}
-        />
+        <>
+          <CalendarView
+            monthAnchor={monthAnchor}
+            bookings={bookings}
+            dogById={dogById}
+            eventsByDate={eventsByDate}
+          />
+          {events.length > 0 && (
+            <EventList events={events} title="Events this month" compact />
+          )}
+        </>
       ) : (
         <ListView
           from={from}
@@ -214,10 +231,12 @@ function CalendarView({
   monthAnchor,
   bookings,
   dogById,
+  eventsByDate,
 }: {
   monthAnchor: string;
   bookings: Booking[];
   dogById: Map<string, Dog>;
+  eventsByDate: Map<string, Event[]>;
 }) {
   const grid = monthGrid(monthAnchor);
   const today = todayISO();
@@ -281,6 +300,7 @@ function CalendarView({
         ))}
         {grid.days.map((d) => {
           const dayBookings = byDate.get(d.iso) ?? [];
+          const dayEvents = eventsByDate.get(d.iso) ?? [];
           const isOther = d.month !== monthAnchor.slice(0, 7);
           const isToday = d.iso === today;
           return (
@@ -303,17 +323,35 @@ function CalendarView({
                 >
                   {d.day}
                 </span>
-                {dayBookings.length > 0 && (
-                  <span className="text-xs font-medium text-stone-500">
-                    <span className="hidden sm:inline">
-                      {dayBookings.length} dog{dayBookings.length === 1 ? "" : "s"}
+                <div className="flex items-center gap-1">
+                  {dayEvents.length > 0 && (
+                    <span
+                      aria-label={`${dayEvents.length} event${dayEvents.length === 1 ? "" : "s"}`}
+                      title={dayEvents.map((e) => e.title).join(" · ")}
+                      className="inline-block h-2 w-2 rounded-full bg-amber-500"
+                    />
+                  )}
+                  {dayBookings.length > 0 && (
+                    <span className="text-xs font-medium text-stone-500">
+                      <span className="hidden sm:inline">
+                        {dayBookings.length} dog{dayBookings.length === 1 ? "" : "s"}
+                      </span>
+                      <span className="sm:hidden">{dayBookings.length}</span>
                     </span>
-                    <span className="sm:hidden">{dayBookings.length}</span>
-                  </span>
-                )}
+                  )}
+                </div>
               </div>
               <ul className="hidden flex-col gap-0.5 text-xs leading-tight sm:flex">
-                {dayBookings.slice(0, 3).map((b) => {
+                {dayEvents.slice(0, 1).map((e) => (
+                  <li
+                    key={`ev-${e.id}`}
+                    className="truncate text-amber-700"
+                    title={e.title}
+                  >
+                    ★ {e.title}
+                  </li>
+                ))}
+                {dayBookings.slice(0, dayEvents.length > 0 ? 2 : 3).map((b) => {
                   const dog = dogById.get(b.dog_id);
                   return (
                     <li
@@ -328,9 +366,9 @@ function CalendarView({
                     </li>
                   );
                 })}
-                {dayBookings.length > 3 && (
+                {dayBookings.length > (dayEvents.length > 0 ? 2 : 3) && (
                   <li className="text-stone-500">
-                    +{dayBookings.length - 3} more
+                    +{dayBookings.length - (dayEvents.length > 0 ? 2 : 3)} more
                   </li>
                 )}
               </ul>

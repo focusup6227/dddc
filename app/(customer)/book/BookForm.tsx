@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Dog, VaccineType } from "@/lib/supabase/types";
+import type { Dog, Event, VaccineType } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
 import {
   DEFAULT_DROP_OFF_TIME,
@@ -10,6 +10,7 @@ import {
   EARLIEST_TIME,
   LATEST_TIME,
 } from "@/lib/hours";
+import { EventList } from "@/components/EventList";
 import { createBooking } from "./actions";
 
 export function BookForm({
@@ -21,6 +22,8 @@ export function BookForm({
   fullDates,
   vaccineBlocks,
   vaccineLabels,
+  events,
+  eventDates,
 }: {
   dogs: Dog[];
   daysRemaining: number;
@@ -30,6 +33,8 @@ export function BookForm({
   fullDates: string[];
   vaccineBlocks: Record<string, VaccineType[]>;
   vaccineLabels: Record<VaccineType, string>;
+  events: Event[];
+  eventDates: string[];
 }) {
   const firstReady = dogs.find((d) => !vaccineBlocks[d.id]?.length);
   const [dogId, setDogId] = useState(firstReady?.id ?? dogs[0]?.id ?? "");
@@ -55,6 +60,7 @@ export function BookForm({
   }, [existingBookings, dogId]);
 
   const full = useMemo(() => new Set(fullDates), [fullDates]);
+  const eventSet = useMemo(() => new Set(eventDates), [eventDates]);
 
   const days = useMemo(() => generateDays(startDate, 42), [startDate]);
 
@@ -155,6 +161,7 @@ export function BookForm({
             const isFull = full.has(d.iso);
             const isSelected = selected.has(d.iso);
             const isPast = d.iso < startDate;
+            const isEvent = eventSet.has(d.iso);
             const disabled = isTaken || isFull || isPast;
             return (
               <button
@@ -163,7 +170,7 @@ export function BookForm({
                 disabled={disabled}
                 onClick={() => toggle(d.iso)}
                 className={
-                  "aspect-square rounded-md border text-sm transition-colors " +
+                  "relative aspect-square rounded-md border text-sm transition-colors " +
                   (isSelected
                     ? "border-brand-600 bg-brand-600 text-white"
                     : isTaken
@@ -174,14 +181,30 @@ export function BookForm({
                           ? "border-stone-100 text-stone-300"
                           : "border-stone-200 bg-white text-stone-800 hover:border-brand-400 hover:bg-brand-50")
                 }
-                title={isFull ? `${d.iso} · full` : d.iso}
+                title={isFull ? `${d.iso} · full` : isEvent ? `${d.iso} · event` : d.iso}
               >
                 {d.day}
+                {isEvent && (
+                  <span
+                    aria-hidden
+                    className={
+                      "pointer-events-none absolute bottom-1 left-1/2 inline-block h-1.5 w-1.5 -translate-x-1/2 rounded-full " +
+                      (isSelected ? "bg-white" : "bg-amber-500")
+                    }
+                  />
+                )}
               </button>
             );
           })}
         </div>
       </section>
+
+      <EventList
+        events={events}
+        title="Events in the next 6 weeks"
+        emptyText="Nothing scheduled in this window."
+        compact
+      />
 
       <section className="card">
         <h3 className="font-semibold text-stone-900">Times</h3>

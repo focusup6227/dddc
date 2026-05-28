@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Dog, VaccineType } from "@/lib/supabase/types";
+import type { Dog, Event, VaccineType } from "@/lib/supabase/types";
 import { addDays, formatDateShort, formatMoney } from "@/lib/format";
 import {
   DEFAULT_DROP_OFF_TIME,
@@ -10,6 +10,7 @@ import {
   EARLIEST_TIME,
   LATEST_TIME,
 } from "@/lib/hours";
+import { EventList } from "@/components/EventList";
 import { createBoarding } from "./actions";
 
 export function BoardForm({
@@ -19,6 +20,7 @@ export function BoardForm({
   fullNights,
   vaccineBlocks,
   vaccineLabels,
+  events,
 }: {
   dogs: Dog[];
   rateCents: number;
@@ -26,6 +28,7 @@ export function BoardForm({
   fullNights: string[];
   vaccineBlocks: Record<string, VaccineType[]>;
   vaccineLabels: Record<VaccineType, string>;
+  events: Event[];
 }) {
   const firstReady = dogs.find((d) => !vaccineBlocks[d.id]?.length);
   const [dogId, setDogId] = useState(firstReady?.id ?? dogs[0]?.id ?? "");
@@ -44,6 +47,12 @@ export function BoardForm({
   const fullSet = useMemo(() => new Set(fullNights), [fullNights]);
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
+  const eventsInStay = useMemo(() => {
+    if (nights.length === 0) return [];
+    const first = nights[0];
+    const last = nights[nights.length - 1];
+    return events.filter((ev) => ev.start_date <= last && ev.end_date >= first);
+  }, [events, nights]);
   const overlappingFull = useMemo(
     () => nights.filter((n) => fullSet.has(n)),
     [nights, fullSet],
@@ -142,7 +151,20 @@ export function BoardForm({
             />
           </label>
         </div>
+        {eventsInStay.length > 0 && (
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Your stay overlaps:{" "}
+            {eventsInStay.map((e) => e.title).join(", ")} — see details below.
+          </div>
+        )}
       </section>
+
+      <EventList
+        events={events}
+        title="Events in the next 60 days"
+        emptyText="Nothing scheduled in this window."
+        compact
+      />
 
       <section className="card">
         <h3 className="font-semibold text-stone-900">Times</h3>

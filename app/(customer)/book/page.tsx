@@ -11,6 +11,7 @@ import type {
 import { addDays, formatMoney, todayISO } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
+import { getEventsInRange } from "@/lib/events.server";
 import {
   missingForBooking,
   summarizeCoverage,
@@ -151,6 +152,20 @@ export default async function BookPage({
   }
   const fullDates = Array.from(fullDatesSet);
 
+  // Events overlapping the visible window (today → today+42, matching the
+  // BookForm calendar's 6-week grid).
+  const calendarEnd = addDays(startDate, 42);
+  const events = await getEventsInRange(startDate, calendarEnd);
+  const eventDates = new Set<string>();
+  for (const ev of events) {
+    let cur = ev.start_date > startDate ? ev.start_date : startDate;
+    const end = ev.end_date < calendarEnd ? ev.end_date : calendarEnd;
+    while (cur <= end) {
+      eventDates.add(cur);
+      cur = addDays(cur, 1);
+    }
+  }
+
   return (
     <div className="max-w-3xl">
       <header>
@@ -202,6 +217,8 @@ export default async function BookPage({
         fullDates={fullDates}
         vaccineBlocks={vaccineBlocks}
         vaccineLabels={VACCINE_LABEL}
+        events={events}
+        eventDates={Array.from(eventDates)}
       />
     </div>
   );

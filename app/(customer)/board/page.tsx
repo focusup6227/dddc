@@ -5,6 +5,7 @@ import type { Dog, DogVaccination, VaccineType } from "@/lib/supabase/types";
 import { addDays, todayISO } from "@/lib/format";
 import { getBoardingRateCents, getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
+import { getEventsInRange } from "@/lib/events.server";
 import {
   missingForBooking,
   summarizeCoverage,
@@ -71,6 +72,7 @@ export default async function BoardPage({
   for (let i = 0; i <= 60; i++) datesInRange.push(addDays(startDate, i));
   const endDate = datesInRange[datesInRange.length - 1];
   const fullNights = Array.from(await getFullDates(datesInRange, "boarding"));
+  const events = await getEventsInRange(startDate, endDate);
 
   const dogIds = dogs.map((d) => d.id);
   const { data: vaxRows } = dogIds.length
@@ -125,6 +127,7 @@ export default async function BoardPage({
         fullNights={fullNights}
         vaccineBlocks={vaccineBlocks}
         vaccineLabels={VACCINE_LABEL}
+        events={events}
       />
     </div>
   );

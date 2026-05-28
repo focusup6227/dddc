@@ -187,6 +187,15 @@ export interface Chore {
   created_at: string;
 }
 
+export interface Event {
+  id: string;
+  title: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
 export type VaccineType = "rabies" | "dhpp" | "bordetella";
 export type VaccinationStatus = "pending" | "verified" | "rejected";
 
