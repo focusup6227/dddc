@@ -105,7 +105,7 @@ export default async function StaffChoresPage({
             )}
           </p>
         </div>
-        <form className="flex items-end gap-2 text-sm">
+        <form className="flex flex-wrap items-end gap-2 text-sm">
           {showDone && <input type="hidden" name="done" value="1" />}
           <label className="block">
             <span className="block text-xs text-stone-500">Date</span>

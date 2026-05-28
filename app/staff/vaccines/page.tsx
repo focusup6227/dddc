@@ -84,14 +84,14 @@ export default async function StaffVaccinesPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex items-end justify-between">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Vaccine records</h1>
           <p className="text-stone-600">
             Approve uploaded records so customers can book.
           </p>
         </div>
-        <div className="flex gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm">
           <FilterLink current={filter} value="pending" label="Pending" />
           <FilterLink current={filter} value="all" label="All recent" />
         </div>
@@ -175,7 +175,7 @@ function VaccineReviewRow({ row }: { row: Row }) {
           )}
         </p>
       </div>
-      <div className="flex flex-col items-end gap-2">
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
         {row.signedUrl ? (
           <a
             href={row.signedUrl}
@@ -189,24 +189,24 @@ function VaccineReviewRow({ row }: { row: Row }) {
           <span className="text-xs text-stone-500">Document unavailable</span>
         )}
         {row.status === "pending" && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <form action={verifyVaccine}>
               <input type="hidden" name="id" value={row.id} />
               <button type="submit" className="btn-primary text-sm">
                 Verify
               </button>
             </form>
-            <form action={rejectVaccine} className="flex items-center gap-1">
+            <form action={rejectVaccine} className="flex flex-1 items-center gap-1 sm:flex-none">
               <input type="hidden" name="id" value={row.id} />
               <input
                 type="text"
                 name="reason"
                 placeholder="Reason (optional)"
-                className="input w-44 text-sm"
+                className="input flex-1 text-sm sm:w-44 sm:flex-none"
               />
               <button
                 type="submit"
-                className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+                className="shrink-0 rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
               >
                 Reject
               </button>

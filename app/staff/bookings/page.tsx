@@ -143,7 +143,7 @@ function ListView({
 
   return (
     <div className="space-y-8">
-      <form className="flex items-end gap-2 text-sm">
+      <form className="flex flex-wrap items-end gap-2 text-sm">
         <input type="hidden" name="view" value="list" />
         <label className="block">
           <span className="block text-xs text-stone-500">From</span>
@@ -268,12 +268,15 @@ function CalendarView({
       <Legend />
 
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-stone-200 bg-stone-200 text-sm">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
           <div
-            key={d}
-            className="bg-stone-50 px-2 py-1.5 text-center text-xs font-semibold text-stone-600"
+            key={i}
+            className="bg-stone-50 px-1 py-1.5 text-center text-xs font-semibold text-stone-600 sm:px-2"
           >
-            {d}
+            <span className="sm:hidden">{d}</span>
+            <span className="hidden sm:inline">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]}
+            </span>
           </div>
         ))}
         {grid.days.map((d) => {
@@ -285,7 +288,7 @@ function CalendarView({
               key={d.iso}
               href={`/staff/bookings?view=list&from=${d.iso}&to=${d.iso}`}
               className={
-                "flex min-h-[110px] flex-col gap-1 bg-white p-1.5 hover:bg-brand-50 " +
+                "flex min-h-[64px] flex-col gap-1 bg-white p-1 hover:bg-brand-50 sm:min-h-[110px] sm:p-1.5 " +
                 (isOther ? "opacity-40 " : "")
               }
             >
@@ -302,11 +305,14 @@ function CalendarView({
                 </span>
                 {dayBookings.length > 0 && (
                   <span className="text-xs font-medium text-stone-500">
-                    {dayBookings.length} dog{dayBookings.length === 1 ? "" : "s"}
+                    <span className="hidden sm:inline">
+                      {dayBookings.length} dog{dayBookings.length === 1 ? "" : "s"}
+                    </span>
+                    <span className="sm:hidden">{dayBookings.length}</span>
                   </span>
                 )}
               </div>
-              <ul className="flex flex-col gap-0.5 text-xs leading-tight">
+              <ul className="hidden flex-col gap-0.5 text-xs leading-tight sm:flex">
                 {dayBookings.slice(0, 3).map((b) => {
                   const dog = dogById.get(b.dog_id);
                   return (
@@ -328,6 +334,13 @@ function CalendarView({
                   </li>
                 )}
               </ul>
+              {dayBookings.length > 0 && (
+                <div className="flex flex-wrap gap-0.5 sm:hidden">
+                  {dayBookings.slice(0, 4).map((b) => (
+                    <StatusDot key={b.id} status={b.status} />
+                  ))}
+                </div>
+              )}
             </Link>
           );
         })}

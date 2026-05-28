@@ -26,15 +26,15 @@ export default async function StaffCustomersPage({
     <div>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-2xl font-bold text-stone-900">Customers</h1>
-        <form className="flex items-end gap-2">
+        <form className="flex w-full items-end gap-2 sm:w-auto">
           <input
             type="search"
             name="q"
             defaultValue={q}
             placeholder="Search name, email, phone"
-            className="input w-64"
+            className="input flex-1 sm:w-64"
           />
-          <button type="submit" className="btn-secondary">Search</button>
+          <button type="submit" className="btn-secondary shrink-0">Search</button>
         </form>
       </header>
 
