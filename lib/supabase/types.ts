@@ -166,6 +166,27 @@ export interface ReportCardPhoto {
   uploaded_at: string;
 }
 
+export type ChoreKind = "walk" | "sanitize" | "manual";
+export type ChoreRecurrence = "none" | "daily" | "weekly";
+
+export interface Chore {
+  id: string;
+  kind: ChoreKind;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  dog_id: string | null;
+  booking_id: string | null;
+  auto_key: string | null;
+  parent_chore_id: string | null;
+  recurrence: ChoreRecurrence;
+  weekday: number | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 export type VaccineType = "rabies" | "dhpp" | "bordetella";
 export type VaccinationStatus = "pending" | "verified" | "rejected";
 
