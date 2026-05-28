@@ -2,13 +2,13 @@ import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, todayISO } from "@/lib/format";
-import { getFullDates } from "@/lib/settings";
-import type { CustomerPackage, Dog, Package, Profile } from "@/lib/supabase/types";
-import { KioskBookForm } from "./KioskBookForm";
+import { getBoardingRateCents, getFullDates } from "@/lib/settings";
+import type { Dog, Profile } from "@/lib/supabase/types";
+import { KioskBoardForm } from "./KioskBoardForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function KioskNewBookingPage({
+export default async function KioskNewBoardingPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; customer?: string; error?: string }>;
@@ -20,17 +20,7 @@ export default async function KioskNewBookingPage({
 
   const supabase = await createClient();
 
-  // Drop-in price
-  const { data: dropInPkg } = await supabase
-    .from("packages")
-    .select("*")
-    .eq("active", true)
-    .eq("days_included", 1)
-    .order("price_cents")
-    .limit(1)
-    .maybeSingle<Package>();
-
-  // Search matches
+  // Search matches.
   let matches: Profile[] = [];
   if (q.length >= 2 && !selectedCustomerId) {
     const term = `%${q}%`;
@@ -44,26 +34,20 @@ export default async function KioskNewBookingPage({
     matches = (data ?? []) as Profile[];
   }
 
-  // Selected customer
   let customer: Profile | null = null;
   let dogs: Dog[] = [];
-  let packages: CustomerPackage[] = [];
-  let existing: { dog_id: string; service_date: string }[] = [];
-  const fullDates: string[] = [];
   let waiverSigned = false;
+  let fullNights: string[] = [];
+  const rateCents = await getBoardingRateCents();
 
   if (selectedCustomerId) {
     const startDate = todayISO();
-    const endDate = addDays(startDate, 60);
     const datesInRange: string[] = [];
     for (let i = 0; i <= 60; i++) datesInRange.push(addDays(startDate, i));
     const [
       { data: cust },
       { data: dogRows },
-      { data: pkgRows },
-      { data: daycareBookings },
-      { data: boardingStays },
-      fullDatesSet,
+      fullNightsSet,
       { count: waiverCount },
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", selectedCustomerId).maybeSingle<Profile>(),
@@ -73,30 +57,7 @@ export default async function KioskNewBookingPage({
         .eq("owner_id", selectedCustomerId)
         .eq("active", true)
         .order("name"),
-      supabase
-        .from("customer_packages")
-        .select("*")
-        .eq("customer_id", selectedCustomerId)
-        .eq("payment_status", "paid")
-        .gt("days_remaining", 0)
-        .order("created_at"),
-      supabase
-        .from("bookings")
-        .select("dog_id, service_date")
-        .eq("customer_id", selectedCustomerId)
-        .eq("service_kind", "daycare")
-        .gte("service_date", startDate)
-        .lte("service_date", endDate)
-        .neq("status", "canceled"),
-      supabase
-        .from("bookings")
-        .select("dog_id, service_date, service_end_date")
-        .eq("customer_id", selectedCustomerId)
-        .eq("service_kind", "boarding")
-        .lte("service_date", endDate)
-        .gt("service_end_date", startDate)
-        .neq("status", "canceled"),
-      getFullDates(datesInRange, "daycare"),
+      getFullDates(datesInRange, "boarding"),
       supabase
         .from("waiver_signatures")
         .select("waiver_id, waivers!inner(active)", { count: "exact", head: true })
@@ -105,26 +66,9 @@ export default async function KioskNewBookingPage({
     ]);
     customer = cust ?? null;
     dogs = (dogRows ?? []) as Dog[];
-    packages = (pkgRows ?? []) as CustomerPackage[];
     waiverSigned = (waiverCount ?? 0) > 0;
-
-    const expanded: { dog_id: string; service_date: string }[] = [
-      ...(daycareBookings ?? []),
-    ];
-    for (const stay of boardingStays ?? []) {
-      let cur = stay.service_date;
-      while (cur < stay.service_end_date) {
-        if (cur >= startDate && cur <= endDate) {
-          expanded.push({ dog_id: stay.dog_id, service_date: cur });
-        }
-        cur = addDays(cur, 1);
-      }
-    }
-    existing = expanded;
-    fullDates.push(...fullDatesSet);
+    fullNights = Array.from(fullNightsSet);
   }
-
-  const daysRemaining = packages.reduce((s, p) => s + p.days_remaining, 0);
 
   return (
     <div className="space-y-6">
@@ -132,7 +76,7 @@ export default async function KioskNewBookingPage({
         ← Back to today
       </Link>
 
-      <h1 className="text-3xl font-bold">New booking</h1>
+      <h1 className="text-3xl font-bold">New boarding</h1>
 
       {params.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">
@@ -142,7 +86,7 @@ export default async function KioskNewBookingPage({
 
       {!selectedCustomerId ? (
         <>
-          <form className="flex gap-2" action="/kiosk/booking/new" method="get">
+          <form className="flex gap-2" action="/kiosk/boarding/new" method="get">
             <input
               type="text"
               name="q"
@@ -163,15 +107,13 @@ export default async function KioskNewBookingPage({
                 {matches.length} result{matches.length === 1 ? "" : "s"}
               </h2>
               {matches.length === 0 ? (
-                <p className="text-stone-600">
-                  No customers found.
-                </p>
+                <p className="text-stone-600">No customers found.</p>
               ) : (
                 <ul className="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
                   {matches.map((m) => (
                     <li key={m.id}>
                       <Link
-                        href={`/kiosk/booking/new?customer=${m.id}`}
+                        href={`/kiosk/boarding/new?customer=${m.id}`}
                         className="flex items-center justify-between p-4 hover:bg-stone-50"
                       >
                         <div>
@@ -202,7 +144,7 @@ export default async function KioskNewBookingPage({
         <p className="text-stone-600">Customer not found.</p>
       ) : dogs.length === 0 ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          This customer has no active dogs. They need to add a dog at /dogs before booking.
+          This customer has no active dogs. Add a dog first.
         </div>
       ) : (
         <>
@@ -217,32 +159,26 @@ export default async function KioskNewBookingPage({
               <p className="text-sm text-stone-500">
                 {customer.email}
                 {customer.phone && ` · ${customer.phone}`}
-                {" · "}
-                <span className="text-stone-700">
-                  {daysRemaining} package day{daysRemaining === 1 ? "" : "s"}
-                </span>
               </p>
             </div>
-            <Link href="/kiosk/booking/new" className="btn-secondary">
+            <Link href="/kiosk/boarding/new" className="btn-secondary">
               Change
             </Link>
           </div>
 
           {!waiverSigned && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Customer hasn&apos;t signed the active waiver. They need to sign at
-              /waiver on their own device before this booking is valid.
+              Customer hasn&apos;t signed the active waiver. They need to sign
+              at /waiver on their own device before this booking is valid.
             </div>
           )}
 
-          <KioskBookForm
+          <KioskBoardForm
             customerId={customer.id}
             dogs={dogs}
-            daysRemaining={daysRemaining}
-            dropInPriceCents={dropInPkg?.price_cents ?? null}
-            existingBookings={existing}
-            fullDates={fullDates}
+            rateCents={rateCents}
             startDate={todayISO()}
+            fullNights={fullNights}
           />
         </>
       )}

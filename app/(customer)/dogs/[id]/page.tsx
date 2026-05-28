@@ -1,18 +1,23 @@
 import { notFound } from "next/navigation";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Dog, DogNote } from "@/lib/supabase/types";
+import type { Dog, DogNote, DogVaccination } from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatDate } from "@/lib/format";
+import { summarizeCoverage } from "@/lib/vaccines";
 import { DogForm } from "../DogForm";
 import { saveDog } from "../actions";
+import { VaccinesPanel } from "../VaccinesPanel";
 
 export default async function DogDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ new?: string }>;
 }) {
   const { id } = await params;
+  const { new: isNew } = await searchParams;
   const { userId } = await requireCustomer();
   const supabase = await createClient();
 
@@ -24,16 +29,20 @@ export default async function DogDetailPage({
     .maybeSingle<Dog>();
   if (!dog) notFound();
 
-  const { data: notesData } = await supabase
-    .from("dog_notes")
-    .select("*")
-    .eq("dog_id", id)
-    .order("created_at", { ascending: false })
-    .limit(20);
-  const notes = (notesData ?? []) as DogNote[];
+  const [notesRes, vaxRes] = await Promise.all([
+    supabase
+      .from("dog_notes")
+      .select("*")
+      .eq("dog_id", id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase.from("dog_vaccinations").select("*").eq("dog_id", id),
+  ]);
+  const notes = (notesRes.data ?? []) as DogNote[];
+  const coverage = summarizeCoverage((vaxRes.data ?? []) as DogVaccination[]);
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-4">
         <DogAvatar photoPath={dog.photo_path} name={dog.name} size={80} />
         <div>
@@ -42,8 +51,17 @@ export default async function DogDetailPage({
         </div>
       </div>
 
+      {isNew && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Profile saved. Upload your dog&apos;s vaccine records below to unlock
+          booking.
+        </div>
+      )}
+
+      <VaccinesPanel dogId={dog.id} ownerId={userId} coverage={coverage} />
+
       {notes.length > 0 && (
-        <section className="card mt-6">
+        <section className="card">
           <h2 className="text-lg font-semibold text-stone-900">Day care notes</h2>
           <ul className="mt-3 divide-y divide-stone-200">
             {notes.map((n) => (
@@ -56,8 +74,10 @@ export default async function DogDetailPage({
         </section>
       )}
 
-      <h2 className="mt-8 text-lg font-semibold text-stone-900">Profile</h2>
-      <DogForm action={saveDog} dog={dog} />
+      <div>
+        <h2 className="text-lg font-semibold text-stone-900">Profile</h2>
+        <DogForm action={saveDog} dog={dog} />
+      </div>
     </div>
   );
 }

@@ -1,0 +1,127 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { requireCustomer } from "@/lib/auth";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { appUrl, getStripe } from "@/lib/stripe";
+import { addDays } from "@/lib/format";
+import {
+  BOARDING_STRIPE_PRICE_AMOUNT_CENTS,
+  BOARDING_STRIPE_PRICE_ID,
+  getBoardingRateCents,
+  getFullDates,
+} from "@/lib/settings";
+import { VACCINE_LABEL } from "@/lib/vaccines";
+import { assertDogReadyToBook } from "@/lib/vaccines.server";
+import type { Dog } from "@/lib/supabase/types";
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_NIGHTS = 30;
+
+export async function createBoarding(formData: FormData) {
+  const { userId, profile } = await requireCustomer();
+  const dog_id = String(formData.get("dog_id") ?? "");
+  const checkIn = String(formData.get("check_in") ?? "");
+  const checkOut = String(formData.get("check_out") ?? "");
+
+  if (!dog_id || !ISO_RE.test(checkIn) || !ISO_RE.test(checkOut)) {
+    redirect("/board?error=Pick+a+dog+and+valid+dates");
+  }
+  if (checkOut <= checkIn) {
+    redirect("/board?error=Check-out+must+be+after+check-in");
+  }
+
+  const nights: string[] = [];
+  let cur = checkIn;
+  while (cur < checkOut && nights.length < MAX_NIGHTS) {
+    nights.push(cur);
+    cur = addDays(cur, 1);
+  }
+  if (nights.length === 0) {
+    redirect("/board?error=Pick+at+least+one+night");
+  }
+
+  const supabase = await createClient();
+  const { data: dog } = await supabase
+    .from("dogs")
+    .select("*")
+    .eq("id", dog_id)
+    .eq("owner_id", userId)
+    .maybeSingle<Dog>();
+  if (!dog) redirect("/board?error=Dog+not+found");
+
+  // Vaccines must be verified + non-expired through the last night of the stay.
+  const lastNight = nights[nights.length - 1];
+  const vax = await assertDogReadyToBook(dog_id, lastNight);
+  if (!vax.ok) {
+    const missing = vax.missing.map((k) => VACCINE_LABEL[k]).join(", ");
+    redirect(
+      `/board?error=${encodeURIComponent(
+        `Upload these vaccine records first: ${missing}`,
+      )}`,
+    );
+  }
+
+  // Capacity check against boarding pool.
+  const fullNights = await getFullDates(nights, "boarding");
+  const overlapping = nights.filter((n) => fullNights.has(n));
+  if (overlapping.length > 0) {
+    redirect(
+      `/board?error=${encodeURIComponent(`These nights are full: ${overlapping.join(", ")}`)}`,
+    );
+  }
+
+  const rateCents = await getBoardingRateCents();
+
+  const svc = createServiceClient();
+
+  // If the saved boarding rate still matches the Stripe price's unit_amount,
+  // reference the pre-made Stripe price (clean reporting). Otherwise fall back
+  // to ad-hoc price_data so the customer is charged the current rate.
+  const useStripeId = rateCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS;
+  const stripe = getStripe();
+  const lineItem = useStripeId
+    ? { price: BOARDING_STRIPE_PRICE_ID, quantity: nights.length }
+    : {
+        price_data: {
+          currency: "usd" as const,
+          product_data: {
+            name: `Boarding (${dog!.name})`,
+            description: `${nights.length} night${nights.length === 1 ? "" : "s"}: ${checkIn} → ${checkOut}`,
+          },
+          unit_amount: rateCents,
+        },
+        quantity: nights.length,
+      };
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: profile.email,
+    line_items: [lineItem],
+    success_url: `${appUrl()}/board?status=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${appUrl()}/board?error=Checkout+canceled`,
+    metadata: {
+      kind: "boarding",
+      customer_id: userId,
+      dog_id,
+      service_dates: nights.join(","),
+    },
+  });
+
+  // One booking row covers the full stay: service_date = check-in, service_end_date = check-out.
+  await svc.from("bookings").insert({
+    customer_id: userId,
+    dog_id,
+    service_date: checkIn,
+    service_end_date: checkOut,
+    service_kind: "boarding",
+    status: "reserved",
+    payment_kind: "drop_in",
+    unit_price_cents: rateCents,
+    stripe_checkout_session_id: session.id,
+    payment_status: "unpaid",
+  });
+
+  if (!session.url) redirect("/board?error=Stripe+session+failed");
+  redirect(session.url);
+}

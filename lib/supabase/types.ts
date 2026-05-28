@@ -10,6 +10,7 @@ export type BookingStatus =
   | "canceled";
 export type PaymentKind = "package" | "drop_in";
 export type PaymentStatus = "unpaid" | "paid" | "refunded" | "failed";
+export type ServiceKind = "daycare" | "boarding";
 
 export interface Profile {
   id: string;
@@ -37,6 +38,8 @@ export interface Dog {
   photo_path: string | null;
   vet_name: string | null;
   vet_phone: string | null;
+  microchipped: boolean;
+  microchip_number: string | null;
   vaccinations_current: boolean;
   vaccination_notes: string | null;
   allergies: string | null;
@@ -76,6 +79,8 @@ export interface Package {
   price_cents: number;
   active: boolean;
   sort_order: number;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
   created_at: string;
 }
 
@@ -98,12 +103,14 @@ export interface Booking {
   customer_id: string;
   dog_id: string;
   service_date: string;
+  service_end_date: string; // exclusive — daycare = service_date + 1, boarding = checkout date
+  service_kind: ServiceKind;
   drop_off_time: string | null;
   pickup_time: string | null;
   status: BookingStatus;
   payment_kind: PaymentKind;
   customer_package_id: string | null;
-  drop_in_price_cents: number | null;
+  unit_price_cents: number | null;
   stripe_payment_intent_id: string | null;
   stripe_checkout_session_id: string | null;
   payment_status: PaymentStatus;
@@ -130,4 +137,21 @@ export interface DogNote {
   author_id: string;
   note: string;
   created_at: string;
+}
+
+export type VaccineType = "rabies" | "dhpp" | "bordetella";
+export type VaccinationStatus = "pending" | "verified" | "rejected";
+
+export interface DogVaccination {
+  id: string;
+  dog_id: string;
+  vaccine_type: VaccineType;
+  document_path: string;
+  expires_on: string;
+  status: VaccinationStatus;
+  uploaded_at: string;
+  uploaded_by: string | null;
+  verified_at: string | null;
+  verified_by: string | null;
+  rejection_reason: string | null;
 }

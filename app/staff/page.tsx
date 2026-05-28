@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
 import { DogAvatar } from "@/components/DogAvatar";
+import { getPendingVaccineCount } from "@/lib/vaccines.server";
 import { checkInBooking, checkOutBooking } from "./actions";
 
 export default async function StaffTodayPage() {
@@ -45,6 +46,8 @@ export default async function StaffTodayPage() {
     return ci?.checked_in_at && !ci.checked_out_at;
   });
 
+  const pendingVaccines = await getPendingVaccineCount();
+
   return (
     <div className="space-y-8">
       <header className="flex items-end justify-between">
@@ -55,6 +58,19 @@ export default async function StaffTodayPage() {
           </p>
         </div>
       </header>
+
+      {pendingVaccines > 0 && (
+        <Link
+          href="/staff/vaccines"
+          className="block rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"
+        >
+          <span className="font-semibold">
+            {pendingVaccines} vaccine record
+            {pendingVaccines === 1 ? "" : "s"} pending review
+          </span>
+          <span className="ml-2 text-amber-800">— customers can&apos;t book until you approve.</span>
+        </Link>
+      )}
 
       {bookings.length === 0 ? (
         <p className="text-stone-600">No bookings today.</p>

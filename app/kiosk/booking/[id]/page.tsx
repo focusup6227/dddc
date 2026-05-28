@@ -2,9 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney } from "@/lib/format";
+import { formatDateShort, formatMoney } from "@/lib/format";
 import { DogAvatar } from "@/components/DogAvatar";
-import type { Booking, CheckIn, Dog, Profile } from "@/lib/supabase/types";
+import type {
+  Booking,
+  CheckIn,
+  Dog,
+  DogVaccination,
+  Profile,
+} from "@/lib/supabase/types";
+import {
+  REQUIRED_VACCINES,
+  summarizeCoverage,
+  type VaccineCoverage,
+} from "@/lib/vaccines";
 import { kioskCheckIn, kioskCheckOut, kioskTakePayment } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +36,15 @@ export default async function KioskBookingPage({
     .maybeSingle<Booking>();
   if (!booking) notFound();
 
-  const [{ data: dog }, { data: cust }, { data: ci }] = await Promise.all([
-    supabase.from("dogs").select("*").eq("id", booking.dog_id).maybeSingle<Dog>(),
-    supabase.from("profiles").select("*").eq("id", booking.customer_id).maybeSingle<Profile>(),
-    supabase.from("check_ins").select("*").eq("booking_id", booking.id).maybeSingle<CheckIn>(),
-  ]);
+  const [{ data: dog }, { data: cust }, { data: ci }, { data: vaxRows }] =
+    await Promise.all([
+      supabase.from("dogs").select("*").eq("id", booking.dog_id).maybeSingle<Dog>(),
+      supabase.from("profiles").select("*").eq("id", booking.customer_id).maybeSingle<Profile>(),
+      supabase.from("check_ins").select("*").eq("booking_id", booking.id).maybeSingle<CheckIn>(),
+      supabase.from("dog_vaccinations").select("*").eq("dog_id", booking.dog_id),
+    ]);
   if (!dog || !cust) notFound();
+  const coverage = summarizeCoverage((vaxRows ?? []) as DogVaccination[]);
 
   const isPaid = booking.payment_status === "paid";
   const isCheckedIn = !!ci?.checked_in_at && !ci?.checked_out_at;
@@ -60,14 +74,17 @@ export default async function KioskBookingPage({
 
         <div className="grid grid-cols-1 gap-4 border-t border-stone-200 bg-stone-50 p-6 sm:grid-cols-2">
           <Field label="Vaccinations">
-            {dog.vaccinations_current ? (
-              <span className="text-emerald-700">Current</span>
-            ) : (
-              <span className="text-red-700">Not current</span>
-            )}
-            {dog.vaccination_notes && (
-              <p className="text-xs text-stone-500">{dog.vaccination_notes}</p>
-            )}
+            <ul className="space-y-0.5">
+              {coverage.map((c) => {
+                const meta = REQUIRED_VACCINES.find((v) => v.key === c.vaccineType)!;
+                return (
+                  <li key={c.vaccineType} className="flex items-center justify-between gap-2">
+                    <span className="text-stone-700">{meta.label}</span>
+                    <VaccineStatus coverage={c} />
+                  </li>
+                );
+              })}
+            </ul>
           </Field>
           <Field label="Allergies">{dog.allergies || <em className="text-stone-400">None noted</em>}</Field>
           <Field label="Medications">
@@ -105,6 +122,29 @@ export default async function KioskBookingPage({
   );
 }
 
+function VaccineStatus({ coverage }: { coverage: VaccineCoverage }) {
+  switch (coverage.status) {
+    case "verified":
+      return (
+        <span className="text-xs font-medium text-emerald-700">
+          ✓ {formatDateShort(coverage.expiresOn!)}
+        </span>
+      );
+    case "pending":
+      return <span className="text-xs font-medium text-amber-700">Pending review</span>;
+    case "expired":
+      return (
+        <span className="text-xs font-medium text-red-700">
+          Expired {formatDateShort(coverage.expiresOn!)}
+        </span>
+      );
+    case "rejected":
+      return <span className="text-xs font-medium text-red-700">Rejected</span>;
+    default:
+      return <span className="text-xs font-medium text-stone-400">Missing</span>;
+  }
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -133,8 +173,8 @@ async function ActionPanel({
         <input type="hidden" name="booking_id" value={booking.id} />
         <BigButton tone="red">
           Take payment{" "}
-          {booking.drop_in_price_cents
-            ? `· ${formatMoney(booking.drop_in_price_cents)}`
+          {booking.unit_price_cents
+            ? `· ${formatMoney(booking.unit_price_cents)}`
             : ""}
         </BigButton>
       </form>

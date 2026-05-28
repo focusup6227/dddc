@@ -34,8 +34,8 @@ export async function saveDog(formData: FormData) {
     photo_path: str(formData.get("photo_path")),
     vet_name: str(formData.get("vet_name")),
     vet_phone: str(formData.get("vet_phone")),
-    vaccinations_current: formData.get("vaccinations_current") === "yes",
-    vaccination_notes: str(formData.get("vaccination_notes")),
+    microchipped: formData.get("microchipped") === "yes",
+    microchip_number: str(formData.get("microchip_number")),
     allergies: str(formData.get("allergies")),
     medications: str(formData.get("medications")),
     feeding_notes: str(formData.get("feeding_notes")),
@@ -47,12 +47,21 @@ export async function saveDog(formData: FormData) {
   }
 
   const supabase = await createClient();
+  let nextDogId = id;
   if (id) {
     await supabase.from("dogs").update(payload).eq("id", id).eq("owner_id", userId);
   } else {
-    await supabase.from("dogs").insert(payload);
+    const { data: inserted } = await supabase
+      .from("dogs")
+      .insert(payload)
+      .select("id")
+      .single<{ id: string }>();
+    nextDogId = inserted?.id ?? null;
   }
 
   revalidatePath("/dogs");
+  // For brand-new dogs, land on the detail page so the customer can
+  // immediately upload vaccine records.
+  if (!id && nextDogId) redirect(`/dogs/${nextDogId}?new=1`);
   redirect("/dogs");
 }

@@ -23,11 +23,9 @@ export async function buyPackage(formData: FormData) {
   }
 
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: profile.email,
-    line_items: [
-      {
+  const lineItem = pkg.stripe_price_id
+    ? { price: pkg.stripe_price_id, quantity: 1 }
+    : {
         price_data: {
           currency: "usd",
           product_data: {
@@ -37,8 +35,11 @@ export async function buyPackage(formData: FormData) {
           unit_amount: pkg.price_cents,
         },
         quantity: 1,
-      },
-    ],
+      };
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: profile.email,
+    line_items: [lineItem],
     success_url: `${appUrl()}/packages?status=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl()}/packages?status=canceled`,
     metadata: {

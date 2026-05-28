@@ -2,11 +2,17 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import type Stripe from "stripe";
 import { requireStaff } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
-import { todayISO } from "@/lib/format";
+import { addDays, todayISO } from "@/lib/format";
 import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
+import {
+  BOARDING_STRIPE_PRICE_AMOUNT_CENTS,
+  BOARDING_STRIPE_PRICE_ID,
+  getBoardingRateCents,
+} from "@/lib/settings";
 import type {
   Booking,
   CheckIn,
@@ -17,6 +23,14 @@ import type {
 } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function daysBetween(start: string, end: string): number {
+  const [y1, m1, d1] = start.split("-").map(Number);
+  const [y2, m2, d2] = end.split("-").map(Number);
+  const a = Date.UTC(y1, m1 - 1, d1);
+  const b = Date.UTC(y2, m2 - 1, d2);
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
 
 export async function kioskCheckIn(formData: FormData) {
   const { userId } = await requireStaff();
@@ -117,13 +131,11 @@ export async function kioskWalkInCharge(formData: FormData) {
   }
 
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: profile!.email,
-    line_items: [
-      {
+  const walkInLineItem = dropInPkg!.stripe_price_id
+    ? { price: dropInPkg!.stripe_price_id, quantity: 1 }
+    : {
         price_data: {
-          currency: "usd",
+          currency: "usd" as const,
           product_data: {
             name: `Day care drop-in (${dog!.name})`,
             description: `Walk-in · ${today}`,
@@ -131,8 +143,11 @@ export async function kioskWalkInCharge(formData: FormData) {
           unit_amount: dropInPkg!.price_cents,
         },
         quantity: 1,
-      },
-    ],
+      };
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: profile!.email,
+    line_items: [walkInLineItem],
     success_url: `${appUrl()}/kiosk?paid=1`,
     cancel_url: `${appUrl()}/kiosk?canceled=1`,
     metadata: {
@@ -150,7 +165,7 @@ export async function kioskWalkInCharge(formData: FormData) {
       .from("bookings")
       .update({
         payment_kind: "drop_in",
-        drop_in_price_cents: dropInPkg!.price_cents,
+        unit_price_cents: dropInPkg!.price_cents,
         stripe_checkout_session_id: session.id,
         payment_status: "unpaid",
         status: "reserved",
@@ -161,9 +176,10 @@ export async function kioskWalkInCharge(formData: FormData) {
       customer_id,
       dog_id,
       service_date: today,
+      service_end_date: addDays(today, 1),
       status: "reserved",
       payment_kind: "drop_in",
-      drop_in_price_cents: dropInPkg!.price_cents,
+      unit_price_cents: dropInPkg!.price_cents,
       stripe_checkout_session_id: session.id,
       payment_status: "unpaid",
     });
@@ -238,6 +254,7 @@ export async function kioskCreateBooking(formData: FormData) {
   const dropInAllocs = allocations.filter((a) => !a.pkg);
 
   let dropInPriceCents: number | null = null;
+  let dropInPriceId: string | null = null;
   if (dropInAllocs.length > 0) {
     const { data: dropInPkg } = await svc
       .from("packages")
@@ -253,6 +270,7 @@ export async function kioskCreateBooking(formData: FormData) {
       );
     }
     dropInPriceCents = dropInPkg!.price_cents;
+    dropInPriceId = dropInPkg!.stripe_price_id;
   }
 
   // Insert package-funded bookings + decrement package balances.
@@ -264,6 +282,7 @@ export async function kioskCreateBooking(formData: FormData) {
       customer_id,
       dog_id,
       service_date: a.date,
+      service_end_date: addDays(a.date, 1),
       status: "reserved",
       payment_kind: "package",
       customer_package_id: pkg.id,
@@ -304,13 +323,11 @@ export async function kioskCreateBooking(formData: FormData) {
 
   // Stripe checkout for drop-in days.
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: profile!.email,
-    line_items: [
-      {
+  const kioskDropInLineItem = dropInPriceId
+    ? { price: dropInPriceId, quantity: dropInAllocs.length }
+    : {
         price_data: {
-          currency: "usd",
+          currency: "usd" as const,
           product_data: {
             name: `Day care drop-in (${dog!.name})`,
             description: `Service dates: ${dropInAllocs.map((a) => a.date).join(", ")}`,
@@ -318,8 +335,11 @@ export async function kioskCreateBooking(formData: FormData) {
           unit_amount: dropInPriceCents!,
         },
         quantity: dropInAllocs.length,
-      },
-    ],
+      };
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: profile!.email,
+    line_items: [kioskDropInLineItem],
     success_url: `${appUrl()}/kiosk?paid=1`,
     cancel_url: `${appUrl()}/kiosk?canceled=1`,
     metadata: {
@@ -336,9 +356,10 @@ export async function kioskCreateBooking(formData: FormData) {
       customer_id,
       dog_id,
       service_date: a.date,
+      service_end_date: addDays(a.date, 1),
       status: "reserved",
       payment_kind: "drop_in",
-      drop_in_price_cents: dropInPriceCents,
+      unit_price_cents: dropInPriceCents,
       stripe_checkout_session_id: session.id,
       payment_status: "unpaid",
     });
@@ -409,29 +430,53 @@ export async function kioskTakePayment(formData: FormData) {
   ]);
   if (!dog || !cust || !dropInPkg) redirect("/kiosk");
 
-  const priceCents = booking!.drop_in_price_cents ?? dropInPkg!.price_cents;
+  const isBoarding = booking!.service_kind === "boarding";
+  const nightsCovered = isBoarding
+    ? daysBetween(booking!.service_date, booking!.service_end_date)
+    : 1;
+  const priceCents =
+    booking!.unit_price_cents ??
+    (isBoarding ? BOARDING_STRIPE_PRICE_AMOUNT_CENTS : dropInPkg!.price_cents);
+
+  // Reuse the matching pre-made Stripe price when the saved booking rate
+  // still matches — otherwise fall back to ad-hoc price_data so the
+  // customer is charged what was originally quoted.
+  let lineItem: Stripe.Checkout.SessionCreateParams.LineItem;
+  if (isBoarding && priceCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS) {
+    lineItem = { price: BOARDING_STRIPE_PRICE_ID, quantity: nightsCovered };
+  } else if (
+    !isBoarding &&
+    dropInPkg!.stripe_price_id &&
+    priceCents === dropInPkg!.price_cents
+  ) {
+    lineItem = { price: dropInPkg!.stripe_price_id, quantity: 1 };
+  } else {
+    lineItem = {
+      price_data: {
+        currency: "usd" as const,
+        product_data: {
+          name: isBoarding
+            ? `Boarding (${dog!.name})`
+            : `Day care drop-in (${dog!.name})`,
+          description: isBoarding
+            ? `${nightsCovered} night${nightsCovered === 1 ? "" : "s"}: ${booking!.service_date} → ${booking!.service_end_date}`
+            : `Service date: ${booking!.service_date}`,
+        },
+        unit_amount: priceCents,
+      },
+      quantity: isBoarding ? nightsCovered : 1,
+    };
+  }
 
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: cust!.email,
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: `Day care drop-in (${dog!.name})`,
-            description: `Service date: ${booking!.service_date}`,
-          },
-          unit_amount: priceCents,
-        },
-        quantity: 1,
-      },
-    ],
+    line_items: [lineItem],
     success_url: `${appUrl()}/kiosk?paid=1`,
     cancel_url: `${appUrl()}/kiosk?canceled=1`,
     metadata: {
-      kind: "drop_in",
+      kind: isBoarding ? "boarding" : "drop_in",
       customer_id: cust!.id,
       dog_id: dog!.id,
       service_dates: booking!.service_date,
@@ -443,12 +488,112 @@ export async function kioskTakePayment(formData: FormData) {
     .from("bookings")
     .update({
       payment_kind: "drop_in",
-      drop_in_price_cents: priceCents,
+      unit_price_cents: priceCents,
       stripe_checkout_session_id: session.id,
       payment_status: "unpaid",
     })
     .eq("id", booking_id);
 
   if (!session.url) redirect("/kiosk?canceled=1");
+  redirect(session.url);
+}
+
+/**
+ * Staff creates a multi-night boarding stay on behalf of a customer.
+ * Mirrors the customer-side /board flow but takes customer_id explicitly
+ * and skips the waiver hard-block (staff already saw the in-page warning).
+ */
+export async function kioskCreateBoarding(formData: FormData) {
+  await requireStaff();
+  const customer_id = String(formData.get("customer_id") ?? "");
+  const dog_id = String(formData.get("dog_id") ?? "");
+  const checkIn = String(formData.get("check_in") ?? "");
+  const checkOut = String(formData.get("check_out") ?? "");
+
+  if (
+    !customer_id ||
+    !dog_id ||
+    !ISO_RE.test(checkIn) ||
+    !ISO_RE.test(checkOut) ||
+    checkOut <= checkIn
+  ) {
+    redirect(
+      `/kiosk/boarding/new?customer=${customer_id}&error=Pick+a+dog+and+valid+dates`,
+    );
+  }
+
+  const nights: string[] = [];
+  let cur = checkIn;
+  while (cur < checkOut && nights.length < 30) {
+    nights.push(cur);
+    cur = addDays(cur, 1);
+  }
+  if (nights.length === 0) {
+    redirect(`/kiosk/boarding/new?customer=${customer_id}&error=Pick+at+least+one+night`);
+  }
+
+  const svc = createServiceClient();
+
+  const [{ data: dog }, { data: profile }] = await Promise.all([
+    svc.from("dogs").select("*").eq("id", dog_id).maybeSingle<Dog>(),
+    svc.from("profiles").select("*").eq("id", customer_id).maybeSingle<Profile>(),
+  ]);
+  if (!dog || dog.owner_id !== customer_id) {
+    redirect(`/kiosk/boarding/new?customer=${customer_id}&error=Dog+not+found`);
+  }
+  if (!profile) {
+    redirect(`/kiosk/boarding/new?error=Customer+not+found`);
+  }
+
+  const rateCents = await getBoardingRateCents();
+  const useStripeId = rateCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS;
+
+  const stripe = getStripe();
+  const lineItem = useStripeId
+    ? { price: BOARDING_STRIPE_PRICE_ID, quantity: nights.length }
+    : {
+        price_data: {
+          currency: "usd" as const,
+          product_data: {
+            name: `Boarding (${dog!.name})`,
+            description: `${nights.length} night${nights.length === 1 ? "" : "s"}: ${checkIn} → ${checkOut}`,
+          },
+          unit_amount: rateCents,
+        },
+        quantity: nights.length,
+      };
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: profile!.email,
+    line_items: [lineItem],
+    success_url: `${appUrl()}/kiosk?paid=1`,
+    cancel_url: `${appUrl()}/kiosk?canceled=1`,
+    metadata: {
+      kind: "boarding",
+      customer_id,
+      dog_id,
+      service_dates: nights.join(","),
+      source: "kiosk",
+    },
+  });
+
+  // One row per stay covering [checkIn, checkOut).
+  await svc.from("bookings").insert({
+    customer_id,
+    dog_id,
+    service_date: checkIn,
+    service_end_date: checkOut,
+    service_kind: "boarding",
+    status: "reserved",
+    payment_kind: "drop_in",
+    unit_price_cents: rateCents,
+    stripe_checkout_session_id: session.id,
+    payment_status: "unpaid",
+  });
+
+  if (!session.url) {
+    redirect(`/kiosk/boarding/new?customer=${customer_id}&error=Stripe+session+failed`);
+  }
   redirect(session.url);
 }

@@ -1,36 +1,30 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { getMaxDogsPerDay } from "@/lib/settings";
+import { getDayCounts, getMaxDogsPerDay, getMaxDogsPerNight } from "@/lib/settings";
 import { todayISO } from "@/lib/format";
+import type { ServiceKind } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function KioskAvailabilityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; kind?: string }>;
 }) {
   await requireStaff();
   const params = await searchParams;
+  const kind: ServiceKind = params.kind === "boarding" ? "boarding" : "daycare";
   const monthAnchor = normalizeMonth(params.month) ?? firstOfMonth(todayISO());
   const grid = monthGrid(monthAnchor);
 
-  const supabase = await createClient();
-  const [maxPerDay, { data: bookings }] = await Promise.all([
+  const [maxDay, maxNight, counts] = await Promise.all([
     getMaxDogsPerDay(),
-    supabase
-      .from("bookings")
-      .select("service_date")
-      .gte("service_date", grid.gridStart)
-      .lte("service_date", grid.gridEnd)
-      .neq("status", "canceled"),
+    getMaxDogsPerNight(),
+    getDayCounts(grid.days.map((d) => d.iso), kind),
   ]);
 
-  const counts = new Map<string, number>();
-  for (const r of bookings ?? []) {
-    counts.set(r.service_date, (counts.get(r.service_date) ?? 0) + 1);
-  }
+  const max = kind === "boarding" ? maxNight : maxDay;
+  const unit = kind === "boarding" ? "dogs/night" : "dogs/day";
 
   const monthLabel = new Date(
     Number(monthAnchor.slice(0, 4)),
@@ -41,6 +35,7 @@ export default async function KioskAvailabilityPage({
   const nextMonth = shiftMonth(monthAnchor, 1).slice(0, 7);
   const today = todayISO();
   const thisMonth = monthAnchor.slice(0, 7);
+  const otherKind: ServiceKind = kind === "boarding" ? "daycare" : "boarding";
 
   return (
     <div className="space-y-5">
@@ -52,31 +47,56 @@ export default async function KioskAvailabilityPage({
         <div>
           <h1 className="text-3xl font-bold">Availability</h1>
           <p className="text-sm text-stone-600">
-            Capacity {maxPerDay} dogs/day · set in /staff/settings
+            Capacity {max} {unit} · set in /staff/settings
           </p>
         </div>
         <div className="flex gap-2">
           <Link
-            href={`/kiosk/availability?month=${prevMonth}`}
+            href={`/kiosk/availability?month=${prevMonth}&kind=${kind}`}
             className="btn-secondary"
             aria-label="Previous month"
           >
             ←
           </Link>
           <Link
-            href={`/kiosk/availability?month=${today.slice(0, 7)}`}
+            href={`/kiosk/availability?month=${today.slice(0, 7)}&kind=${kind}`}
             className="btn-secondary"
           >
             Today
           </Link>
           <Link
-            href={`/kiosk/availability?month=${nextMonth}`}
+            href={`/kiosk/availability?month=${nextMonth}&kind=${kind}`}
             className="btn-secondary"
             aria-label="Next month"
           >
             →
           </Link>
         </div>
+      </div>
+
+      <div className="inline-flex rounded-lg border border-stone-300 bg-white p-1 text-sm">
+        <Link
+          href={`/kiosk/availability?month=${thisMonth}&kind=daycare`}
+          className={
+            "rounded-md px-3 py-1.5 font-medium " +
+            (kind === "daycare"
+              ? "bg-brand-600 text-white"
+              : "text-stone-700 hover:bg-stone-100")
+          }
+        >
+          Daycare
+        </Link>
+        <Link
+          href={`/kiosk/availability?month=${thisMonth}&kind=boarding`}
+          className={
+            "rounded-md px-3 py-1.5 font-medium " +
+            (kind === "boarding"
+              ? "bg-brand-600 text-white"
+              : "text-stone-700 hover:bg-stone-100")
+          }
+        >
+          Boarding
+        </Link>
       </div>
 
       <h2 className="text-lg font-semibold text-stone-900">{monthLabel}</h2>
@@ -94,7 +114,7 @@ export default async function KioskAvailabilityPage({
         ))}
         {grid.days.map((d) => {
           const n = counts.get(d.iso) ?? 0;
-          const pct = maxPerDay > 0 ? n / maxPerDay : 0;
+          const pct = max > 0 ? n / max : 0;
           const isOther = d.month !== thisMonth;
           const isToday = d.iso === today;
           const cellTone = toneFor(pct, n, isOther);
@@ -114,7 +134,7 @@ export default async function KioskAvailabilityPage({
                   {d.day}
                 </span>
                 <span className="text-xs font-medium text-stone-700">
-                  {n}/{maxPerDay}
+                  {n}/{max}
                 </span>
               </div>
               <div className="mt-auto h-1.5 w-full rounded-full bg-white/60">
@@ -127,6 +147,10 @@ export default async function KioskAvailabilityPage({
           );
         })}
       </div>
+
+      <p className="text-xs text-stone-500">
+        Showing {kind} bookings. <Link href={`/kiosk/availability?month=${thisMonth}&kind=${otherKind}`} className="text-brand-700 underline">Switch to {otherKind}</Link>.
+      </p>
     </div>
   );
 }

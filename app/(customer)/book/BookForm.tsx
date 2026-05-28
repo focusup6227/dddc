@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Dog } from "@/lib/supabase/types";
+import Link from "next/link";
+import type { Dog, VaccineType } from "@/lib/supabase/types";
 import { formatMoney } from "@/lib/format";
 import { createBooking } from "./actions";
 
@@ -12,6 +13,8 @@ export function BookForm({
   existingBookings,
   startDate,
   fullDates,
+  vaccineBlocks,
+  vaccineLabels,
 }: {
   dogs: Dog[];
   daysRemaining: number;
@@ -19,9 +22,15 @@ export function BookForm({
   existingBookings: { dog_id: string; service_date: string }[];
   startDate: string;
   fullDates: string[];
+  vaccineBlocks: Record<string, VaccineType[]>;
+  vaccineLabels: Record<VaccineType, string>;
 }) {
-  const [dogId, setDogId] = useState(dogs[0]?.id ?? "");
+  const firstReady = dogs.find((d) => !vaccineBlocks[d.id]?.length);
+  const [dogId, setDogId] = useState(firstReady?.id ?? dogs[0]?.id ?? "");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const blockedMissing = vaccineBlocks[dogId] ?? [];
+  const dogBlocked = blockedMissing.length > 0;
 
   const taken = useMemo(() => {
     const s = new Set<string>();
@@ -62,25 +71,53 @@ export function BookForm({
       <section className="card">
         <h3 className="font-semibold text-stone-900">Dog</h3>
         <div className="mt-3 flex flex-wrap gap-2">
-          {dogs.map((d) => (
-            <button
-              type="button"
-              key={d.id}
-              onClick={() => {
-                setDogId(d.id);
-                setSelected(new Set());
-              }}
-              className={
-                "rounded-full border px-3 py-1.5 text-sm " +
-                (dogId === d.id
-                  ? "border-brand-600 bg-brand-50 text-brand-700"
-                  : "border-stone-300 text-stone-700 hover:bg-stone-50")
-              }
-            >
-              {d.name}
-            </button>
-          ))}
+          {dogs.map((d) => {
+            const isBlocked = (vaccineBlocks[d.id]?.length ?? 0) > 0;
+            const isSelected = dogId === d.id;
+            return (
+              <button
+                type="button"
+                key={d.id}
+                onClick={() => {
+                  setDogId(d.id);
+                  setSelected(new Set());
+                }}
+                className={
+                  "rounded-full border px-3 py-1.5 text-sm " +
+                  (isSelected
+                    ? "border-brand-600 bg-brand-50 text-brand-700"
+                    : isBlocked
+                      ? "border-stone-200 bg-stone-50 text-stone-500"
+                      : "border-stone-300 text-stone-700 hover:bg-stone-50")
+                }
+                title={isBlocked ? "Missing required vaccine records" : undefined}
+              >
+                {d.name}
+                {isBlocked && " ⚠"}
+              </button>
+            );
+          })}
         </div>
+        {dogBlocked && (
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="font-medium">
+              {dogs.find((d) => d.id === dogId)?.name} can&apos;t be booked yet.
+            </p>
+            <p className="mt-1">
+              Needs:{" "}
+              {blockedMissing
+                .map((k) => vaccineLabels[k])
+                .join(", ")}
+              . Records must be verified and not expired by your last booked day.
+            </p>
+            <Link
+              href={`/dogs/${dogId}`}
+              className="mt-2 inline-block font-medium text-amber-900 underline"
+            >
+              Upload records →
+            </Link>
+          </div>
+        )}
       </section>
 
       <section className="card">
@@ -160,7 +197,12 @@ export function BookForm({
 
       <button
         type="submit"
-        disabled={selectedCount === 0 || !dogId || (dropInDaysNeeded > 0 && !dropInPriceCents)}
+        disabled={
+          selectedCount === 0 ||
+          !dogId ||
+          dogBlocked ||
+          (dropInDaysNeeded > 0 && !dropInPriceCents)
+        }
         className="btn-primary w-full"
       >
         {dropInDaysNeeded > 0

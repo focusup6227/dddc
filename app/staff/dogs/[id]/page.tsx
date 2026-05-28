@@ -2,9 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Booking, Dog, DogNote, Profile } from "@/lib/supabase/types";
+import type {
+  Booking,
+  Dog,
+  DogNote,
+  DogVaccination,
+  Profile,
+} from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatDate, formatDateShort } from "@/lib/format";
+import {
+  REQUIRED_VACCINES,
+  summarizeCoverage,
+  type VaccineCoverage,
+} from "@/lib/vaccines";
 import { addDogNote, updateStaffNotes } from "../../actions";
 
 export default async function StaffDogDetailPage({
@@ -23,7 +34,7 @@ export default async function StaffDogDetailPage({
     .maybeSingle<Dog>();
   if (!dog) notFound();
 
-  const [ownerRes, notesRes, bookingsRes] = await Promise.all([
+  const [ownerRes, notesRes, bookingsRes, vaxRes] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", dog.owner_id).maybeSingle<Profile>(),
     supabase
       .from("dog_notes")
@@ -37,10 +48,12 @@ export default async function StaffDogDetailPage({
       .eq("dog_id", id)
       .order("service_date", { ascending: false })
       .limit(20),
+    supabase.from("dog_vaccinations").select("*").eq("dog_id", id),
   ]);
   const owner = ownerRes.data ?? null;
   const notes = (notesRes.data ?? []) as DogNote[];
   const bookings = (bookingsRes.data ?? []) as Booking[];
+  const coverage = summarizeCoverage((vaxRes.data ?? []) as DogVaccination[]);
 
   return (
     <div className="space-y-8">
@@ -72,13 +85,33 @@ export default async function StaffDogDetailPage({
         <section className="card">
           <h2 className="font-semibold text-stone-900">Health</h2>
           <dl className="mt-3 space-y-2 text-sm">
-            <Row label="Vaccinations" value={dog.vaccinations_current ? "Current ✓" : "Not confirmed"} />
-            <Row label="Vaccine notes" value={dog.vaccination_notes} />
             <Row label="Allergies" value={dog.allergies} />
             <Row label="Medications" value={dog.medications} />
             <Row label="Vet" value={dog.vet_name} />
             <Row label="Vet phone" value={dog.vet_phone} />
           </dl>
+          <div className="mt-4 border-t border-stone-200 pt-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-900">Vaccines</h3>
+              <Link
+                href="/staff/vaccines"
+                className="text-xs font-medium text-brand-700 hover:underline"
+              >
+                Review queue →
+              </Link>
+            </div>
+            <ul className="mt-2 space-y-1 text-sm">
+              {coverage.map((c) => {
+                const meta = REQUIRED_VACCINES.find((v) => v.key === c.vaccineType)!;
+                return (
+                  <li key={c.vaccineType} className="flex items-center justify-between">
+                    <span className="text-stone-700">{meta.label}</span>
+                    <VaccineStatusText coverage={c} />
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </section>
 
         <section className="card">
@@ -157,6 +190,30 @@ export default async function StaffDogDetailPage({
       </section>
     </div>
   );
+}
+
+function VaccineStatusText({ coverage }: { coverage: VaccineCoverage }) {
+  if (coverage.status === "verified") {
+    return (
+      <span className="text-emerald-700">
+        ✓ Expires {formatDateShort(coverage.expiresOn!)}
+      </span>
+    );
+  }
+  if (coverage.status === "pending") {
+    return <span className="text-amber-700">Pending review</span>;
+  }
+  if (coverage.status === "expired") {
+    return (
+      <span className="text-red-700">
+        Expired {formatDateShort(coverage.expiresOn!)}
+      </span>
+    );
+  }
+  if (coverage.status === "rejected") {
+    return <span className="text-red-700">Rejected</span>;
+  }
+  return <span className="text-stone-400">Missing</span>;
 }
 
 function Row({ label, value }: { label: string; value: string | null | boolean }) {

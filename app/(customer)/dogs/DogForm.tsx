@@ -109,26 +109,30 @@ export function DogForm({
       </section>
 
       <section className="card space-y-4">
+        <h3 className="font-semibold text-stone-900">Microchip</h3>
+        <label className="flex items-center gap-2 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            name="microchipped"
+            value="yes"
+            defaultChecked={dog?.microchipped ?? false}
+            className="h-4 w-4 rounded border-stone-300"
+          />
+          Microchipped
+        </label>
+        <Field
+          name="microchip_number"
+          label="Chip number (if known)"
+          defaultValue={dog?.microchip_number ?? ""}
+        />
+      </section>
+
+      <section className="card space-y-4">
         <h3 className="font-semibold text-stone-900">Health & vet</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field name="vet_name" label="Vet name" defaultValue={dog?.vet_name ?? ""} />
           <Field name="vet_phone" label="Vet phone" defaultValue={dog?.vet_phone ?? ""} />
         </div>
-        <label className="flex items-center gap-2 text-sm text-stone-700">
-          <input
-            type="checkbox"
-            name="vaccinations_current"
-            value="yes"
-            defaultChecked={dog?.vaccinations_current ?? false}
-            className="h-4 w-4 rounded border-stone-300"
-          />
-          Vaccinations are current (Rabies, DHPP, Bordetella)
-        </label>
-        <Textarea
-          name="vaccination_notes"
-          label="Vaccination notes"
-          defaultValue={dog?.vaccination_notes ?? ""}
-        />
         <Textarea
           name="allergies"
           label="Allergies"
@@ -139,6 +143,12 @@ export function DogForm({
           label="Medications"
           defaultValue={dog?.medications ?? ""}
         />
+        {!dog && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            After you save, you&apos;ll be asked to upload your dog&apos;s vaccine
+            records (Rabies, DHPP, Bordetella) before booking.
+          </p>
+        )}
       </section>
 
       <section className="card space-y-4">

@@ -34,6 +34,14 @@ export default async function BookingsPage() {
   );
 }
 
+function nightCount(start: string, end: string): number {
+  const [y1, m1, d1] = start.split("-").map(Number);
+  const [y2, m2, d2] = end.split("-").map(Number);
+  const a = Date.UTC(y1, m1 - 1, d1);
+  const b = Date.UTC(y2, m2 - 1, d2);
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
+
 function Section({
   title,
   bookings,
@@ -58,11 +66,18 @@ function Section({
               <li key={b.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="font-medium text-stone-900">
-                    {formatDateShort(b.service_date)} — {dog?.name ?? "Dog"}
+                    {b.service_kind === "boarding"
+                      ? `${formatDateShort(b.service_date)} → ${formatDateShort(b.service_end_date)}`
+                      : formatDateShort(b.service_date)}{" "}
+                    — {dog?.name ?? "Dog"}
                   </p>
                   <p className="text-sm text-stone-500">
-                    {b.payment_kind === "package" ? "Package day" : "Drop-in"} ·{" "}
-                    {b.status} · {b.payment_status}
+                    {b.service_kind === "boarding"
+                      ? `Boarding · ${nightCount(b.service_date, b.service_end_date)} night${nightCount(b.service_date, b.service_end_date) === 1 ? "" : "s"}`
+                      : b.payment_kind === "package"
+                        ? "Package day"
+                        : "Drop-in"}{" "}
+                    · {b.status} · {b.payment_status}
                   </p>
                 </div>
                 {cancelable && b.status === "reserved" && (

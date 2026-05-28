@@ -1,6 +1,10 @@
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getMaxDogsPerDay } from "@/lib/settings";
+import {
+  getBoardingRateCents,
+  getMaxDogsPerDay,
+  getMaxDogsPerNight,
+} from "@/lib/settings";
 import { saveSettings } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +16,11 @@ export default async function StaffSettingsPage({
 }) {
   await requireStaff();
   const params = await searchParams;
-  const max = await getMaxDogsPerDay();
-  // Pull all current settings to display.
+  const [maxDay, maxNight, boardingCents] = await Promise.all([
+    getMaxDogsPerDay(),
+    getMaxDogsPerNight(),
+    getBoardingRateCents(),
+  ]);
   const supabase = await createClient();
   const { data: rows } = await supabase
     .from("settings")
@@ -38,7 +45,7 @@ export default async function StaffSettingsPage({
       <form action={saveSettings} className="card space-y-4">
         <div>
           <label htmlFor="max_dogs_per_day" className="label">
-            Maximum dogs per day
+            Daycare capacity (dogs per day)
           </label>
           <input
             id="max_dogs_per_day"
@@ -46,13 +53,52 @@ export default async function StaffSettingsPage({
             type="number"
             min={1}
             max={500}
-            defaultValue={max}
+            defaultValue={maxDay}
             required
             className="input"
           />
           <p className="mt-1 text-xs text-stone-500">
-            New customer bookings are blocked once a day reaches this many dogs.
-            Staff can still book past the limit from the kiosk.
+            New customer daycare bookings are blocked once a day reaches this
+            many dogs. Staff can still book past the limit from the kiosk.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="max_dogs_per_night" className="label">
+            Boarding capacity (dogs per night)
+          </label>
+          <input
+            id="max_dogs_per_night"
+            name="max_dogs_per_night"
+            type="number"
+            min={1}
+            max={500}
+            defaultValue={maxNight}
+            required
+            className="input"
+          />
+          <p className="mt-1 text-xs text-stone-500">
+            New boarding bookings are blocked once a night reaches this many
+            dogs. Tracked separately from daycare capacity.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="boarding_rate_dollars" className="label">
+            Boarding rate ($ / night)
+          </label>
+          <input
+            id="boarding_rate_dollars"
+            name="boarding_rate_dollars"
+            type="number"
+            min={1}
+            max={10000}
+            step="0.01"
+            defaultValue={(boardingCents / 100).toFixed(2)}
+            required
+            className="input"
+          />
+          <p className="mt-1 text-xs text-stone-500">
+            Per dog, per night. Existing bookings are charged the rate that was
+            in effect when they were created.
           </p>
         </div>
         <button type="submit" className="btn-primary">

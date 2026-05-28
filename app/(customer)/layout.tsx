@@ -24,7 +24,8 @@ export default async function CustomerLayout({
   const nav = [
     { href: "/dashboard", label: "Home" },
     { href: "/dogs", label: "My Dogs" },
-    { href: "/book", label: "Book a Day" },
+    { href: "/book", label: "Day Care" },
+    { href: "/board", label: "Boarding" },
     { href: "/packages", label: "Packages" },
     { href: "/bookings", label: "Bookings" },
   ];

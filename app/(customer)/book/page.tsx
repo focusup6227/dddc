@@ -1,9 +1,20 @@
 import Link from "next/link";
 import { requireCustomer } from "@/lib/auth";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
-import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
+import { createClient } from "@/lib/supabase/server";
+import type {
+  CustomerPackage,
+  Dog,
+  DogVaccination,
+  Package,
+  VaccineType,
+} from "@/lib/supabase/types";
 import { addDays, formatMoney, todayISO } from "@/lib/format";
-import { getMaxDogsPerDay } from "@/lib/settings";
+import { getFullDates } from "@/lib/settings";
+import {
+  missingForBooking,
+  summarizeCoverage,
+  VACCINE_LABEL,
+} from "@/lib/vaccines";
 import { BookForm } from "./BookForm";
 
 export default async function BookPage({
@@ -68,30 +79,65 @@ export default async function BookPage({
   // Pre-fetch existing bookings for the next 60 days so the calendar can avoid dupes.
   const startDate = todayISO();
   const endDate = addDays(startDate, 60);
-  const [{ data: existingData }, { data: allDayRows }, maxPerDay] = await Promise.all([
+  const datesInRange: string[] = [];
+  for (let i = 0; i <= 60; i++) datesInRange.push(addDays(startDate, i));
+
+  // Vaccine coverage per dog (evaluated as of the last bookable day so dogs
+  // whose records would expire mid-range are flagged early).
+  const dogIds = dogs.map((d) => d.id);
+  const { data: vaxRows } = dogIds.length
+    ? await supabase
+        .from("dog_vaccinations")
+        .select("*")
+        .in("dog_id", dogIds)
+    : { data: [] as DogVaccination[] };
+  const vaxByDog = new Map<string, DogVaccination[]>();
+  for (const r of (vaxRows ?? []) as DogVaccination[]) {
+    const arr = vaxByDog.get(r.dog_id) ?? [];
+    arr.push(r);
+    vaxByDog.set(r.dog_id, arr);
+  }
+  const vaccineBlocks: Record<string, VaccineType[]> = {};
+  for (const d of dogs) {
+    const cov = summarizeCoverage(vaxByDog.get(d.id) ?? [], endDate);
+    const missing = missingForBooking(cov, endDate);
+    if (missing.length > 0) vaccineBlocks[d.id] = missing;
+  }
+  const allDogsBlocked =
+    dogs.length > 0 && dogs.every((d) => vaccineBlocks[d.id]?.length);
+
+  const [{ data: daycareRows }, { data: boardingStays }, fullDatesSet] = await Promise.all([
     supabase
       .from("bookings")
-      .select("dog_id, service_date, status")
+      .select("dog_id, service_date")
       .eq("customer_id", userId)
+      .eq("service_kind", "daycare")
       .gte("service_date", startDate)
       .lte("service_date", endDate)
       .neq("status", "canceled"),
-    createServiceClient()
+    supabase
       .from("bookings")
-      .select("service_date")
-      .gte("service_date", startDate)
+      .select("dog_id, service_date, service_end_date")
+      .eq("customer_id", userId)
+      .eq("service_kind", "boarding")
       .lte("service_date", endDate)
+      .gt("service_end_date", startDate)
       .neq("status", "canceled"),
-    getMaxDogsPerDay(),
+    getFullDates(datesInRange, "daycare"),
   ]);
-  const dayCounts = new Map<string, number>();
-  for (const r of allDayRows ?? []) {
-    dayCounts.set(r.service_date, (dayCounts.get(r.service_date) ?? 0) + 1);
+  const existingData: { dog_id: string; service_date: string }[] = [
+    ...(daycareRows ?? []),
+  ];
+  for (const stay of boardingStays ?? []) {
+    let cur = stay.service_date;
+    while (cur < stay.service_end_date) {
+      if (cur >= startDate && cur <= endDate) {
+        existingData.push({ dog_id: stay.dog_id, service_date: cur });
+      }
+      cur = addDays(cur, 1);
+    }
   }
-  const fullDates: string[] = [];
-  for (const [d, n] of dayCounts) {
-    if (n >= maxPerDay) fullDates.push(d);
-  }
+  const fullDates = Array.from(fullDatesSet);
 
   return (
     <div className="max-w-3xl">
@@ -122,13 +168,22 @@ export default async function BookPage({
         </div>
       )}
 
+      {allDogsBlocked && (
+        <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          All your dogs are missing required vaccine records. Open a dog&apos;s
+          profile to upload them — once we verify, you can book.
+        </div>
+      )}
+
       <BookForm
         dogs={dogs}
         daysRemaining={daysRemaining}
         dropInPriceCents={dropInPkg?.price_cents ?? null}
-        existingBookings={(existingData ?? []) as { dog_id: string; service_date: string }[]}
+        existingBookings={existingData}
         startDate={startDate}
         fullDates={fullDates}
+        vaccineBlocks={vaccineBlocks}
+        vaccineLabels={VACCINE_LABEL}
       />
     </div>
   );

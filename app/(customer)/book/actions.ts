@@ -5,7 +5,10 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
 import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
+import { addDays } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
+import { VACCINE_LABEL } from "@/lib/vaccines";
+import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -32,6 +35,20 @@ export async function createBooking(formData: FormData) {
     .eq("owner_id", userId)
     .maybeSingle<Dog>();
   if (!dog) redirect("/book?error=Dog+not+found");
+
+  // Vaccine gate: require verified, non-expired records covering the last
+  // service day. The client form already blocks, but a malicious / stale
+  // request must still be rejected here.
+  const lastDate = dates[dates.length - 1];
+  const vax = await assertDogReadyToBook(dog_id, lastDate);
+  if (!vax.ok) {
+    const missing = vax.missing.map((k) => VACCINE_LABEL[k]).join(", ");
+    redirect(
+      `/book?error=${encodeURIComponent(
+        `Upload these vaccine records first: ${missing}`,
+      )}`,
+    );
+  }
 
   // Capacity check: block any requested date that's already at the daily cap.
   const full = await getFullDates(dates);
@@ -71,6 +88,7 @@ export async function createBooking(formData: FormData) {
 
   // Look up the 1-day "drop in" package price.
   let dropInPriceCents: number | null = null;
+  let dropInPriceId: string | null = null;
   if (dropInAllocs.length > 0) {
     const { data: dropInPkg } = await supabase
       .from("packages")
@@ -84,6 +102,7 @@ export async function createBooking(formData: FormData) {
       redirect("/book?error=No+drop-in+rate+configured");
     }
     dropInPriceCents = dropInPkg!.price_cents;
+    dropInPriceId = dropInPkg!.stripe_price_id;
   }
 
   // Use service client to decrement package days + insert bookings transactionally-ish.
@@ -99,6 +118,7 @@ export async function createBooking(formData: FormData) {
       customer_id: userId,
       dog_id,
       service_date: a.date,
+      service_end_date: addDays(a.date, 1),
       status: "reserved",
       payment_kind: "package",
       customer_package_id: pkg.id,
@@ -153,13 +173,11 @@ export async function createBooking(formData: FormData) {
 
   // Otherwise: create Stripe checkout for the drop-in days, with a "pending" booking row each.
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: profile.email,
-    line_items: [
-      {
+  const dropInLineItem = dropInPriceId
+    ? { price: dropInPriceId, quantity: dropInAllocs.length }
+    : {
         price_data: {
-          currency: "usd",
+          currency: "usd" as const,
           product_data: {
             name: `Day care drop-in (${dog.name})`,
             description: `Service dates: ${dropInAllocs.map((a) => a.date).join(", ")}`,
@@ -167,8 +185,11 @@ export async function createBooking(formData: FormData) {
           unit_amount: dropInPriceCents!,
         },
         quantity: dropInAllocs.length,
-      },
-    ],
+      };
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: profile.email,
+    line_items: [dropInLineItem],
     success_url: `${appUrl()}/book?status=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl()}/book?error=Checkout+canceled`,
     metadata: {
@@ -185,9 +206,10 @@ export async function createBooking(formData: FormData) {
       customer_id: userId,
       dog_id,
       service_date: a.date,
+      service_end_date: addDays(a.date, 1),
       status: "reserved",
       payment_kind: "drop_in",
-      drop_in_price_cents: dropInPriceCents,
+      unit_price_cents: dropInPriceCents,
       stripe_checkout_session_id: session.id,
       payment_status: "unpaid",
     });

@@ -21,7 +21,8 @@ export default async function KioskHomePage({
   const { data: bookingsData } = await supabase
     .from("bookings")
     .select("*")
-    .eq("service_date", today)
+    .lte("service_date", today)
+    .gt("service_end_date", today)
     .neq("status", "canceled")
     .order("drop_off_time", { nullsFirst: true });
   const bookings = (bookingsData ?? []) as Booking[];
@@ -79,9 +80,13 @@ export default async function KioskHomePage({
 
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Today</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Today</h1>
           <p className="text-stone-600">
             {bookings.length} booked · {here.length} on site · {gone.length} gone
+          </p>
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-stone-500">
+            <span className="kiosk-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Auto-refreshes every 15 s
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -95,7 +100,13 @@ export default async function KioskHomePage({
             href="/kiosk/booking/new"
             className="inline-flex items-center gap-2 rounded-xl border border-brand-600 bg-white px-4 py-3 text-base font-semibold text-brand-700 hover:bg-brand-50"
           >
-            + New booking
+            + Daycare
+          </Link>
+          <Link
+            href="/kiosk/boarding/new"
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-600 bg-white px-4 py-3 text-base font-semibold text-brand-700 hover:bg-brand-50"
+          >
+            + Boarding
           </Link>
           <Link
             href="/kiosk/walk-in"

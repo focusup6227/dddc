@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendBookingConfirmation, sendPaymentReceipt } from "@/lib/email";
+import { addDays } from "@/lib/format";
 
 // Stripe sends raw bodies; opt out of body parsing.
 export const runtime = "nodejs";
@@ -108,7 +109,7 @@ async function handleCheckoutSucceeded(
     return;
   }
 
-  if (kind === "drop_in") {
+  if (kind === "drop_in" || kind === "boarding") {
     const { data: bookingRows } = await svc
       .from("bookings")
       .update({
@@ -116,7 +117,7 @@ async function handleCheckoutSucceeded(
         stripe_payment_intent_id: paymentIntentId,
       })
       .eq("stripe_checkout_session_id", session.id)
-      .select("id, customer_id, dog_id, service_date, drop_in_price_cents");
+      .select("id, customer_id, dog_id, service_date, service_end_date, unit_price_cents");
     const bookings = bookingRows ?? [];
     if (bookings.length === 0) return;
 
@@ -128,11 +129,24 @@ async function handleCheckoutSucceeded(
     ]);
     if (!profile?.email || !dog) return;
 
-    const dates = bookings.map((b) => b.service_date).sort();
-    const totalCents = bookings.reduce(
-      (sum, b) => sum + (b.drop_in_price_cents ?? 0),
-      0,
-    );
+    // Expand each booking into the dates it covers. Daycare bookings span one
+    // day; boarding bookings span multiple nights as a single row.
+    const dates: string[] = [];
+    let totalCents = 0;
+    let unitCount = 0;
+    for (const b of bookings) {
+      let cur = b.service_date;
+      while (cur < b.service_end_date) {
+        dates.push(cur);
+        unitCount += 1;
+        totalCents += b.unit_price_cents ?? 0;
+        cur = addDays(cur, 1);
+      }
+    }
+    dates.sort();
+
+    const isBoarding = kind === "boarding";
+    const unit = isBoarding ? "night" : "day";
 
     await sendBookingConfirmation({
       to: profile.email,
@@ -140,13 +154,13 @@ async function handleCheckoutSucceeded(
       dogName: dog.name,
       dates,
       paidByPackageCount: 0,
-      dropInCount: bookings.length,
+      dropInCount: unitCount,
       dropInTotalCents: totalCents,
     });
     await sendPaymentReceipt({
       to: profile.email,
       customerName: profile.full_name ?? profile.email,
-      description: `Drop-in for ${dog.name} × ${bookings.length} day${bookings.length === 1 ? "" : "s"}`,
+      description: `${isBoarding ? "Boarding" : "Drop-in"} for ${dog.name} × ${unitCount} ${unit}${unitCount === 1 ? "" : "s"}`,
       amountCents: totalCents || session.amount_total || 0,
       paidAt: new Date(),
     });
@@ -164,7 +178,7 @@ async function handleCheckoutFailed(
       .from("customer_packages")
       .update({ payment_status: "failed" })
       .eq("stripe_checkout_session_id", session.id);
-  } else if (kind === "drop_in") {
+  } else if (kind === "drop_in" || kind === "boarding") {
     await svc
       .from("bookings")
       .update({ payment_status: "failed", status: "canceled" })
