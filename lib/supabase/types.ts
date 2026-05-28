@@ -144,6 +144,28 @@ export interface DogNote {
   created_at: string;
 }
 
+export interface ReportCard {
+  id: string;
+  booking_id: string;
+  note: string;
+  published_at: string | null;
+  published_by: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportCardPhoto {
+  id: string;
+  report_card_id: string;
+  storage_path: string;
+  caption: string | null;
+  photo_date: string | null;
+  sort_order: number;
+  uploaded_by: string | null;
+  uploaded_at: string;
+}
+
 export type VaccineType = "rabies" | "dhpp" | "bordetella";
 export type VaccinationStatus = "pending" | "verified" | "rejected";
 

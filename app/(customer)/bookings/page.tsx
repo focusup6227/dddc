@@ -1,9 +1,15 @@
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { Booking, Dog } from "@/lib/supabase/types";
+import type {
+  Booking,
+  Dog,
+  ReportCard,
+  ReportCardPhoto,
+} from "@/lib/supabase/types";
 import { formatDateShort, formatMoney, todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
 import { isPastDueUnpaid, refundFractionForBooking } from "@/lib/bookings.server";
+import { ReportCardView } from "@/components/ReportCardView";
 import { cancelBooking, payBooking } from "./actions";
 import ConfirmCancelButton from "./ConfirmCancelButton";
 
@@ -29,6 +35,33 @@ export default async function BookingsPage({
   const dogs = (dogsRes.data ?? []) as Dog[];
   const today = todayISO();
 
+  // RLS only returns cards that are published AND on the customer's bookings,
+  // so a simple "any card on these bookings" select is safe.
+  const bookingIds = bookings.map((b) => b.id);
+  const [cardsRes, photosRes] = bookingIds.length
+    ? await Promise.all([
+        supabase
+          .from("report_cards")
+          .select("*")
+          .in("booking_id", bookingIds),
+        supabase
+          .from("report_card_photos")
+          .select("*")
+          .order("sort_order")
+          .order("uploaded_at"),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const cards = (cardsRes.data ?? []) as ReportCard[];
+  const allPhotos = (photosRes.data ?? []) as ReportCardPhoto[];
+
+  const cardByBooking = new Map(cards.map((c) => [c.booking_id, c]));
+  const photosByCard = new Map<string, ReportCardPhoto[]>();
+  for (const p of allPhotos) {
+    const arr = photosByCard.get(p.report_card_id) ?? [];
+    arr.push(p);
+    photosByCard.set(p.report_card_id, arr);
+  }
+
   const upcoming = bookings.filter((b) => b.service_date >= today && b.status !== "canceled");
   const past = bookings.filter((b) => b.service_date < today || b.status === "canceled");
 
@@ -52,8 +85,23 @@ export default async function BookingsPage({
         </div>
       )}
 
-      <Section title="Upcoming" bookings={upcoming} dogs={dogs} today={today} cancelable />
-      <Section title="Past" bookings={past} dogs={dogs} today={today} />
+      <Section
+        title="Upcoming"
+        bookings={upcoming}
+        dogs={dogs}
+        today={today}
+        cardByBooking={cardByBooking}
+        photosByCard={photosByCard}
+        cancelable
+      />
+      <Section
+        title="Past"
+        bookings={past}
+        dogs={dogs}
+        today={today}
+        cardByBooking={cardByBooking}
+        photosByCard={photosByCard}
+      />
     </div>
   );
 }
@@ -89,12 +137,16 @@ function Section({
   bookings,
   dogs,
   today,
+  cardByBooking,
+  photosByCard,
   cancelable,
 }: {
   title: string;
   bookings: Booking[];
   dogs: Dog[];
   today: string;
+  cardByBooking: Map<string, ReportCard>;
+  photosByCard: Map<string, ReportCardPhoto[]>;
   cancelable?: boolean;
 }) {
   return (
@@ -114,9 +166,12 @@ function Section({
               cancelable && b.status === "reserved" && !isPastDue;
             const showPayNow = isUnpaid;
             const preview = showCancel ? refundPreview(b) : "";
+            const card = cardByBooking.get(b.id);
+            const cardPhotos = card ? photosByCard.get(card.id) ?? [] : [];
             return (
-              <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
+              <li key={b.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                   <p className="font-medium text-stone-900">
                     {b.service_kind === "boarding"
                       ? `${formatDateShort(b.service_date)} → ${formatDateShort(b.service_end_date)}`
@@ -167,6 +222,16 @@ function Section({
                     </form>
                   )}
                 </div>
+                </div>
+                {card && card.published_at && (
+                  <div className="mt-3">
+                    <ReportCardView
+                      card={card}
+                      photos={cardPhotos}
+                      dogName={dog?.name ?? "Dog"}
+                    />
+                  </div>
+                )}
               </li>
             );
           })}

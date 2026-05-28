@@ -454,6 +454,46 @@ export async function sendBookingReminder(args: {
   });
 }
 
+// --- Report card ready ----------------------------------------------------
+
+export async function sendReportCardReady(args: {
+  to: string;
+  customerName: string;
+  dogName: string;
+  serviceKind: "daycare" | "boarding";
+  serviceDate: string;
+  serviceEndDate: string;
+}) {
+  const { to, customerName, dogName, serviceKind, serviceDate, serviceEndDate } =
+    args;
+
+  const dateLabel =
+    serviceKind === "boarding"
+      ? `${formatDateShort(serviceDate)} → ${formatDateShort(serviceEndDate)}`
+      : formatDateShort(serviceDate);
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi ${escape(customerName)},</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">We made a report card for <strong style="color:${COLOR.text};">${escape(dogName)}</strong> — a quick note plus some photos from the day.</p>
+    ${detailCard([
+      { label: "Dog", value: escape(dogName) },
+      { label: serviceKind === "boarding" ? "Stay" : "Day", value: escape(dateLabel) },
+    ])}
+    ${button(`${appUrl()}/bookings`, `See ${escape(dogName)}'s report card`)}
+    <p style="margin:14px 0 0;font-family:${FONT};font-size:14px;line-height:1.55;color:${COLOR.textMuted};">Thanks for trusting us with ${escape(dogName)}. 🐾</p>
+  `;
+
+  await send({
+    to,
+    subject: `${dogName}'s report card is ready`,
+    html: shell({
+      preheader: `A note + photos from ${dogName}'s ${serviceKind === "boarding" ? "stay" : "day"}.`,
+      heading: `${dogName}'s report card`,
+      body,
+    }),
+  });
+}
+
 function escape(s: string): string {
   return s
     .replace(/&/g, "&amp;")

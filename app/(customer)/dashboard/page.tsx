@@ -2,7 +2,14 @@ import Link from "next/link";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateShort, todayISO } from "@/lib/format";
-import type { Booking, CustomerPackage, Dog } from "@/lib/supabase/types";
+import type {
+  Booking,
+  CustomerPackage,
+  Dog,
+  ReportCard,
+  ReportCardPhoto,
+} from "@/lib/supabase/types";
+import { ReportCardView } from "@/components/ReportCardView";
 
 export default async function CustomerDashboard() {
   const { userId, profile } = await requireCustomer();
@@ -37,6 +44,38 @@ export default async function CustomerDashboard() {
   const packages = (packagesRes.data ?? []) as CustomerPackage[];
   const totalDays = packages.reduce((s, p) => s + p.days_remaining, 0);
 
+  // Latest published report card across all of the customer's bookings.
+  // RLS filters to published + owned, so we can just take the newest.
+  const { data: latestCardData } = await supabase
+    .from("report_cards")
+    .select("*")
+    .not("published_at", "is", null)
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<ReportCard>();
+  const latestCard = latestCardData;
+
+  let latestCardPhotos: ReportCardPhoto[] = [];
+  let latestCardDog: Dog | null = null;
+  if (latestCard) {
+    const [photosRes, bookingRes] = await Promise.all([
+      supabase
+        .from("report_card_photos")
+        .select("*")
+        .eq("report_card_id", latestCard.id)
+        .order("sort_order")
+        .order("uploaded_at"),
+      supabase
+        .from("bookings")
+        .select("dog_id")
+        .eq("id", latestCard.booking_id)
+        .maybeSingle<{ dog_id: string }>(),
+    ]);
+    latestCardPhotos = (photosRes.data ?? []) as ReportCardPhoto[];
+    const dogId = bookingRes.data?.dog_id;
+    if (dogId) latestCardDog = dogs.find((d) => d.id === dogId) ?? null;
+  }
+
   return (
     <div className="space-y-8">
       <header>
@@ -63,6 +102,28 @@ export default async function CustomerDashboard() {
           cta={{ href: "/book", label: "Book a day" }}
         />
       </div>
+
+      {latestCard && latestCardDog && (
+        <section>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold text-stone-900">
+              Latest report card
+            </h2>
+            <Link
+              href="/bookings"
+              className="text-sm font-medium text-brand-700 hover:underline"
+            >
+              See all →
+            </Link>
+          </div>
+          <ReportCardView
+            card={latestCard}
+            photos={latestCardPhotos}
+            dogName={latestCardDog.name}
+            variant="teaser"
+          />
+        </section>
+      )}
 
       <section className="card">
         <h2 className="text-lg font-semibold text-stone-900">Upcoming bookings</h2>

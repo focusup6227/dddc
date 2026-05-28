@@ -10,6 +10,7 @@ const NAV: { href: string; label: string; badgeKey?: "vaccines" }[] = [
   { href: "/staff/customers", label: "Customers" },
   { href: "/staff/dogs", label: "Dogs" },
   { href: "/staff/vaccines", label: "Vaccines", badgeKey: "vaccines" },
+  { href: "/staff/report-cards", label: "Report cards" },
   { href: "/staff/packages", label: "Packages" },
   { href: "/staff/settings", label: "Settings" },
   { href: "/kiosk", label: "Kiosk" },
