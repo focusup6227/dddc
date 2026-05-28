@@ -15,7 +15,10 @@ function getResend(): Resend | null {
 }
 
 function fromAddress(): string {
-  return process.env.EMAIL_FROM ?? "Dixon Doggy Day Care <noreply@dixondoggydaycare.com>";
+  return (
+    process.env.EMAIL_FROM ??
+    "Dixon Doggy Day Care and Boarding <noreply@dixondoggydaycare.com>"
+  );
 }
 
 type SendArgs = {
@@ -45,7 +48,7 @@ async function send(args: SendArgs) {
   }
 }
 
-const BRAND = "Dixon Doggy Day Care";
+const BRAND = "Dixon Doggy Day Care and Boarding";
 
 function shell(title: string, body: string): string {
   return `<!doctype html>

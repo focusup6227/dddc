@@ -1,11 +1,20 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-20">
+    <main className="mx-auto max-w-3xl px-6 py-16">
       <div className="text-center">
-        <p className="text-sm font-semibold uppercase tracking-wider text-brand-600">
-          Dixon Doggy Day Care
+        <Image
+          src="/logo.jpg"
+          alt="Dixon Doggy Day Care and Boarding"
+          width={240}
+          height={240}
+          priority
+          className="mx-auto h-44 w-44 rounded-full shadow-md sm:h-56 sm:w-56"
+        />
+        <p className="mt-6 text-sm font-semibold uppercase tracking-wider text-brand-600">
+          Dixon Doggy Day Care and Boarding
         </p>
         <h1 className="mt-3 text-4xl font-bold tracking-tight text-stone-900 sm:text-5xl">
           A second home for your best friend.

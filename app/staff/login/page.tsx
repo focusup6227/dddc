@@ -14,7 +14,7 @@ export default async function StaffLoginPage({
   return (
     <main className="mx-auto max-w-md px-6 py-16">
       <h1 className="text-2xl font-bold text-stone-900">Operator sign in</h1>
-      <p className="mt-1 text-sm text-stone-600">For Dixon Doggy Day Care staff.</p>
+      <p className="mt-1 text-sm text-stone-600">For Dixon Doggy Day Care and Boarding staff.</p>
 
       <form action={staffLogin} className="mt-8 space-y-4">
         <div>

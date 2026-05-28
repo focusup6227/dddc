@@ -1,4 +1,4 @@
-# Dixon Doggy Day Care
+# Dixon Doggy Day Care and Boarding
 
 A management dashboard + customer portal for a doggy day care, built on
 **Next.js 15** (App Router), **Supabase** (auth + Postgres + Storage), and

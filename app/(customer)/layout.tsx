@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -32,8 +33,17 @@ export default async function CustomerLayout({
     <div className="min-h-screen bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <Link href="/dashboard" className="text-lg font-bold text-brand-700">
-            Dixon Doggy Day Care
+          <Link href="/dashboard" className="flex items-center gap-2 text-brand-700">
+            <Image
+              src="/logo.jpg"
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full"
+            />
+            <span className="hidden text-lg font-bold sm:inline">
+              Dixon Doggy Day Care and Boarding
+            </span>
           </Link>
           <nav className="hidden gap-1 md:flex">
             {nav.map((n) => (

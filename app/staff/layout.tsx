@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getSessionProfile } from "@/lib/auth";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -24,8 +25,19 @@ export default async function StaffLayout({
     <div className="min-h-screen bg-stone-50">
       <header className="border-b border-stone-200 bg-stone-900 text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link href="/staff" className="text-lg font-bold">
-            DDDC · Operator
+          <Link href="/staff" className="flex items-center gap-2">
+            <Image
+              src="/logo.jpg"
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full ring-2 ring-stone-700"
+            />
+            <span className="text-lg font-bold">
+              <span className="hidden sm:inline">Dixon Doggy Day Care</span>
+              <span className="sm:hidden">DDDC</span>
+              {" · Operator"}
+            </span>
           </Link>
           {session?.profile.role === "staff" && (
             <>
