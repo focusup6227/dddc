@@ -1,0 +1,17 @@
+node_modules
+.next
+.turbo
+out
+dist
+
+.env
+.env.local
+.env*.local
+
+.DS_Store
+*.log
+.vscode
+.idea
+
+supabase/.branches
+supabase/.temp

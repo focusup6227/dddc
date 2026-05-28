@@ -1,0 +1,133 @@
+// Minimal hand-written DB types. Regenerate with `supabase gen types typescript`
+// once you wire up the Supabase CLI to your project.
+
+export type UserRole = "customer" | "staff";
+export type BookingStatus =
+  | "reserved"
+  | "checked_in"
+  | "checked_out"
+  | "no_show"
+  | "canceled";
+export type PaymentKind = "package" | "drop_in";
+export type PaymentStatus = "unpaid" | "paid" | "refunded" | "failed";
+
+export interface Profile {
+  id: string;
+  role: UserRole;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Dog {
+  id: string;
+  owner_id: string;
+  name: string;
+  breed: string | null;
+  sex: "male" | "female" | null;
+  spayed_neutered: boolean;
+  date_of_birth: string | null;
+  weight_lbs: number | null;
+  color: string | null;
+  photo_path: string | null;
+  vet_name: string | null;
+  vet_phone: string | null;
+  vaccinations_current: boolean;
+  vaccination_notes: string | null;
+  allergies: string | null;
+  medications: string | null;
+  feeding_notes: string | null;
+  behavior_notes: string | null;
+  staff_notes: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Waiver {
+  id: string;
+  version: string;
+  title: string;
+  body_markdown: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface WaiverSignature {
+  id: string;
+  user_id: string;
+  waiver_id: string;
+  signed_full_name: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  signed_at: string;
+}
+
+export interface Package {
+  id: string;
+  name: string;
+  description: string | null;
+  days_included: number;
+  price_cents: number;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface CustomerPackage {
+  id: string;
+  customer_id: string;
+  package_id: string;
+  days_total: number;
+  days_remaining: number;
+  amount_paid_cents: number;
+  stripe_payment_intent_id: string | null;
+  stripe_checkout_session_id: string | null;
+  payment_status: PaymentStatus;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface Booking {
+  id: string;
+  customer_id: string;
+  dog_id: string;
+  service_date: string;
+  drop_off_time: string | null;
+  pickup_time: string | null;
+  status: BookingStatus;
+  payment_kind: PaymentKind;
+  customer_package_id: string | null;
+  drop_in_price_cents: number | null;
+  stripe_payment_intent_id: string | null;
+  stripe_checkout_session_id: string | null;
+  payment_status: PaymentStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CheckIn {
+  id: string;
+  booking_id: string;
+  checked_in_at: string | null;
+  checked_in_by: string | null;
+  checked_out_at: string | null;
+  checked_out_by: string | null;
+  arrival_notes: string | null;
+  departure_notes: string | null;
+}
+
+export interface DogNote {
+  id: string;
+  dog_id: string;
+  booking_id: string | null;
+  author_id: string;
+  note: string;
+  created_at: string;
+}
