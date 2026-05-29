@@ -24,7 +24,7 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
   const dogs = (dogsRes.data ?? []) as Pick<Dog, "id" | "name">[];
   const dogName = new Map(dogs.map((d) => [d.id, d.name]));
 
-  // --- Walks (AM + PM per checked-in dog) -----------------------------------
+  // --- Walks (AM + PM + evening per checked-in dog) -------------------------
   const walkRows = dogs.flatMap((d) => [
     {
       kind: "walk" as const,
@@ -39,6 +39,13 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
       due_date: date,
       dog_id: d.id,
       auto_key: "walk_pm",
+    },
+    {
+      kind: "walk" as const,
+      title: `Evening walk — ${d.name}`,
+      due_date: date,
+      dog_id: d.id,
+      auto_key: "walk_eve",
     },
   ]);
 
