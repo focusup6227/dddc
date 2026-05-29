@@ -57,7 +57,7 @@ body {
     @apply card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift hover:border-stone-300;
   }
   .pill {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
   .pill-warm {
     @apply pill bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200/60;

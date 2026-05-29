@@ -181,12 +181,12 @@ function Section({
 function TeamRowItem({ row, isSelf }: { row: TeamRow; isSelf: boolean }) {
   const pending = row.last_sign_in_at == null;
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+    <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <Link
         href={`/staff/team/${row.id}`}
-        className="group -mx-2 min-w-0 flex-1 rounded-lg px-2 py-1 transition-colors hover:bg-cream-50"
+        className="group -mx-2 block rounded-lg px-2 py-1 transition-colors hover:bg-cream-50 sm:min-w-0 sm:flex-1"
       >
-        <p className="font-semibold text-ink-900">
+        <p className="font-semibold text-ink-900 break-words">
           {row.full_name || row.email}
           {isSelf && (
             <span className="ml-2 align-middle pill-warm">you</span>
@@ -204,14 +204,14 @@ function TeamRowItem({ row, isSelf }: { row: TeamRow; isSelf: boolean }) {
             className="ml-1 inline-block align-middle text-ink-400 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100"
           />
         </p>
-        <p className="text-sm text-ink-500">{row.email}</p>
+        <p className="break-all text-sm text-ink-500">{row.email}</p>
         <p className="text-xs text-ink-400">
           Joined {formatDate(row.created_at)}
           {row.last_sign_in_at &&
             ` · Last seen ${formatDate(row.last_sign_in_at)}`}
         </p>
       </Link>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {pending && (
           <form action={resendInvite}>
             <input type="hidden" name="email" value={row.email} />

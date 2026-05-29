@@ -124,49 +124,54 @@ export default async function StaffTodayPage() {
             const cust = custs.find((c) => c.id === b.customer_id);
             const ci = checkIns.find((c) => c.booking_id === b.id);
             return (
-              <li key={b.id} className="card-lift flex flex-wrap items-center gap-4">
-                {dog && <DogAvatar photoPath={dog.photo_path} name={dog.name} size={56} />}
-                <div className="min-w-0 flex-1">
-                  <p className="font-display text-lg font-semibold text-ink-900">
-                    {dog?.name ?? "Dog"}{" "}
-                    <span className="font-sans text-sm font-normal text-ink-500">
-                      · {cust?.full_name || cust?.email}
-                    </span>
-                  </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="pill-neutral">
-                      {b.payment_kind === "package" ? "Package" : "Drop-in"}
-                    </span>
-                    <span className="pill-neutral">{b.status}</span>
-                    <span
-                      className={
-                        b.payment_status === "paid"
-                          ? "pill-success"
-                          : b.payment_status === "unpaid"
-                            ? "pill-warn"
-                            : "pill-neutral"
-                      }
-                    >
-                      {b.payment_status}
-                    </span>
-                  </div>
-                  {(b.drop_off_time || b.pickup_time) && (
-                    <p className="mt-1.5 text-xs text-ink-500">
-                      {b.drop_off_time && <>Drop-off {formatTime(b.drop_off_time)}</>}
-                      {b.drop_off_time && b.pickup_time && " · "}
-                      {b.pickup_time && <>Pickup {formatTime(b.pickup_time)}</>}
+              <li
+                key={b.id}
+                className="card-lift flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4"
+              >
+                <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                  {dog && <DogAvatar photoPath={dog.photo_path} name={dog.name} size={56} />}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-lg font-semibold text-ink-900">
+                      {dog?.name ?? "Dog"}{" "}
+                      <span className="font-sans text-sm font-normal text-ink-500">
+                        · {cust?.full_name || cust?.email}
+                      </span>
                     </p>
-                  )}
-                  {dog && (
-                    <Link
-                      href={`/staff/dogs/${dog.id}`}
-                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 hover:underline"
-                    >
-                      Open profile <ArrowRight size={12} />
-                    </Link>
-                  )}
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="pill-neutral">
+                        {b.payment_kind === "package" ? "Package" : "Drop-in"}
+                      </span>
+                      <span className="pill-neutral">{b.status}</span>
+                      <span
+                        className={
+                          b.payment_status === "paid"
+                            ? "pill-success"
+                            : b.payment_status === "unpaid"
+                              ? "pill-warn"
+                              : "pill-neutral"
+                        }
+                      >
+                        {b.payment_status}
+                      </span>
+                    </div>
+                    {(b.drop_off_time || b.pickup_time) && (
+                      <p className="mt-1.5 text-xs text-ink-500">
+                        {b.drop_off_time && <>Drop-off {formatTime(b.drop_off_time)}</>}
+                        {b.drop_off_time && b.pickup_time && " · "}
+                        {b.pickup_time && <>Pickup {formatTime(b.pickup_time)}</>}
+                      </p>
+                    )}
+                    {dog && (
+                      <Link
+                        href={`/staff/dogs/${dog.id}`}
+                        className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900 hover:underline"
+                      >
+                        Open profile <ArrowRight size={12} />
+                      </Link>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-stone-200/70 pt-3 sm:border-0 sm:pt-0">
                   {!ci?.checked_in_at ? (
                     <form action={checkInBooking}>
                       <input type="hidden" name="booking_id" value={b.id} />
