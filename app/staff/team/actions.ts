@@ -127,6 +127,45 @@ export async function changeUserRole(formData: FormData) {
   redirect("/staff/team?saved=" + encodeURIComponent("Role updated."));
 }
 
+/**
+ * Edit a team member's profile details (name, phone, address, emergency
+ * contact). Senior-staff only. Email is intentionally not editable here —
+ * it's the auth login identity. Only applies to team members.
+ */
+export async function updateTeamMember(formData: FormData) {
+  await requireFullStaff();
+  const id = str(formData.get("id"));
+  if (!id) err("Invalid request.");
+
+  const svc = createServiceClient();
+
+  // Only allow editing actual team members.
+  const { data: target } = await svc
+    .from("profiles")
+    .select("role")
+    .eq("id", id)
+    .maybeSingle<{ role: Role }>();
+  if (!target || (target.role !== "staff" && target.role !== "junior_staff")) {
+    err("That account isn't a team member.");
+  }
+
+  const { error } = await svc
+    .from("profiles")
+    .update({
+      full_name: str(formData.get("full_name")) ?? "",
+      phone: str(formData.get("phone")),
+      address: str(formData.get("address")),
+      emergency_contact_name: str(formData.get("emergency_contact_name")),
+      emergency_contact_phone: str(formData.get("emergency_contact_phone")),
+    })
+    .eq("id", id);
+  if (error) err(error.message);
+
+  revalidatePath(`/staff/team/${id}`);
+  revalidatePath("/staff/team");
+  redirect(`/staff/team/${id}?saved=` + encodeURIComponent("Details updated."));
+}
+
 export async function resendInvite(formData: FormData) {
   const session = await requireFullStaff();
   const inviterName =

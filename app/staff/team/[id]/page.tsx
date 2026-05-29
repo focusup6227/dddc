@@ -12,6 +12,13 @@ import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Chore, ChoreKind, Profile } from "@/lib/supabase/types";
 import { addDays, formatDateShort, todayISO } from "@/lib/format";
+import { ToastNotifier } from "@/components/ToastNotifier";
+import { updateTeamMember } from "../actions";
+
+const TOASTS = [
+  { param: "saved" },
+  { param: "error", tone: "error" as const },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -69,9 +76,23 @@ export default async function TeamMemberActivityPage({
 
   const { data: member } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role")
+    .select(
+      "id, full_name, email, role, phone, address, emergency_contact_name, emergency_contact_phone",
+    )
     .eq("id", id)
-    .maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "role">>();
+    .maybeSingle<
+      Pick<
+        Profile,
+        | "id"
+        | "full_name"
+        | "email"
+        | "role"
+        | "phone"
+        | "address"
+        | "emergency_contact_name"
+        | "emergency_contact_phone"
+      >
+    >();
   if (!member || member.role === "customer") notFound();
 
   // Week window (Mon–Sun). `week` param is any date inside the desired week.
@@ -116,6 +137,7 @@ export default async function TeamMemberActivityPage({
 
   return (
     <div className="space-y-8 animate-fade-up">
+      <ToastNotifier toasts={TOASTS} />
       <div>
         <Link
           href="/staff/team"
@@ -132,11 +154,100 @@ export default async function TeamMemberActivityPage({
               </span>
             )}
           </h1>
-          <p className="mt-1 text-sm text-ink-500">
-            Chores completed this week
-          </p>
+          <p className="mt-1 text-sm text-ink-500">{member.email}</p>
         </header>
       </div>
+
+      {/* Edit details */}
+      <section className="card">
+        <h2 className="font-display text-lg font-semibold text-ink-900">
+          Details
+        </h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Edit this team member&apos;s contact info. Email is the login and
+          can&apos;t be changed here.
+        </p>
+        <form action={updateTeamMember} className="mt-4 space-y-4">
+          <input type="hidden" name="id" value={member.id} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="full_name" className="label">
+                Full name
+              </label>
+              <input
+                id="full_name"
+                name="full_name"
+                defaultValue={member.full_name ?? ""}
+                placeholder="Jane Doe"
+                className="input"
+              />
+            </div>
+            <div>
+              <label htmlFor="phone" className="label">
+                Phone
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                defaultValue={member.phone ?? ""}
+                placeholder="(555) 123-4567"
+                className="input"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="address" className="label">
+              Address
+            </label>
+            <input
+              id="address"
+              name="address"
+              defaultValue={member.address ?? ""}
+              placeholder="123 Main St, Anytown"
+              className="input"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="emergency_contact_name" className="label">
+                Emergency contact name
+              </label>
+              <input
+                id="emergency_contact_name"
+                name="emergency_contact_name"
+                defaultValue={member.emergency_contact_name ?? ""}
+                placeholder="Contact name"
+                className="input"
+              />
+            </div>
+            <div>
+              <label htmlFor="emergency_contact_phone" className="label">
+                Emergency contact phone
+              </label>
+              <input
+                id="emergency_contact_phone"
+                name="emergency_contact_phone"
+                type="tel"
+                defaultValue={member.emergency_contact_phone ?? ""}
+                placeholder="(555) 987-6543"
+                className="input"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" className="btn-primary">
+              Save details
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <header>
+        <h2 className="font-display text-xl font-semibold text-ink-900">
+          Chores completed this week
+        </h2>
+      </header>
 
       {/* Week navigation */}
       <div className="flex items-center justify-between gap-3">
