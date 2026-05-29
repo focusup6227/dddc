@@ -128,7 +128,12 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
     (r) => !taken.has(`${r.auto_key}|${r.dog_id ?? ""}`),
   );
   if (newRows.length === 0) return;
-  await supabase.from("chores").insert(newRows);
+  const { error } = await supabase.from("chores").insert(newRows);
+  if (error) {
+    // Don't fail silently — a constraint violation on one row aborts the whole
+    // batch and would otherwise drop auto-generated walks without a trace.
+    throw new Error(`Failed to materialize auto chores for ${date}: ${error.message}`);
+  }
 }
 
 function weekdayOf(iso: string): number {
