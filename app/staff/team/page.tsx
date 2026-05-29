@@ -1,4 +1,5 @@
-import { Mail, ShieldCheck, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Mail, ShieldCheck, UserPlus } from "lucide-react";
 import { requireFullStaff } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/supabase/types";
@@ -181,7 +182,10 @@ function TeamRowItem({ row, isSelf }: { row: TeamRow; isSelf: boolean }) {
   const pending = row.last_sign_in_at == null;
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-      <div className="min-w-0 flex-1">
+      <Link
+        href={`/staff/team/${row.id}`}
+        className="group -mx-2 min-w-0 flex-1 rounded-lg px-2 py-1 transition-colors hover:bg-cream-50"
+      >
         <p className="font-semibold text-ink-900">
           {row.full_name || row.email}
           {isSelf && (
@@ -195,6 +199,10 @@ function TeamRowItem({ row, isSelf }: { row: TeamRow; isSelf: boolean }) {
               <ShieldCheck size={12} /> Senior
             </span>
           )}
+          <ChevronRight
+            size={16}
+            className="ml-1 inline-block align-middle text-ink-400 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100"
+          />
         </p>
         <p className="text-sm text-ink-500">{row.email}</p>
         <p className="text-xs text-ink-400">
@@ -202,7 +210,7 @@ function TeamRowItem({ row, isSelf }: { row: TeamRow; isSelf: boolean }) {
           {row.last_sign_in_at &&
             ` · Last seen ${formatDate(row.last_sign_in_at)}`}
         </p>
-      </div>
+      </Link>
       <div className="flex flex-wrap items-center gap-2">
         {pending && (
           <form action={resendInvite}>
