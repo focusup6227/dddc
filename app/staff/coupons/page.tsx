@@ -112,7 +112,7 @@ export default async function StaffCouponsPage() {
             {coupons.map((c) => (
               <li
                 key={c.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+                className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <p className="font-semibold text-ink-900">
@@ -132,7 +132,7 @@ export default async function StaffCouponsPage() {
                     )}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <form action={toggleCoupon}>
                     <input type="hidden" name="id" value={c.id} />
                     <button type="submit" className="btn-secondary text-sm">

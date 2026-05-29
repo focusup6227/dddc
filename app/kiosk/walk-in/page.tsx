@@ -180,8 +180,8 @@ function CustomerStep({
 }) {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between rounded-3xl border border-stone-200/80 bg-white p-5 shadow-soft">
-        <div>
+      <div className="flex flex-col gap-3 rounded-3xl border border-stone-200/80 bg-white p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
             Customer
           </p>
@@ -193,7 +193,7 @@ function CustomerStep({
             {customer.phone && ` · ${customer.phone}`}
           </p>
         </div>
-        <Link href="/kiosk/walk-in" className="btn-secondary">
+        <Link href="/kiosk/walk-in" className="btn-secondary shrink-0">
           Change
         </Link>
       </div>

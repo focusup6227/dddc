@@ -161,8 +161,8 @@ export default async function KioskNewBoardingPage({
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between rounded-3xl border border-stone-200/80 bg-white p-5 shadow-soft">
-            <div>
+          <div className="flex flex-col gap-3 rounded-3xl border border-stone-200/80 bg-white p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
                 Customer
               </p>
@@ -174,7 +174,7 @@ export default async function KioskNewBoardingPage({
                 {customer.phone && ` · ${customer.phone}`}
               </p>
             </div>
-            <Link href="/kiosk/boarding/new" className="btn-secondary">
+            <Link href="/kiosk/boarding/new" className="btn-secondary shrink-0">
               Change
             </Link>
           </div>
