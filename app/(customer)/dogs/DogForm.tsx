@@ -5,6 +5,15 @@ import { createClient } from "@/lib/supabase/client";
 import type { Dog } from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
 
+const GETS_ALONG_OPTIONS = [
+  "Small dogs",
+  "Big dogs",
+  "Male dogs",
+  "Female dogs",
+  "All dogs",
+  "I'm not sure",
+] as const;
+
 export function DogForm({
   action,
   dog,
@@ -134,13 +143,18 @@ export function DogForm({
           <Field name="vet_phone" label="Vet phone" defaultValue={dog?.vet_phone ?? ""} />
         </div>
         <Textarea
+          name="health_issues"
+          label="Does your dog have any health issues we should be aware of?"
+          defaultValue={dog?.health_issues ?? ""}
+        />
+        <Textarea
           name="allergies"
           label="Allergies"
           defaultValue={dog?.allergies ?? ""}
         />
         <Textarea
           name="medications"
-          label="Medications"
+          label="Does your dog take any medications?"
           defaultValue={dog?.medications ?? ""}
         />
         {!dog && (
@@ -162,6 +176,44 @@ export function DogForm({
           name="behavior_notes"
           label="Behavior / personality"
           defaultValue={dog?.behavior_notes ?? ""}
+        />
+      </section>
+
+      <section className="card space-y-4">
+        <h3 className="font-display text-lg font-semibold text-ink-900">
+          Socialization
+        </h3>
+        <fieldset>
+          <legend className="label">My dog gets along best with</legend>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GETS_ALONG_OPTIONS.map((option) => (
+              <label
+                key={option}
+                className="flex items-center gap-2 text-sm text-ink-700"
+              >
+                <input
+                  type="checkbox"
+                  name="gets_along_with"
+                  value={option}
+                  defaultChecked={dog?.gets_along_with?.includes(option) ?? false}
+                  className="h-4 w-4 rounded border-stone-300"
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </section>
+
+      <section className="card space-y-4">
+        <h3 className="font-display text-lg font-semibold text-ink-900">
+          Anything else?
+        </h3>
+        <Textarea
+          name="additional_notes"
+          label="Is there anything else you want us to know about your dog?"
+          rows={6}
+          defaultValue={dog?.additional_notes ?? ""}
         />
       </section>
 
@@ -211,10 +263,12 @@ function Textarea({
   name,
   label,
   defaultValue,
+  rows = 3,
 }: {
   name: string;
   label: string;
   defaultValue?: string;
+  rows?: number;
 }) {
   return (
     <div>
@@ -224,7 +278,7 @@ function Textarea({
       <textarea
         id={name}
         name={name}
-        rows={3}
+        rows={rows}
         defaultValue={defaultValue}
         className="input"
       />

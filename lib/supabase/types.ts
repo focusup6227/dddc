@@ -46,6 +46,9 @@ export interface Dog {
   vaccination_notes: string | null;
   allergies: string | null;
   medications: string | null;
+  health_issues: string | null;
+  gets_along_with: string[];
+  additional_notes: string | null;
   feeding_notes: string | null;
   behavior_notes: string | null;
   staff_notes: string | null;

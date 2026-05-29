@@ -38,6 +38,12 @@ export async function saveDog(formData: FormData) {
     microchip_number: str(formData.get("microchip_number")),
     allergies: str(formData.get("allergies")),
     medications: str(formData.get("medications")),
+    health_issues: str(formData.get("health_issues")),
+    gets_along_with: formData
+      .getAll("gets_along_with")
+      .map((v) => String(v))
+      .filter(Boolean),
+    additional_notes: str(formData.get("additional_notes")),
     feeding_notes: str(formData.get("feeding_notes")),
     behavior_notes: str(formData.get("behavior_notes")),
   };
