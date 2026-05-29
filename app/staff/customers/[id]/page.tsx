@@ -197,7 +197,7 @@ export default async function StaffCustomerDetailPage({
               return (
                 <li
                   key={b.id}
-                  className="flex items-center justify-between px-5 py-3 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 px-5 py-3 text-sm"
                 >
                   <span className="font-medium text-ink-900">
                     {formatDateShort(b.service_date)} — {dog?.name ?? "Dog"}

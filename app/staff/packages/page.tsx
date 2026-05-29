@@ -72,9 +72,9 @@ export default async function StaffPackagesPage() {
             {packages.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between px-5 py-4"
+                className="flex items-center justify-between gap-3 px-5 py-4"
               >
-                <div>
+                <div className="min-w-0">
                   <p className="font-semibold text-ink-900">
                     {p.name}{" "}
                     {!p.active && (
@@ -85,7 +85,7 @@ export default async function StaffPackagesPage() {
                     {p.days_included} days · {formatMoney(p.price_cents)}
                   </p>
                 </div>
-                <form action={togglePackage}>
+                <form action={togglePackage} className="shrink-0">
                   <input type="hidden" name="id" value={p.id} />
                   <input
                     type="hidden"

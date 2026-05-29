@@ -196,14 +196,14 @@ export default async function StaffOverviewPage() {
           ) : (
             <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
               {topCustomers.map((t) => (
-                <li key={t.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                   <Link
                     href={`/staff/customers/${t.id}`}
-                    className="font-medium text-ink-900 hover:underline"
+                    className="min-w-0 truncate font-medium text-ink-900 hover:underline"
                   >
                     {t.profile?.full_name || t.profile?.email || "—"}
                   </Link>
-                  <span className="text-ink-500">
+                  <span className="shrink-0 text-ink-500">
                     {t.count} booking{t.count === 1 ? "" : "s"}
                   </span>
                 </li>
@@ -227,14 +227,14 @@ export default async function StaffOverviewPage() {
               {lowPackages.map((p) => {
                 const cust = custById.get(p.customer_id);
                 return (
-                  <li key={p.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                     <Link
                       href={`/staff/customers/${p.customer_id}`}
-                      className="font-medium text-ink-900 hover:underline"
+                      className="min-w-0 truncate font-medium text-ink-900 hover:underline"
                     >
                       {cust?.full_name || cust?.email || "—"}
                     </Link>
-                    <span className="text-ink-500">
+                    <span className="shrink-0 text-ink-500">
                       {p.days_remaining} day{p.days_remaining === 1 ? "" : "s"} left
                     </span>
                   </li>
