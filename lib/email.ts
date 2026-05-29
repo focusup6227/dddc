@@ -490,6 +490,39 @@ export async function sendStaffInvite(args: {
   });
 }
 
+// --- Customer welcome (staff-created account) -----------------------------
+
+export async function sendCustomerWelcome(args: {
+  to: string;
+  customerName: string;
+  actionUrl: string;
+}) {
+  const { to, customerName, actionUrl } = args;
+  const greeting = customerName?.trim() ? `Hi ${escape(customerName)},` : "Hi there,";
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">${greeting}</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">
+      We&rsquo;ve set up an account for you at <strong style="color:${COLOR.text};">${escape(BRAND)}</strong>.
+      Set a password below and you&rsquo;ll be able to manage your dogs, book day care and boarding, and view your visits online.
+    </p>
+    ${button(actionUrl, "Set your password")}
+    <p style="margin:14px 0 0;font-family:${FONT};font-size:13px;line-height:1.55;color:${COLOR.textFaint};">
+      This link expires in 24 hours. If you weren&rsquo;t expecting this, you can safely ignore the email.
+    </p>
+  `;
+
+  await send({
+    to,
+    subject: `Welcome to ${BRAND}`,
+    html: shell({
+      preheader: `Set up your account at ${BRAND}.`,
+      heading: "Welcome!",
+      body,
+    }),
+  });
+}
+
 // --- Vaccine expiring soon ------------------------------------------------
 
 export async function sendVaccineExpiryReminder(args: {

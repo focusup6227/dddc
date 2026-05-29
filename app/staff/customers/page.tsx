@@ -1,8 +1,14 @@
 import Link from "next/link";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Search, UserPlus } from "lucide-react";
 import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/supabase/types";
+import { ToastNotifier } from "@/components/ToastNotifier";
+
+const TOASTS = [
+  { param: "saved" },
+  { param: "error", tone: "error" as const },
+];
 
 export default async function StaffCustomersPage({
   searchParams,
@@ -28,6 +34,7 @@ export default async function StaffCustomersPage({
 
   return (
     <div className="animate-fade-up">
+      <ToastNotifier toasts={TOASTS} />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold text-ink-900">
@@ -37,6 +44,9 @@ export default async function StaffCustomersPage({
             {customers.length} {customers.length === 1 ? "person" : "people"} on file.
           </p>
         </div>
+        <Link href="/staff/customers/new" className="btn-primary inline-flex items-center gap-2">
+          <UserPlus size={16} /> New customer
+        </Link>
         <form className="flex w-full items-end gap-2 sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-400">

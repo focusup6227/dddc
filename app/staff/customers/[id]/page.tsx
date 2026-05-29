@@ -9,8 +9,15 @@ import type {
   Profile,
   WaiverSignature,
 } from "@/lib/supabase/types";
+import { PlusCircle, CalendarPlus } from "lucide-react";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatDate, formatDateShort, formatMoney } from "@/lib/format";
+import { ToastNotifier } from "@/components/ToastNotifier";
+
+const TOASTS = [
+  { param: "saved" },
+  { param: "error", tone: "error" as const },
+];
 
 export default async function StaffCustomerDetailPage({
   params,
@@ -55,6 +62,7 @@ export default async function StaffCustomerDetailPage({
 
   return (
     <div className="space-y-8 animate-fade-up">
+      <ToastNotifier toasts={TOASTS} />
       <header>
         <h1 className="font-display text-3xl font-bold text-ink-900">
           {customer.full_name || "(no name)"}
@@ -74,21 +82,40 @@ export default async function StaffCustomerDetailPage({
       </header>
 
       <section>
-        <h2 className="font-display text-xl font-semibold text-ink-900">Dogs</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-xl font-semibold text-ink-900">Dogs</h2>
+          <Link
+            href={`/staff/customers/${id}/dogs/new`}
+            className="btn-secondary inline-flex items-center gap-2 text-sm"
+          >
+            <PlusCircle size={16} /> Add dog
+          </Link>
+        </div>
         <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {dogs.map((d) => (
-            <li key={d.id}>
+            <li
+              key={d.id}
+              className="card-lift flex items-center justify-between gap-4"
+            >
               <Link
                 href={`/staff/dogs/${d.id}`}
-                className="card-lift flex items-center gap-4"
+                className="flex min-w-0 flex-1 items-center gap-4"
               >
                 <DogAvatar photoPath={d.photo_path} name={d.name} />
-                <div>
-                  <p className="font-display text-lg font-semibold text-ink-900">
+                <div className="min-w-0">
+                  <p className="truncate font-display text-lg font-semibold text-ink-900">
                     {d.name}
                   </p>
-                  <p className="text-sm text-ink-500">{d.breed ?? "Mixed breed"}</p>
+                  <p className="truncate text-sm text-ink-500">
+                    {d.breed ?? "Mixed breed"}
+                  </p>
                 </div>
+              </Link>
+              <Link
+                href={`/staff/customers/${id}/book?dog=${d.id}`}
+                className="btn-secondary inline-flex shrink-0 items-center gap-1.5 text-sm"
+              >
+                <CalendarPlus size={15} /> Book
               </Link>
             </li>
           ))}
@@ -148,9 +175,19 @@ export default async function StaffCustomerDetailPage({
       </section>
 
       <section>
-        <h2 className="font-display text-xl font-semibold text-ink-900">
-          Recent bookings
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-xl font-semibold text-ink-900">
+            Recent bookings
+          </h2>
+          {dogs.length > 0 && (
+            <Link
+              href={`/staff/customers/${id}/book`}
+              className="btn-secondary inline-flex items-center gap-2 text-sm"
+            >
+              <CalendarPlus size={16} /> New booking
+            </Link>
+          )}
+        </div>
         {bookings.length === 0 ? (
           <p className="mt-2 text-sm text-ink-500">None.</p>
         ) : (

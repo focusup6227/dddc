@@ -1,0 +1,271 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { requireFullStaff } from "@/lib/auth";
+import { sendCustomerWelcome } from "@/lib/email";
+import { createServiceClient } from "@/lib/supabase/server";
+import { appUrl } from "@/lib/stripe";
+import { addDays } from "@/lib/format";
+import { isTimeInWindow } from "@/lib/hours";
+import { getBoardingRateCents } from "@/lib/settings";
+import type { Package, ServiceKind } from "@/lib/supabase/types";
+
+function str(v: FormDataEntryValue | null): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
+function num(v: FormDataEntryValue | null): number | null {
+  const s = str(v);
+  if (s == null) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function listErr(msg: string): never {
+  redirect("/staff/customers?error=" + encodeURIComponent(msg));
+}
+
+function customerErr(id: string, msg: string): never {
+  redirect(`/staff/customers/${id}?error=` + encodeURIComponent(msg));
+}
+
+/**
+ * Create a customer on a walk-in's behalf. Mints a real auth account (so they
+ * can log in later) via the admin generateLink API — the same mechanism the
+ * staff-invite flow uses — then fills in their profile. Optionally emails them
+ * a "set your password" link via Resend.
+ */
+export async function createCustomer(formData: FormData) {
+  await requireFullStaff();
+
+  const full_name = str(formData.get("full_name"));
+  const emailRaw = str(formData.get("email"))?.toLowerCase();
+  const phone = str(formData.get("phone"));
+  const address = str(formData.get("address"));
+  const emergency_contact_name = str(formData.get("emergency_contact_name"));
+  const emergency_contact_phone = str(formData.get("emergency_contact_phone"));
+  const sendInvite = formData.get("send_invite") === "yes";
+
+  if (!full_name) listErr("Name is required.");
+  if (!emailRaw) listErr("Email is required.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) listErr("Invalid email.");
+
+  const svc = createServiceClient();
+
+  // Already on file? Send staff to the existing record rather than erroring.
+  const { data: existing } = await svc
+    .from("profiles")
+    .select("id, role")
+    .ilike("email", emailRaw)
+    .maybeSingle<{ id: string; role: string }>();
+
+  if (existing) {
+    if (existing.role !== "customer") {
+      listErr("That email belongs to a staff account.");
+    }
+    redirect(
+      `/staff/customers/${existing.id}?saved=` +
+        encodeURIComponent("That email already had an account — opened it."),
+    );
+  }
+
+  // Mint the auth user + invite link (does not send an email itself).
+  const redirectTo = `${appUrl()}/auth/callback?next=${encodeURIComponent("/onboarding/set-password")}`;
+  const { data, error } = await svc.auth.admin.generateLink({
+    type: "invite",
+    email: emailRaw,
+    options: { redirectTo, data: { full_name } },
+  });
+  if (error || !data?.user || !data.properties?.action_link) {
+    listErr(error?.message ?? "Failed to create the account.");
+  }
+
+  // Fill in the profile the trigger just created.
+  const { error: profErr } = await svc
+    .from("profiles")
+    .update({
+      full_name,
+      phone,
+      address,
+      emergency_contact_name,
+      emergency_contact_phone,
+    })
+    .eq("id", data.user.id);
+  if (profErr) listErr(profErr.message);
+
+  if (sendInvite) {
+    await sendCustomerWelcome({
+      to: emailRaw,
+      customerName: full_name,
+      actionUrl: data.properties.action_link,
+    });
+  }
+
+  revalidatePath("/staff/customers");
+  redirect(
+    `/staff/customers/${data.user.id}?saved=` +
+      encodeURIComponent(
+        sendInvite ? "Customer created — welcome email sent." : "Customer created.",
+      ),
+  );
+}
+
+/** Add a dog to a customer's file (staff acting on their behalf). */
+export async function addDogForCustomer(formData: FormData) {
+  await requireFullStaff();
+  const owner_id = str(formData.get("owner_id"));
+  if (!owner_id) listErr("Missing customer.");
+
+  const name = str(formData.get("name"));
+  if (!name) customerErr(owner_id, "Dog name is required.");
+
+  const payload = {
+    owner_id,
+    name,
+    breed: str(formData.get("breed")),
+    sex: str(formData.get("sex")) as "male" | "female" | null,
+    spayed_neutered: formData.get("spayed_neutered") === "yes",
+    date_of_birth: str(formData.get("date_of_birth")),
+    weight_lbs: num(formData.get("weight_lbs")),
+    color: str(formData.get("color")),
+    vet_name: str(formData.get("vet_name")),
+    vet_phone: str(formData.get("vet_phone")),
+    health_issues: str(formData.get("health_issues")),
+    medications: str(formData.get("medications")),
+    gets_along_with: formData
+      .getAll("gets_along_with")
+      .map((v) => String(v))
+      .filter(Boolean),
+    feeding_notes: str(formData.get("feeding_notes")),
+    behavior_notes: str(formData.get("behavior_notes")),
+    additional_notes: str(formData.get("additional_notes")),
+  };
+
+  const svc = createServiceClient();
+  const { error } = await svc.from("dogs").insert(payload);
+  if (error) customerErr(owner_id, error.message);
+
+  revalidatePath(`/staff/customers/${owner_id}`);
+  redirect(`/staff/customers/${owner_id}?saved=` + encodeURIComponent(`${name} added.`));
+}
+
+/** Look up the cheapest active 1-day day-care rate, in cents. */
+async function getDaycareDropInCents(): Promise<number | null> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("packages")
+    .select("*")
+    .eq("active", true)
+    .eq("days_included", 1)
+    .order("price_cents")
+    .limit(1)
+    .maybeSingle<Package>();
+  return data?.price_cents ?? null;
+}
+
+/**
+ * Book a customer's dog on their behalf, payable at drop-off (drop_in /
+ * unpaid / reserved). Deliberately skips the vaccine and capacity gates that
+ * guard the self-serve flow — staff are making this call knowingly — but the
+ * one-booking-per-dog-per-day constraint still applies.
+ */
+export async function createStaffBooking(formData: FormData) {
+  await requireFullStaff();
+
+  const customer_id = str(formData.get("customer_id"));
+  const dog_id = str(formData.get("dog_id"));
+  if (!customer_id) listErr("Missing customer.");
+  if (!dog_id) customerErr(customer_id, "Pick a dog.");
+
+  const kind = (str(formData.get("service_kind")) ?? "daycare") as ServiceKind;
+  const drop_off_time = str(formData.get("drop_off_time")) ?? "08:00";
+  const pickup_time = str(formData.get("pickup_time")) ?? "17:00";
+
+  if (!isTimeInWindow(drop_off_time) || !isTimeInWindow(pickup_time)) {
+    customerErr(customer_id, "Drop-off and pickup must be between 6 AM and 6 PM.");
+  }
+
+  const svc = createServiceClient();
+
+  // Verify the dog belongs to this customer.
+  const { data: dog } = await svc
+    .from("dogs")
+    .select("id, name, owner_id")
+    .eq("id", dog_id)
+    .eq("owner_id", customer_id)
+    .maybeSingle<{ id: string; name: string; owner_id: string }>();
+  if (!dog) customerErr(customer_id, "Dog not found for this customer.");
+
+  if (kind === "boarding") {
+    const checkIn = str(formData.get("check_in"));
+    const checkOut = str(formData.get("check_out"));
+    if (!checkIn || !ISO_RE.test(checkIn) || !checkOut || !ISO_RE.test(checkOut)) {
+      customerErr(customer_id, "Pick valid check-in and check-out dates.");
+    }
+    if (checkOut <= checkIn) {
+      customerErr(customer_id, "Check-out must be after check-in.");
+    }
+    const rateCents = await getBoardingRateCents();
+    const { error } = await svc.from("bookings").insert({
+      customer_id,
+      dog_id,
+      service_date: checkIn,
+      service_end_date: checkOut,
+      drop_off_time,
+      pickup_time,
+      service_kind: "boarding",
+      status: "reserved",
+      payment_kind: "drop_in",
+      unit_price_cents: rateCents,
+      payment_status: "unpaid",
+    });
+    if (error) {
+      const dup = error.message.toLowerCase().includes("duplicate");
+      customerErr(
+        customer_id,
+        dup ? `${dog.name} already has a booking on those dates.` : error.message,
+      );
+    }
+  } else {
+    const date = str(formData.get("service_date"));
+    if (!date || !ISO_RE.test(date)) {
+      customerErr(customer_id, "Pick a valid day.");
+    }
+    const priceCents = await getDaycareDropInCents();
+    if (priceCents == null) {
+      customerErr(customer_id, "No day-care rate is configured yet.");
+    }
+    const { error } = await svc.from("bookings").insert({
+      customer_id,
+      dog_id,
+      service_date: date,
+      service_end_date: addDays(date!, 1),
+      drop_off_time,
+      pickup_time,
+      service_kind: "daycare",
+      status: "reserved",
+      payment_kind: "drop_in",
+      unit_price_cents: priceCents,
+      payment_status: "unpaid",
+    });
+    if (error) {
+      const dup = error.message.toLowerCase().includes("duplicate");
+      customerErr(
+        customer_id,
+        dup ? `${dog.name} is already booked that day.` : error.message,
+      );
+    }
+  }
+
+  revalidatePath(`/staff/customers/${customer_id}`);
+  revalidatePath("/staff/bookings");
+  redirect(
+    `/staff/customers/${customer_id}?saved=` +
+      encodeURIComponent(`Booked ${dog.name} — payment due at drop-off.`),
+  );
+}
