@@ -82,7 +82,7 @@ export default async function StaffCustomerDetailPage({
       </header>
 
       <section>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-xl font-semibold text-ink-900">Dogs</h2>
           <Link
             href={`/staff/customers/${id}/dogs/new`}
@@ -175,7 +175,7 @@ export default async function StaffCustomerDetailPage({
       </section>
 
       <section>
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-xl font-semibold text-ink-900">
             Recent bookings
           </h2>

@@ -107,7 +107,7 @@ export default async function StaffTodayPage() {
               </p>
             </div>
           </div>
-          <ArrowRight size={18} className="text-amber-700" />
+          <ArrowRight size={18} className="shrink-0 text-amber-700" />
         </Link>
       )}
 
