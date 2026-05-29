@@ -261,7 +261,7 @@ export default async function CustomerDashboard() {
                   key={b.id}
                   className="flex items-center justify-between gap-3 px-5 py-4"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold text-ink-900">
                       {formatDateShort(b.service_date)} — {dog?.name ?? "Dog"}
                     </p>
@@ -271,7 +271,7 @@ export default async function CustomerDashboard() {
                   </div>
                   <Link
                     href="/bookings"
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-900 hover:underline"
+                    className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-900 hover:underline"
                   >
                     Details <ArrowRight size={14} />
                   </Link>

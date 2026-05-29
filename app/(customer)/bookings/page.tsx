@@ -218,7 +218,7 @@ function Section({
             const cardPhotos = card ? photosByCard.get(card.id) ?? [] : [];
             return (
               <li key={b.id} className="px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                   <div className="min-w-0 flex-1">
                   <p className="font-medium text-ink-900">
                     {b.service_kind === "boarding"
@@ -251,7 +251,7 @@ function Section({
                   )}
                   {showCancel && <p className="mt-1 text-xs text-ink-500">{preview}</p>}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {showPayNow && (
                     <form action={payBooking}>
                       <input type="hidden" name="id" value={b.id} />
