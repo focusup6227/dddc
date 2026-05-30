@@ -9,10 +9,11 @@ import type {
   Profile,
   WaiverSignature,
 } from "@/lib/supabase/types";
-import { PlusCircle, CalendarPlus } from "lucide-react";
+import { PlusCircle, CalendarPlus, Mail } from "lucide-react";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatDate, formatDateShort, formatMoney } from "@/lib/format";
 import { ToastNotifier } from "@/components/ToastNotifier";
+import { resendCustomerInvite, updateCustomer } from "../actions";
 
 const TOASTS = [
   { param: "saved" },
@@ -67,19 +68,102 @@ export default async function StaffCustomerDetailPage({
         <h1 className="font-display text-3xl font-bold text-ink-900">
           {customer.full_name || "(no name)"}
         </h1>
-        <p className="mt-1 text-ink-700">
-          {customer.email}
-          {customer.phone ? ` · ${customer.phone}` : ""}
-        </p>
-        {customer.emergency_contact_name && (
-          <p className="mt-1 text-sm text-ink-500">
-            Emergency: {customer.emergency_contact_name}{" "}
-            {customer.emergency_contact_phone
-              ? `(${customer.emergency_contact_phone})`
-              : ""}
-          </p>
-        )}
+        <p className="mt-1 break-all text-ink-700">{customer.email}</p>
       </header>
+
+      <section className="card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-ink-900">
+              Details
+            </h2>
+            <p className="mt-1 text-sm text-ink-500">
+              Edit contact info. Email is the login and can&apos;t be changed
+              here.
+            </p>
+          </div>
+          <form action={resendCustomerInvite} className="shrink-0">
+            <input type="hidden" name="id" value={customer.id} />
+            <button type="submit" className="btn-secondary text-sm">
+              <Mail size={16} /> Resend account link
+            </button>
+          </form>
+        </div>
+        <form action={updateCustomer} className="mt-4 space-y-4">
+          <input type="hidden" name="id" value={customer.id} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="full_name" className="label">
+                Full name
+              </label>
+              <input
+                id="full_name"
+                name="full_name"
+                defaultValue={customer.full_name ?? ""}
+                placeholder="Jane Doe"
+                className="input"
+              />
+            </div>
+            <div>
+              <label htmlFor="phone" className="label">
+                Phone
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                defaultValue={customer.phone ?? ""}
+                placeholder="(555) 123-4567"
+                className="input"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="address" className="label">
+              Address
+            </label>
+            <input
+              id="address"
+              name="address"
+              defaultValue={customer.address ?? ""}
+              placeholder="123 Main St, Anytown"
+              className="input"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="emergency_contact_name" className="label">
+                Emergency contact name
+              </label>
+              <input
+                id="emergency_contact_name"
+                name="emergency_contact_name"
+                defaultValue={customer.emergency_contact_name ?? ""}
+                placeholder="Contact name"
+                className="input"
+              />
+            </div>
+            <div>
+              <label htmlFor="emergency_contact_phone" className="label">
+                Emergency contact phone
+              </label>
+              <input
+                id="emergency_contact_phone"
+                name="emergency_contact_phone"
+                type="tel"
+                defaultValue={customer.emergency_contact_phone ?? ""}
+                placeholder="(555) 987-6543"
+                className="input"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button type="submit" className="btn-primary">
+              Save details
+            </button>
+          </div>
+        </form>
+      </section>
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">

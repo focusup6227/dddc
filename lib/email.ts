@@ -496,14 +496,15 @@ export async function sendCustomerWelcome(args: {
   to: string;
   customerName: string;
   actionUrl: string;
+  resend?: boolean;
 }) {
-  const { to, customerName, actionUrl } = args;
+  const { to, customerName, actionUrl, resend } = args;
   const greeting = customerName?.trim() ? `Hi ${escape(customerName)},` : "Hi there,";
 
   const body = `
     <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">${greeting}</p>
     <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">
-      We&rsquo;ve set up an account for you at <strong style="color:${COLOR.text};">${escape(BRAND)}</strong>.
+      ${resend ? "Here&rsquo;s a fresh link to finish setting up your account at" : "We&rsquo;ve set up an account for you at"} <strong style="color:${COLOR.text};">${escape(BRAND)}</strong>.
       Set a password below and you&rsquo;ll be able to manage your dogs, book day care and boarding, and view your visits online.
     </p>
     ${button(actionUrl, "Set your password")}
@@ -514,10 +515,10 @@ export async function sendCustomerWelcome(args: {
 
   await send({
     to,
-    subject: `Welcome to ${BRAND}`,
+    subject: resend ? `Your ${BRAND} account link` : `Welcome to ${BRAND}`,
     html: shell({
       preheader: `Set up your account at ${BRAND}.`,
-      heading: "Welcome!",
+      heading: resend ? "Finish setting up" : "Welcome!",
       body,
     }),
   });

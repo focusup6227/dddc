@@ -115,6 +115,85 @@ export async function createCustomer(formData: FormData) {
   );
 }
 
+/**
+ * Edit a customer's profile details (name, phone, address, emergency contact).
+ * Senior-staff only. Email is the auth login and isn't editable here. Only
+ * applies to customer accounts.
+ */
+export async function updateCustomer(formData: FormData) {
+  await requireFullStaff();
+  const id = str(formData.get("id"));
+  if (!id) listErr("Invalid request.");
+
+  const svc = createServiceClient();
+
+  const { data: target } = await svc
+    .from("profiles")
+    .select("role")
+    .eq("id", id)
+    .maybeSingle<{ role: string }>();
+  if (!target || target.role !== "customer") {
+    customerErr(id, "That account isn't a customer.");
+  }
+
+  const full_name = str(formData.get("full_name"));
+  if (!full_name) customerErr(id, "Name is required.");
+
+  const { error } = await svc
+    .from("profiles")
+    .update({
+      full_name,
+      phone: str(formData.get("phone")),
+      address: str(formData.get("address")),
+      emergency_contact_name: str(formData.get("emergency_contact_name")),
+      emergency_contact_phone: str(formData.get("emergency_contact_phone")),
+    })
+    .eq("id", id);
+  if (error) customerErr(id, error.message);
+
+  revalidatePath(`/staff/customers/${id}`);
+  redirect(`/staff/customers/${id}?saved=` + encodeURIComponent("Customer updated."));
+}
+
+/**
+ * Re-send a customer their account setup link. The auth user already exists,
+ * so we mint a fresh magic link (not an invite) and deliver it via Resend —
+ * the same mechanism the staff-invite resend uses.
+ */
+export async function resendCustomerInvite(formData: FormData) {
+  await requireFullStaff();
+  const id = str(formData.get("id"));
+  if (!id) listErr("Invalid request.");
+
+  const svc = createServiceClient();
+  const { data: customer } = await svc
+    .from("profiles")
+    .select("email, full_name, role")
+    .eq("id", id)
+    .maybeSingle<{ email: string; full_name: string; role: string }>();
+  if (!customer) customerErr(id, "Customer not found.");
+  if (customer.role !== "customer") customerErr(id, "That account isn't a customer.");
+
+  const redirectTo = `${appUrl()}/auth/callback?next=${encodeURIComponent("/onboarding/set-password")}`;
+  const { data, error } = await svc.auth.admin.generateLink({
+    type: "magiclink",
+    email: customer.email,
+    options: { redirectTo },
+  });
+  if (error || !data?.properties?.action_link) {
+    customerErr(id, error?.message ?? "Failed to generate link.");
+  }
+
+  await sendCustomerWelcome({
+    to: customer.email,
+    customerName: customer.full_name,
+    actionUrl: data.properties.action_link,
+    resend: true,
+  });
+
+  redirect(`/staff/customers/${id}?saved=` + encodeURIComponent("Account link re-sent."));
+}
+
 /** Add a dog to a customer's file (staff acting on their behalf). */
 export async function addDogForCustomer(formData: FormData) {
   await requireFullStaff();
