@@ -192,8 +192,8 @@ export async function payAllUnpaid() {
 
   // Read account credit fresh, then settle each booking against the shared
   // pool — applying its coupon OR credit (never both), exactly like the
-  // single-booking checkout. The displayed balance nets coupons only (credit
-  // shown separately), so the charge here is always ≤ what was shown.
+  // single-booking checkout. The displayed balance runs the same helper with
+  // the same credit pool, so the charge here matches what was shown.
   const { data: prof } = await svc
     .from("profiles")
     .select("account_credit_cents")

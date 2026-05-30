@@ -43,7 +43,7 @@ export default async function BookingsPage({
     coupon?: string;
   }>;
 }) {
-  const { userId } = await requireCustomer();
+  const { userId, profile } = await requireCustomer();
   const supabase = await createClient();
   const params = await searchParams;
 
@@ -96,15 +96,20 @@ export default async function BookingsPage({
   const unpaidBookings = bookings.filter(
     (b) => b.status === "reserved" && b.payment_status === "unpaid",
   );
-  // Net of each booking's coupon (credit pool 0 here — like the per-booking
-  // "Pay now" price, account credit is applied silently at checkout). This now
-  // reflects coupons, which payAllUnpaid also honors, so the two agree.
-  const balanceCents = settleUnpaidBookings(
+  // Net of each booking's coupon AND the shared account-credit pool, using the
+  // same helper payAllUnpaid charges with — so the displayed balance and the
+  // charge always agree. The credit applied is surfaced in the banner.
+  const settlements = settleUnpaidBookings(
     [...unpaidBookings].sort((a, b) =>
       a.service_date.localeCompare(b.service_date),
     ),
+    profile.account_credit_cents ?? 0,
+  );
+  const balanceCents = settlements.reduce((sum, s) => sum + s.chargeAfter, 0);
+  const creditAppliedCents = settlements.reduce(
+    (sum, s) => sum + s.creditApplied,
     0,
-  ).reduce((sum, s) => sum + s.chargeAfter, 0);
+  );
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -125,6 +130,11 @@ export default async function BookingsPage({
             <p className="text-sm font-semibold text-amber-900">
               Outstanding balance: {formatMoney(balanceCents)}
             </p>
+            {creditAppliedCents > 0 && (
+              <p className="text-xs font-medium text-emerald-700">
+                −{formatMoney(creditAppliedCents)} account credit applied
+              </p>
+            )}
             <p className="text-xs text-amber-800">
               {unpaidBookings.length} unpaid booking
               {unpaidBookings.length === 1 ? "" : "s"} — pay everything in one
@@ -133,7 +143,9 @@ export default async function BookingsPage({
           </div>
           <form action={payAllUnpaid}>
             <button type="submit" className="btn-primary">
-              Pay {formatMoney(balanceCents)}
+              {balanceCents === 0
+                ? "Confirm — covered by credit"
+                : `Pay ${formatMoney(balanceCents)}`}
             </button>
           </form>
         </section>

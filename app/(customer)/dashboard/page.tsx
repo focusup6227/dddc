@@ -65,12 +65,17 @@ export default async function CustomerDashboard() {
   const packages = (packagesRes.data ?? []) as CustomerPackage[];
   const totalDays = packages.reduce((s, p) => s + p.days_remaining, 0);
   const unpaid = (unpaidRes.data ?? []) as Booking[];
-  // Net of coupons (credit pool 0 — account credit is shown separately above
-  // and applied at checkout). Reflects coupons, matching payAllUnpaid.
-  const balanceCents = settleUnpaidBookings(
+  // Net of coupons AND the shared account-credit pool (same helper
+  // payAllUnpaid charges with), so the displayed balance matches the charge.
+  const settlements = settleUnpaidBookings(
     [...unpaid].sort((a, b) => a.service_date.localeCompare(b.service_date)),
+    profile.account_credit_cents ?? 0,
+  );
+  const balanceCents = settlements.reduce((sum, s) => sum + s.chargeAfter, 0);
+  const creditAppliedCents = settlements.reduce(
+    (sum, s) => sum + s.creditApplied,
     0,
-  ).reduce((sum, s) => sum + s.chargeAfter, 0);
+  );
 
   const today = todayISO();
   const horizon = addDays(today, 90);
@@ -169,6 +174,11 @@ export default async function CustomerDashboard() {
               <p className="text-sm font-semibold text-amber-900">
                 Outstanding balance: {formatMoney(balanceCents)}
               </p>
+              {creditAppliedCents > 0 && (
+                <p className="text-xs font-medium text-emerald-700">
+                  −{formatMoney(creditAppliedCents)} account credit applied
+                </p>
+              )}
               <p className="text-xs text-amber-800">
                 {unpaid.length} unpaid booking{unpaid.length === 1 ? "" : "s"}.
               </p>
@@ -176,7 +186,9 @@ export default async function CustomerDashboard() {
           </div>
           <form action={payAllUnpaid}>
             <button type="submit" className="btn-primary">
-              Pay {formatMoney(balanceCents)}
+              {balanceCents === 0
+                ? "Confirm — covered by credit"
+                : `Pay ${formatMoney(balanceCents)}`}
             </button>
           </form>
         </section>
