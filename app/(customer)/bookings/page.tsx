@@ -9,6 +9,7 @@ import type {
 import { formatDateShort, formatMoney, todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
 import { isPastDueUnpaid, refundFractionForBooking } from "@/lib/bookings.server";
+import { settleUnpaidBookings } from "@/lib/coupons.server";
 import { materializeForCustomer } from "@/lib/recurring.server";
 import { ReportCardView } from "@/components/ReportCardView";
 import { ToastNotifier } from "@/components/ToastNotifier";
@@ -95,10 +96,15 @@ export default async function BookingsPage({
   const unpaidBookings = bookings.filter(
     (b) => b.status === "reserved" && b.payment_status === "unpaid",
   );
-  const balanceCents = unpaidBookings.reduce((sum, b) => {
-    const nights = Math.max(1, nightCount(b.service_date, b.service_end_date));
-    return sum + (b.unit_price_cents ?? 0) * nights;
-  }, 0);
+  // Net of each booking's coupon (credit pool 0 here — like the per-booking
+  // "Pay now" price, account credit is applied silently at checkout). This now
+  // reflects coupons, which payAllUnpaid also honors, so the two agree.
+  const balanceCents = settleUnpaidBookings(
+    [...unpaidBookings].sort((a, b) =>
+      a.service_date.localeCompare(b.service_date),
+    ),
+    0,
+  ).reduce((sum, s) => sum + s.chargeAfter, 0);
 
   return (
     <div className="space-y-8 animate-fade-up">

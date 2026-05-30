@@ -23,6 +23,7 @@ import { EventList } from "@/components/EventList";
 import { EmptyState } from "@/components/EmptyState";
 import { EmptyCalendar, MascotFace } from "@/components/illustrations";
 import { firstName, getGreeting } from "@/lib/greeting";
+import { settleUnpaidBookings } from "@/lib/coupons.server";
 import { payAllUnpaid } from "../bookings/actions";
 
 export default async function CustomerDashboard() {
@@ -64,17 +65,12 @@ export default async function CustomerDashboard() {
   const packages = (packagesRes.data ?? []) as CustomerPackage[];
   const totalDays = packages.reduce((s, p) => s + p.days_remaining, 0);
   const unpaid = (unpaidRes.data ?? []) as Booking[];
-  const balanceCents = unpaid.reduce((sum, b) => {
-    const [y1, m1, d1] = b.service_date.split("-").map(Number);
-    const [y2, m2, d2] = b.service_end_date.split("-").map(Number);
-    const nights = Math.max(
-      1,
-      Math.round(
-        (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000,
-      ),
-    );
-    return sum + (b.unit_price_cents ?? 0) * nights;
-  }, 0);
+  // Net of coupons (credit pool 0 — account credit is shown separately above
+  // and applied at checkout). Reflects coupons, matching payAllUnpaid.
+  const balanceCents = settleUnpaidBookings(
+    [...unpaid].sort((a, b) => a.service_date.localeCompare(b.service_date)),
+    0,
+  ).reduce((sum, s) => sum + s.chargeAfter, 0);
 
   const today = todayISO();
   const horizon = addDays(today, 90);
