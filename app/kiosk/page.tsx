@@ -65,14 +65,20 @@ export default async function KioskHomePage() {
     ci: ciByBooking.get(b.id),
   }));
 
-  const unpaid = rows.filter((r) => r.booking.payment_status !== "paid");
-  const here = rows.filter(
-    (r) => r.booking.payment_status === "paid" && r.ci?.checked_in_at && !r.ci.checked_out_at,
-  );
-  const gone = rows.filter((r) => r.ci?.checked_out_at);
+  // Bucket by physical presence, not payment — payment is due at completion,
+  // so boarders (and pay-later daycare) are checked in while still unpaid.
+  // "Unpaid" is a collections worklist for dogs that have already left owing.
   const arriving = rows.filter(
-    (r) =>
-      r.booking.payment_status === "paid" && !r.ci?.checked_in_at,
+    (r) => !r.ci?.checked_in_at && !r.ci?.checked_out_at,
+  );
+  const here = rows.filter(
+    (r) => r.ci?.checked_in_at && !r.ci?.checked_out_at,
+  );
+  const gone = rows.filter(
+    (r) => r.ci?.checked_out_at && r.booking.payment_status === "paid",
+  );
+  const unpaid = rows.filter(
+    (r) => r.ci?.checked_out_at && r.booking.payment_status !== "paid",
   );
 
   return (
@@ -123,7 +129,13 @@ export default async function KioskHomePage() {
         ) : (
           <Tiles>
             {arriving.map((r) => (
-              <DogTile key={r.booking.id} row={r} cta="Check in" tone="amber" />
+              <DogTile
+                key={r.booking.id}
+                row={r}
+                cta="Check in"
+                tone="amber"
+                unpaid={r.booking.payment_status !== "paid"}
+              />
             ))}
           </Tiles>
         )}
@@ -135,7 +147,13 @@ export default async function KioskHomePage() {
         ) : (
           <Tiles>
             {here.map((r) => (
-              <DogTile key={r.booking.id} row={r} cta="Check out" tone="emerald" />
+              <DogTile
+                key={r.booking.id}
+                row={r}
+                cta="Check out"
+                tone="emerald"
+                unpaid={r.booking.payment_status !== "paid"}
+              />
             ))}
           </Tiles>
         )}
@@ -204,6 +222,7 @@ function DogTile({
   row,
   cta,
   tone,
+  unpaid,
 }: {
   row: {
     booking: {
@@ -216,6 +235,7 @@ function DogTile({
   };
   cta: string;
   tone: "amber" | "emerald" | "red" | "stone";
+  unpaid?: boolean;
 }) {
   const toneStyles: Record<typeof tone, string> = {
     amber: "bg-amber-500 hover:bg-amber-600 shadow-soft",
@@ -244,6 +264,9 @@ function DogTile({
       <div className="min-w-0 flex-1">
         <p className="truncate font-display text-base font-semibold text-ink-900">
           {row.dog?.name ?? "Dog"}
+          {unpaid && (
+            <span className="ml-2 align-middle pill-warn">unpaid</span>
+          )}
         </p>
         <p className="truncate text-sm text-ink-500">
           {row.cust?.full_name || row.cust?.email}
