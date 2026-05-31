@@ -116,6 +116,34 @@ export default async function StaffOverviewPage() {
     (c) => c.created_at >= monthStart && c.created_at < nextMonth,
   ).length;
 
+  // Outstanding balances: every unpaid, non-canceled booking (any date, not
+  // just this month). Amount owed mirrors the billing math used at checkout —
+  // nightly rate × nights for boarding, the unit price for a daycare day.
+  const { data: unpaidRows } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("payment_status", "unpaid")
+    .neq("status", "canceled");
+  const unpaidBookings = (unpaidRows ?? []) as Booking[];
+
+  const unpaidByCust = new Map<string, { amount: number; count: number }>();
+  let unpaidTotal = 0;
+  for (const b of unpaidBookings) {
+    const units =
+      b.service_kind === "boarding"
+        ? Math.max(1, nightCount(b.service_date, b.service_end_date))
+        : 1;
+    const amount = (b.unit_price_cents ?? 0) * units;
+    unpaidTotal += amount;
+    const cur = unpaidByCust.get(b.customer_id) ?? { amount: 0, count: 0 };
+    cur.amount += amount;
+    cur.count += 1;
+    unpaidByCust.set(b.customer_id, cur);
+  }
+  const unpaidByCustomer = Array.from(unpaidByCust.entries())
+    .map(([id, v]) => ({ id, profile: custById.get(id), ...v }))
+    .sort((a, b) => b.amount - a.amount);
+
   // Today/tomorrow occupancy.
   const daycareToday = daycareCounts.get(today) ?? 0;
   const daycareTomorrow = daycareCounts.get(addDays(today, 1)) ?? 0;
@@ -157,6 +185,11 @@ export default async function StaffOverviewPage() {
           title="Refunds"
           value={formatMoney(refunds)}
           hint="this month"
+        />
+        <UnpaidCard
+          total={unpaidTotal}
+          count={unpaidBookings.length}
+          byCustomer={unpaidByCustomer}
         />
       </div>
 
@@ -245,6 +278,75 @@ export default async function StaffOverviewPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function UnpaidCard({
+  total,
+  count,
+  byCustomer,
+}: {
+  total: number;
+  count: number;
+  byCustomer: {
+    id: string;
+    profile: Profile | undefined;
+    amount: number;
+    count: number;
+  }[];
+}) {
+  return (
+    <details className="card-lift group sm:col-span-2 lg:col-span-4">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+            Unpaid balance
+          </p>
+          <p className="mt-2 font-display text-3xl font-bold text-ink-900">
+            {formatMoney(total)}
+          </p>
+          <p className="mt-1.5 text-xs text-ink-500">
+            {count} unpaid booking{count === 1 ? "" : "s"}
+            {byCustomer.length > 0 && (
+              <> across {byCustomer.length} customer
+                {byCustomer.length === 1 ? "" : "s"}</>
+            )}
+            {" · "}tap to see by customer
+          </p>
+        </div>
+        <span
+          aria-hidden
+          className="mt-1 shrink-0 text-ink-400 transition-transform group-open:rotate-90"
+        >
+          ▸
+        </span>
+      </summary>
+      {byCustomer.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-700">No unpaid balances. 🎉</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+          {byCustomer.map((c) => (
+            <li
+              key={c.id}
+              className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
+            >
+              <Link
+                href={`/staff/customers/${c.id}`}
+                className="min-w-0 truncate font-medium text-ink-900 hover:underline"
+              >
+                {c.profile?.full_name || c.profile?.email || "—"}
+                <span className="ml-2 text-xs font-normal text-ink-500">
+                  {c.count} booking{c.count === 1 ? "" : "s"}
+                </span>
+              </Link>
+              <span className="shrink-0 font-semibold text-red-700">
+                {formatMoney(c.amount)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
   );
 }
 
