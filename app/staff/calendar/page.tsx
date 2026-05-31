@@ -7,7 +7,7 @@ import type {
   Event,
   Profile,
 } from "@/lib/supabase/types";
-import { todayISO } from "@/lib/format";
+import { bookingDatesInRange, todayISO } from "@/lib/format";
 import { getEventsInRange, indexEventsByDate } from "@/lib/events.server";
 import { getBlackoutsInRange, indexBlackoutsByDate } from "@/lib/blackouts.server";
 import { StaffSubNav } from "@/components/StaffSubNav";
@@ -39,8 +39,10 @@ export default async function StaffCalendarPage({
     supabase
       .from("bookings")
       .select("*")
-      .gte("service_date", grid.gridStart)
+      // Overlap test: any booking whose stay intersects the visible grid. This
+      // catches multi-day boarding stays that began before the grid start.
       .lte("service_date", grid.gridEnd)
+      .gte("service_end_date", grid.gridStart)
       .neq("status", "canceled")
       .order("service_date"),
     getEventsInRange(grid.gridStart, grid.gridEnd),
@@ -63,9 +65,11 @@ export default async function StaffCalendarPage({
 
   const bookingsByDate = new Map<string, Booking[]>();
   for (const b of bookings) {
-    const arr = bookingsByDate.get(b.service_date) ?? [];
-    arr.push(b);
-    bookingsByDate.set(b.service_date, arr);
+    for (const date of bookingDatesInRange(b, grid.gridStart, grid.gridEnd)) {
+      const arr = bookingsByDate.get(date) ?? [];
+      arr.push(b);
+      bookingsByDate.set(date, arr);
+    }
   }
   const eventsByDate = indexEventsByDate(events, grid.gridStart, grid.gridEnd);
   const blackoutsByDate = indexBlackoutsByDate(

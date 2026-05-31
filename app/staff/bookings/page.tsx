@@ -8,7 +8,13 @@ import type {
   Event,
   Profile,
 } from "@/lib/supabase/types";
-import { addDays, formatDateShort, formatMoney, todayISO } from "@/lib/format";
+import {
+  addDays,
+  bookingDatesInRange,
+  formatDateShort,
+  formatMoney,
+  todayISO,
+} from "@/lib/format";
 import { EventList } from "@/components/EventList";
 import { getEventsInRange, indexEventsByDate } from "@/lib/events.server";
 import { StaffSubNav } from "@/components/StaffSubNav";
@@ -55,8 +61,10 @@ export default async function StaffBookingsPage({
   const { data: bookingsData } = await supabase
     .from("bookings")
     .select("*")
-    .gte("service_date", from)
+    // Overlap test: include multi-day boarding stays that span into this range
+    // even if they began before it.
     .lte("service_date", to)
+    .gte("service_end_date", from)
     .neq("status", "canceled")
     .order("service_date");
   const bookings = (bookingsData ?? []) as Booking[];
@@ -170,9 +178,11 @@ function ListView({
 }) {
   const byDate = new Map<string, Booking[]>();
   for (const b of bookings) {
-    const arr = byDate.get(b.service_date) ?? [];
-    arr.push(b);
-    byDate.set(b.service_date, arr);
+    for (const date of bookingDatesInRange(b, from, to)) {
+      const arr = byDate.get(date) ?? [];
+      arr.push(b);
+      byDate.set(date, arr);
+    }
   }
   const sortedDates = Array.from(byDate.keys()).sort();
 
@@ -224,7 +234,10 @@ function ListView({
                           · {cust?.full_name ?? cust?.email}
                         </span>
                         <p className="text-xs text-ink-500">
-                          {b.payment_kind} · {b.status} · {b.payment_status}
+                          {b.service_kind === "boarding"
+                            ? `Boarding ${formatDateShort(b.service_date)}–${formatDateShort(b.service_end_date)}`
+                            : b.payment_kind}{" "}
+                          · {b.status} · {b.payment_status}
                         </p>
                       </div>
                       {canCancel && b.status === "reserved" && (
@@ -266,9 +279,11 @@ function CalendarView({
 
   const byDate = new Map<string, Booking[]>();
   for (const b of bookings) {
-    const arr = byDate.get(b.service_date) ?? [];
-    arr.push(b);
-    byDate.set(b.service_date, arr);
+    for (const date of bookingDatesInRange(b, grid.gridStart, grid.gridEnd)) {
+      const arr = byDate.get(date) ?? [];
+      arr.push(b);
+      byDate.set(date, arr);
+    }
   }
 
   const prevMonth = shiftMonth(monthAnchor, -1).slice(0, 7);

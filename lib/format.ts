@@ -1,3 +1,33 @@
+/**
+ * The calendar days a booking occupies, clamped to [rangeStart, rangeEnd] (inclusive).
+ * Daycare occupies only its service_date. Boarding occupies every day from drop-off
+ * through its departure (service_end_date) day inclusive, matching the in-house window
+ * used on the staff Today page. Returns dates in ascending order.
+ */
+export function bookingDatesInRange(
+  booking: {
+    service_kind: string;
+    service_date: string;
+    service_end_date: string;
+  },
+  rangeStart: string,
+  rangeEnd: string,
+): string[] {
+  const lastDay =
+    booking.service_kind === "boarding"
+      ? booking.service_end_date
+      : booking.service_date;
+  // ISO dates (YYYY-MM-DD) compare correctly as strings.
+  const start =
+    booking.service_date < rangeStart ? rangeStart : booking.service_date;
+  const end = lastDay > rangeEnd ? rangeEnd : lastDay;
+  const days: string[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) {
+    days.push(d);
+  }
+  return days;
+}
+
 export function formatMoney(cents: number): string {
   return (cents / 100).toLocaleString("en-US", {
     style: "currency",
