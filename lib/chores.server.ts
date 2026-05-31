@@ -36,28 +36,21 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
     bookings.filter((b) => b.service_kind === "boarding").map((b) => b.dog_id),
   );
 
-  // --- Walks (AM + PM + evening per checked-in dog) -------------------------
+  // --- Walks (11:30 AM + 7:30 PM per checked-in dog) ------------------------
   const walkRows = dogs.flatMap((d) => [
     {
       kind: "walk" as const,
-      title: `Morning walk — ${d.name}`,
+      title: `Walk 11:30 AM — ${d.name}`,
       due_date: date,
       dog_id: d.id,
       auto_key: "walk_am",
     },
     {
       kind: "walk" as const,
-      title: `Afternoon walk — ${d.name}`,
+      title: `Walk 7:30 PM — ${d.name}`,
       due_date: date,
       dog_id: d.id,
       auto_key: "walk_pm",
-    },
-    {
-      kind: "walk" as const,
-      title: `Evening walk — ${d.name}`,
-      due_date: date,
-      dog_id: d.id,
-      auto_key: "walk_eve",
     },
   ]);
 
