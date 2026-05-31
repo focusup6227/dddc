@@ -5,8 +5,10 @@ import {
   ChevronRight,
   ClipboardList,
   Footprints,
+  Pill,
   Sparkles,
   ShieldCheck,
+  Utensils,
 } from "lucide-react";
 import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +29,16 @@ const KIND_META: Record<
   { label: string; Icon: typeof Footprints; tone: string }
 > = {
   walk: { label: "Walk", Icon: Footprints, tone: "text-sky-600 bg-sky-50" },
+  feeding: {
+    label: "Feeding",
+    Icon: Utensils,
+    tone: "text-orange-600 bg-orange-50",
+  },
+  medication: {
+    label: "Medication",
+    Icon: Pill,
+    tone: "text-rose-600 bg-rose-50",
+  },
   sanitize: {
     label: "Sanitize",
     Icon: Sparkles,
@@ -131,6 +143,8 @@ export default async function TeamMemberActivityPage({
   const total = chores.length;
   const byKind = {
     walk: chores.filter((c) => c.kind === "walk").length,
+    feeding: chores.filter((c) => c.kind === "feeding").length,
+    medication: chores.filter((c) => c.kind === "medication").length,
     sanitize: chores.filter((c) => c.kind === "sanitize").length,
     manual: chores.filter((c) => c.kind === "manual").length,
   };
@@ -279,9 +293,11 @@ export default async function TeamMemberActivityPage({
       </div>
 
       {/* Summary */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <SummaryStat label="Total" value={total} />
         <SummaryStat label="Walks" value={byKind.walk} />
+        <SummaryStat label="Feeding" value={byKind.feeding} />
+        <SummaryStat label="Meds" value={byKind.medication} />
         <SummaryStat label="Sanitize" value={byKind.sanitize} />
         <SummaryStat label="Tasks" value={byKind.manual} />
       </section>

@@ -80,18 +80,32 @@ export default async function StaffChoresPage({
   ).length;
   const doneCount = chores.length - outstandingCount;
 
-  // Group: walks (sub-grouped by dog), sanitize, manual.
+  // Group: walks + feeding (sub-grouped by dog), medication, sanitize, manual.
   const walks = visible.filter((c) => c.kind === "walk");
+  const feeding = visible.filter((c) => c.kind === "feeding");
+  const medication = visible.filter((c) => c.kind === "medication");
   const sanitize = visible.filter((c) => c.kind === "sanitize");
   const manual = visible.filter((c) => c.kind === "manual");
 
-  const walksByDog = new Map<string, Chore[]>();
-  for (const w of walks) {
-    if (!w.dog_id) continue;
-    const arr = walksByDog.get(w.dog_id) ?? [];
-    arr.push(w);
-    walksByDog.set(w.dog_id, arr);
-  }
+  const byDog = (items: Chore[]) => {
+    const m = new Map<string, Chore[]>();
+    for (const c of items) {
+      if (!c.dog_id) continue;
+      const arr = m.get(c.dog_id) ?? [];
+      arr.push(c);
+      m.set(c.dog_id, arr);
+    }
+    return m;
+  };
+  const walksByDog = byDog(walks);
+  const feedingByDog = byDog(feeding);
+
+  const nameFor = (c: Chore) =>
+    c.completed_by
+      ? userMap.get(c.completed_by)?.full_name ??
+        userMap.get(c.completed_by)?.email ??
+        "staff"
+      : null;
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -179,6 +193,58 @@ export default async function StaffChoresPage({
               );
             })}
           </div>
+        )}
+      </Section>
+
+      <Section title="🍽️ Feeding">
+        {feedingByDog.size === 0 ? (
+          <Empty
+            text={showDone ? "Nothing here." : "No boarders to feed today."}
+          />
+        ) : (
+          <div className="space-y-3">
+            {Array.from(feedingByDog.entries()).map(([dogId, items]) => {
+              const dog = dogById.get(dogId);
+              return (
+                <div
+                  key={dogId}
+                  className="rounded-lg border border-stone-200 bg-white p-3"
+                >
+                  <p className="mb-2 font-medium text-ink-900">
+                    {dog?.name ?? "Dog"}
+                  </p>
+                  <ul className="divide-y divide-stone-100">
+                    {items
+                      .sort((a, b) =>
+                        (a.auto_key ?? "").localeCompare(b.auto_key ?? ""),
+                      )
+                      .map((c) => (
+                        <ChoreRow
+                          key={c.id}
+                          chore={c}
+                          completedByName={nameFor(c)}
+                          title={
+                            c.auto_key === "feed_am" ? "Breakfast" : "Dinner"
+                          }
+                        />
+                      ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+
+      <Section title="💊 Medication">
+        {medication.length === 0 ? (
+          <Empty text={showDone ? "Nothing here." : "No meds due today."} />
+        ) : (
+          <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
+            {medication.map((c) => (
+              <ChoreRow key={c.id} chore={c} completedByName={nameFor(c)} />
+            ))}
+          </ul>
         )}
       </Section>
 

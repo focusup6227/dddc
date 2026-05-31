@@ -19,10 +19,22 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
 
   const dogIds = Array.from(new Set(bookings.map((b) => b.dog_id)));
   const dogsRes = dogIds.length
-    ? await supabase.from("dogs").select("id, name").in("id", dogIds)
+    ? await supabase
+        .from("dogs")
+        .select("id, name, feeding_notes, medications")
+        .in("id", dogIds)
     : { data: [] };
-  const dogs = (dogsRes.data ?? []) as Pick<Dog, "id" | "name">[];
+  const dogs = (dogsRes.data ?? []) as Pick<
+    Dog,
+    "id" | "name" | "feeding_notes" | "medications"
+  >[];
   const dogName = new Map(dogs.map((d) => [d.id, d.name]));
+
+  // Boarding stays get feeding + medication chores (multi-night care). Daycare
+  // dogs are only on site for the day, so they just get walks.
+  const boardingDogIds = new Set(
+    bookings.filter((b) => b.service_kind === "boarding").map((b) => b.dog_id),
+  );
 
   // --- Walks (AM + PM + evening per checked-in dog) -------------------------
   const walkRows = dogs.flatMap((d) => [
@@ -48,6 +60,39 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
       auto_key: "walk_eve",
     },
   ]);
+
+  // --- Feeding (Breakfast + Dinner per boarder) -----------------------------
+  const boarders = dogs.filter((d) => boardingDogIds.has(d.id));
+  const feedingRows = boarders.flatMap((d) => [
+    {
+      kind: "feeding" as const,
+      title: `Breakfast — ${d.name}`,
+      description: d.feeding_notes,
+      due_date: date,
+      dog_id: d.id,
+      auto_key: "feed_am",
+    },
+    {
+      kind: "feeding" as const,
+      title: `Dinner — ${d.name}`,
+      description: d.feeding_notes,
+      due_date: date,
+      dog_id: d.id,
+      auto_key: "feed_pm",
+    },
+  ]);
+
+  // --- Medication (one per boarder that has meds on file) -------------------
+  const medRows = boarders
+    .filter((d) => (d.medications ?? "").trim().length > 0)
+    .map((d) => ({
+      kind: "medication" as const,
+      title: `Meds — ${d.name}`,
+      description: d.medications,
+      due_date: date,
+      dog_id: d.id,
+      auto_key: "meds",
+    }));
 
   // --- Backyard sanitize: weekly, Mondays only ------------------------------
   const sanitizeRows: Array<{
@@ -116,7 +161,13 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
     });
   }
 
-  const candidates = [...walkRows, ...sanitizeRows, ...templateRows];
+  const candidates = [
+    ...walkRows,
+    ...feedingRows,
+    ...medRows,
+    ...sanitizeRows,
+    ...templateRows,
+  ];
   if (candidates.length === 0) return;
 
   // Pre-filter against existing auto-rows for this date. The unique index is

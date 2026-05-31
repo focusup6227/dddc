@@ -186,7 +186,12 @@ export interface ReportCardPhoto {
   uploaded_at: string;
 }
 
-export type ChoreKind = "walk" | "sanitize" | "manual";
+export type ChoreKind =
+  | "walk"
+  | "sanitize"
+  | "manual"
+  | "feeding"
+  | "medication";
 export type ChoreRecurrence = "none" | "daily" | "weekly";
 
 export interface Chore {
