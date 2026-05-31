@@ -183,8 +183,8 @@ export default async function StaffChoresPage({
                           }
                           title={
                             c.auto_key === "walk_am"
-                              ? "Morning walk"
-                              : "Afternoon walk"
+                              ? "Walk · 11:30 AM"
+                              : "Walk · 7:30 PM"
                           }
                         />
                       ))}
