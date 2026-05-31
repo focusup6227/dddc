@@ -3,6 +3,10 @@ import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendBookingConfirmation, sendPaymentReceipt } from "@/lib/email";
+import {
+  markAddonsFailedBySession,
+  markAddonsPaidBySession,
+} from "@/lib/addons.server";
 import { addDays } from "@/lib/format";
 
 // Stripe sends raw bodies; opt out of body parsing.
@@ -80,6 +84,32 @@ async function handleCheckoutSucceeded(
     typeof session.payment_intent === "string"
       ? session.payment_intent
       : session.payment_intent?.id ?? null;
+
+  // Flip any dog-wash add-ons paid by this session, regardless of kind. For
+  // booking+wash checkouts the wash total is folded into the receipt below;
+  // for wash-only checkouts (kind "addon") we send a standalone receipt.
+  const wash = await markAddonsPaidBySession(svc, session.id, paymentIntentId);
+
+  if (kind === "addon") {
+    if (wash.totalCents > 0) {
+      const customerId = session.metadata?.customer_id;
+      const dogId = session.metadata?.dog_id;
+      const [{ data: profile }, { data: dog }] = await Promise.all([
+        svc.from("profiles").select("email, full_name").eq("id", customerId).maybeSingle(),
+        svc.from("dogs").select("name").eq("id", dogId).maybeSingle(),
+      ]);
+      if (profile?.email) {
+        await sendPaymentReceipt({
+          to: profile.email,
+          customerName: profile.full_name ?? profile.email,
+          description: `Dog wash for ${dog?.name ?? "your dog"}`,
+          amountCents: wash.totalCents || session.amount_total || 0,
+          paidAt: new Date(),
+        });
+      }
+    }
+    return;
+  }
 
   if (kind === "package") {
     const { data: pkgRows } = await svc
@@ -176,8 +206,8 @@ async function handleCheckoutSucceeded(
     await sendPaymentReceipt({
       to: profile.email,
       customerName: profile.full_name ?? profile.email,
-      description: `${isBoarding ? "Boarding" : "Drop-in"} for ${dog.name} × ${unitCount} ${unit}${unitCount === 1 ? "" : "s"}`,
-      amountCents: totalCents || session.amount_total || 0,
+      description: `${isBoarding ? "Boarding" : "Drop-in"} for ${dog.name} × ${unitCount} ${unit}${unitCount === 1 ? "" : "s"}${wash.count > 0 ? " + dog wash" : ""}`,
+      amountCents: totalCents + wash.totalCents || session.amount_total || 0,
       paidAt: new Date(),
     });
     return;
@@ -255,6 +285,7 @@ async function handleCheckoutFailed(
   session: Stripe.Checkout.Session,
 ) {
   const kind = session.metadata?.kind;
+  await markAddonsFailedBySession(svc, session.id);
   if (kind === "package") {
     await svc
       .from("customer_packages")

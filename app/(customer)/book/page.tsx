@@ -9,7 +9,7 @@ import type {
   VaccineType,
 } from "@/lib/supabase/types";
 import { addDays, formatMoney, todayISO } from "@/lib/format";
-import { getFullDates } from "@/lib/settings";
+import { DOG_WASH_PRICE_CENTS, getFullDates } from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { getEventsInRange } from "@/lib/events.server";
 import { getBlackoutsInRange, expandBlackoutDates } from "@/lib/blackouts.server";
@@ -246,6 +246,7 @@ export default async function BookPage({
         dogs={dogs}
         daysRemaining={daysRemaining}
         dropInPriceCents={dropInPkg?.price_cents ?? null}
+        dogWashPriceCents={DOG_WASH_PRICE_CENTS}
         existingBookings={existingData}
         startDate={startDate}
         fullDates={fullDates}

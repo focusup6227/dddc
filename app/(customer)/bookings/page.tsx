@@ -2,6 +2,7 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
+  BookingAddon,
   Dog,
   ReportCard,
   ReportCardPhoto,
@@ -18,6 +19,7 @@ import {
   cancelBooking,
   payAllUnpaid,
   payBooking,
+  payDogWash,
   removeCouponFromBooking,
 } from "./actions";
 import ConfirmCancelButton from "./ConfirmCancelButton";
@@ -90,6 +92,21 @@ export default async function BookingsPage({
     photosByCard.set(p.report_card_id, arr);
   }
 
+  // Dog-wash add-ons across these bookings. Track, per booking, the paid total
+  // (to label) and the unpaid total (to fold into the balance + Pay now).
+  const { data: addonRows } = bookingIds.length
+    ? await supabase.from("booking_addons").select("*").in("booking_id", bookingIds)
+    : { data: [] };
+  const addons = (addonRows ?? []) as BookingAddon[];
+  const washPaidByBooking = new Map<string, number>();
+  const washUnpaidByBooking = new Map<string, number>();
+  for (const a of addons) {
+    if (a.kind !== "dog_wash") continue;
+    const map = a.payment_status === "paid" ? washPaidByBooking : washUnpaidByBooking;
+    if (a.payment_status !== "paid" && a.payment_status !== "unpaid") continue;
+    map.set(a.booking_id, (map.get(a.booking_id) ?? 0) + a.amount_cents);
+  }
+
   const upcoming = bookings.filter((b) => b.service_date >= today && b.status !== "canceled");
   const past = bookings.filter((b) => b.service_date < today || b.status === "canceled");
 
@@ -105,7 +122,15 @@ export default async function BookingsPage({
     ),
     profile.account_credit_cents ?? 0,
   );
-  const balanceCents = settlements.reduce((sum, s) => sum + s.chargeAfter, 0);
+  // Every unpaid wash (riding on an unpaid stay OR stranded on a paid one)
+  // counts toward the balance; payAllUnpaid bundles them all. Discounts never
+  // touch the wash.
+  const unpaidWashTotal = Array.from(washUnpaidByBooking.values()).reduce(
+    (sum, c) => sum + c,
+    0,
+  );
+  const balanceCents =
+    settlements.reduce((sum, s) => sum + s.chargeAfter, 0) + unpaidWashTotal;
   const creditAppliedCents = settlements.reduce(
     (sum, s) => sum + s.creditApplied,
     0,
@@ -124,7 +149,7 @@ export default async function BookingsPage({
 
       <ToastNotifier toasts={TOASTS} />
 
-      {unpaidBookings.length > 0 && (
+      {(unpaidBookings.length > 0 || unpaidWashTotal > 0) && (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 shadow-soft">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-amber-900">
@@ -136,9 +161,9 @@ export default async function BookingsPage({
               </p>
             )}
             <p className="text-xs text-amber-800">
-              {unpaidBookings.length} unpaid booking
-              {unpaidBookings.length === 1 ? "" : "s"} — pay everything in one
-              checkout.
+              {unpaidBookings.length > 0
+                ? `${unpaidBookings.length} unpaid booking${unpaidBookings.length === 1 ? "" : "s"} — pay everything in one checkout.`
+                : "Dog wash to pay — settle it in one checkout."}
             </p>
           </div>
           <form action={payAllUnpaid}>
@@ -158,6 +183,8 @@ export default async function BookingsPage({
         today={today}
         cardByBooking={cardByBooking}
         photosByCard={photosByCard}
+        washPaidByBooking={washPaidByBooking}
+        washUnpaidByBooking={washUnpaidByBooking}
         cancelable
       />
       <Section
@@ -167,6 +194,8 @@ export default async function BookingsPage({
         today={today}
         cardByBooking={cardByBooking}
         photosByCard={photosByCard}
+        washPaidByBooking={washPaidByBooking}
+        washUnpaidByBooking={washUnpaidByBooking}
       />
     </div>
   );
@@ -180,19 +209,26 @@ function nightCount(start: string, end: string): number {
   return Math.max(0, Math.round((b - a) / 86400000));
 }
 
-function refundPreview(b: Booking): string {
+function refundPreview(b: Booking, washPaidCents: number): string {
   const fraction = refundFractionForBooking(b.service_date, "customer");
+  const washRefund = Math.round(washPaidCents * fraction);
+  const washNote =
+    washRefund > 0 ? ` Dog wash: ${formatMoney(washRefund)} refunded.` : "";
   if (b.payment_kind === "package") {
-    return fraction === 1
-      ? "Full refund: 1 day returned to your package."
-      : "Within 24h: package day will be forfeited (no refund).";
+    const base =
+      fraction === 1
+        ? "Full refund: 1 day returned to your package."
+        : "Within 24h: package day will be forfeited (no refund).";
+    return base + washNote;
   }
   if (b.payment_status !== "paid" || !b.unit_price_cents) {
-    return "No charge to refund.";
+    return washRefund > 0
+      ? `Dog wash: ${formatMoney(washRefund)} refunded.`
+      : "No charge to refund.";
   }
   const nights = Math.max(1, nightCount(b.service_date, b.service_end_date));
   const total = b.unit_price_cents * nights;
-  const amount = Math.round(total * fraction);
+  const amount = Math.round(total * fraction) + washRefund;
   return fraction === 1
     ? `Full refund of ${formatMoney(amount)}.`
     : `Within 24h: 50% refund of ${formatMoney(amount)}.`;
@@ -205,6 +241,8 @@ function Section({
   today,
   cardByBooking,
   photosByCard,
+  washPaidByBooking,
+  washUnpaidByBooking,
   cancelable,
 }: {
   title: string;
@@ -213,6 +251,8 @@ function Section({
   today: string;
   cardByBooking: Map<string, ReportCard>;
   photosByCard: Map<string, ReportCardPhoto[]>;
+  washPaidByBooking: Map<string, number>;
+  washUnpaidByBooking: Map<string, number>;
   cancelable?: boolean;
 }) {
   return (
@@ -227,11 +267,23 @@ function Section({
             const isUnpaid =
               b.status === "reserved" && b.payment_status === "unpaid";
             const isPastDue = isPastDueUnpaid(b, today);
+            const washPaid = washPaidByBooking.get(b.id) ?? 0;
+            const washUnpaid = washUnpaidByBooking.get(b.id) ?? 0;
+            const nights = Math.max(1, nightCount(b.service_date, b.service_end_date));
+            const payNowCents =
+              Math.max(
+                0,
+                (b.unit_price_cents ?? 0) * nights - (b.coupon_discount_cents ?? 0),
+              ) + washUnpaid;
             // Past-due unpaid rows can't be canceled — the customer must pay.
             const showCancel =
               cancelable && b.status === "reserved" && !isPastDue;
             const showPayNow = isUnpaid;
-            const preview = showCancel ? refundPreview(b) : "";
+            // A wash stranded on an already-paid (or checked-out) stay — the
+            // normal "Pay now" won't cover it, so offer it on its own.
+            const showPayWash =
+              !isUnpaid && washUnpaid > 0 && b.status !== "canceled";
+            const preview = showCancel ? refundPreview(b, washPaid) : "";
             const card = cardByBooking.get(b.id);
             const cardPhotos = card ? photosByCard.get(card.id) ?? [] : [];
             return (
@@ -262,6 +314,11 @@ function Section({
                       {b.pickup_time && <>Pickup {formatTime(b.pickup_time)}</>}
                     </p>
                   )}
+                  {(washPaid > 0 || washUnpaid > 0) && (
+                    <p className="text-xs text-ink-500">
+                      Dog wash · {washPaid > 0 ? "paid" : "unpaid"}
+                    </p>
+                  )}
                   {isPastDue && (
                     <p className="mt-1 text-xs font-medium text-red-700">
                       Past due — please pay to keep your account active.
@@ -275,9 +332,15 @@ function Section({
                       <input type="hidden" name="id" value={b.id} />
                       <button type="submit" className="btn-primary text-sm">
                         Pay now
-                        {b.unit_price_cents
-                          ? ` · ${formatMoney(Math.max(0, b.unit_price_cents * Math.max(1, nightCount(b.service_date, b.service_end_date)) - (b.coupon_discount_cents ?? 0)))}`
-                          : ""}
+                        {payNowCents > 0 ? ` · ${formatMoney(payNowCents)}` : ""}
+                      </button>
+                    </form>
+                  )}
+                  {showPayWash && (
+                    <form action={payDogWash}>
+                      <input type="hidden" name="id" value={b.id} />
+                      <button type="submit" className="btn-primary text-sm">
+                        Pay dog wash · {formatMoney(washUnpaid)}
                       </button>
                     </form>
                   )}

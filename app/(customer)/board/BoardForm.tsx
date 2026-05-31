@@ -16,6 +16,7 @@ import { createBoarding } from "./actions";
 export function BoardForm({
   dogs,
   rateCents,
+  dogWashPriceCents,
   startDate,
   fullNights,
   vaccineBlocks,
@@ -25,6 +26,7 @@ export function BoardForm({
 }: {
   dogs: Dog[];
   rateCents: number;
+  dogWashPriceCents: number;
   startDate: string;
   fullNights: string[];
   vaccineBlocks: Record<string, VaccineType[]>;
@@ -38,6 +40,7 @@ export function BoardForm({
   const [checkOut, setCheckOut] = useState(addDays(startDate, 1));
   const [dropOffTime, setDropOffTime] = useState(DEFAULT_DROP_OFF_TIME);
   const [pickupTime, setPickupTime] = useState(DEFAULT_PICKUP_TIME);
+  const [dogWash, setDogWash] = useState(false);
   const timesValid =
     dropOffTime >= EARLIEST_TIME &&
     dropOffTime <= LATEST_TIME &&
@@ -68,7 +71,8 @@ export function BoardForm({
     [nights, blackoutSet],
   );
 
-  const totalCents = nights.length * rateCents;
+  const washCents = dogWash ? dogWashPriceCents : 0;
+  const totalCents = nights.length * rateCents + washCents;
   const validRange = nights.length > 0;
   const hasFullNights = overlappingFull.length > 0;
   const hasBlackouts = overlappingBlackouts.length > 0;
@@ -87,6 +91,7 @@ export function BoardForm({
       <input type="hidden" name="check_out" value={checkOut} />
       <input type="hidden" name="drop_off_time" value={dropOffTime} />
       <input type="hidden" name="pickup_time" value={pickupTime} />
+      <input type="hidden" name="dog_wash" value={dogWash ? "1" : "0"} />
 
       <section className="card">
         <h3 className="font-semibold text-ink-900">Dog</h3>
@@ -231,6 +236,24 @@ export function BoardForm({
       </section>
 
       <section className="card">
+        <h3 className="font-semibold text-ink-900">Add-ons</h3>
+        <label className="mt-3 flex cursor-pointer items-center justify-between gap-3">
+          <span>
+            <span className="font-medium text-ink-900">Dog wash</span>
+            <span className="block text-sm text-ink-500">
+              A bath before pickup — {formatMoney(dogWashPriceCents)} one-time.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={dogWash}
+            onChange={(e) => setDogWash(e.target.checked)}
+            className="h-5 w-5 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+          />
+        </label>
+      </section>
+
+      <section className="card">
         <h3 className="font-semibold text-ink-900">Summary</h3>
         <dl className="mt-3 space-y-1 text-sm">
           <div className="flex justify-between">
@@ -243,6 +266,14 @@ export function BoardForm({
               {formatMoney(rateCents)} / night
             </dd>
           </div>
+          {dogWash && (
+            <div className="flex justify-between">
+              <dt className="text-ink-700">Dog wash</dt>
+              <dd className="font-medium text-ink-900">
+                {formatMoney(washCents)}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between border-t border-stone-200 pt-2">
             <dt className="font-semibold text-ink-900">Due today</dt>
             <dd className="font-semibold text-ink-900">

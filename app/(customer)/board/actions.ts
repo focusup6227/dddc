@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import type Stripe from "stripe";
 import { requireCustomer } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
@@ -16,6 +17,7 @@ import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { getBlackoutDates } from "@/lib/blackouts.server";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
+import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
 import type { Dog } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -28,6 +30,7 @@ export async function createBoarding(formData: FormData) {
   const checkOut = String(formData.get("check_out") ?? "");
   const drop_off_time = String(formData.get("drop_off_time") ?? "");
   const pickup_time = String(formData.get("pickup_time") ?? "");
+  const dogWash = String(formData.get("dog_wash") ?? "") === "1";
 
   if (!dog_id || !ISO_RE.test(checkIn) || !ISO_RE.test(checkOut)) {
     redirect("/board?error=Pick+a+dog+and+valid+dates");
@@ -125,10 +128,12 @@ export async function createBoarding(formData: FormData) {
         quantity: nights.length,
       };
 
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [lineItem];
+  if (dogWash) lineItems.push(dogWashLineItem(dog!.name));
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: profile.email,
-    line_items: [lineItem],
+    line_items: lineItems,
     success_url: `${appUrl()}/board?status=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl()}/board?error=Checkout+canceled`,
     metadata: {
@@ -140,20 +145,32 @@ export async function createBoarding(formData: FormData) {
   });
 
   // One booking row covers the full stay: service_date = check-in, service_end_date = check-out.
-  await svc.from("bookings").insert({
-    customer_id: userId,
-    dog_id,
-    service_date: checkIn,
-    service_end_date: checkOut,
-    drop_off_time,
-    pickup_time,
-    service_kind: "boarding",
-    status: "reserved",
-    payment_kind: "drop_in",
-    unit_price_cents: rateCents,
-    stripe_checkout_session_id: session.id,
-    payment_status: "unpaid",
-  });
+  const { data: stay } = await svc
+    .from("bookings")
+    .insert({
+      customer_id: userId,
+      dog_id,
+      service_date: checkIn,
+      service_end_date: checkOut,
+      drop_off_time,
+      pickup_time,
+      service_kind: "boarding",
+      status: "reserved",
+      payment_kind: "drop_in",
+      unit_price_cents: rateCents,
+      stripe_checkout_session_id: session.id,
+      payment_status: "unpaid",
+    })
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (dogWash && stay) {
+    await addDogWash(svc, {
+      bookingId: stay.id,
+      customerId: userId,
+      sessionId: session.id,
+    });
+  }
 
   if (!session.url) redirect("/board?error=Stripe+session+failed");
   redirect(session.url);

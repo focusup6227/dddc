@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, todayISO } from "@/lib/format";
-import { getFullDates } from "@/lib/settings";
+import { DOG_WASH_PRICE_CENTS, getFullDates } from "@/lib/settings";
 import type { CustomerPackage, Dog, Package, Profile } from "@/lib/supabase/types";
 import { ToastNotifier } from "@/components/ToastNotifier";
 import { KioskBookForm } from "./KioskBookForm";
@@ -249,6 +249,7 @@ export default async function KioskNewBookingPage({
             dogs={dogs}
             daysRemaining={daysRemaining}
             dropInPriceCents={dropInPkg?.price_cents ?? null}
+            dogWashPriceCents={DOG_WASH_PRICE_CENTS}
             existingBookings={existing}
             fullDates={fullDates}
             startDate={todayISO()}

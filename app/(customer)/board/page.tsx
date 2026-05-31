@@ -3,7 +3,11 @@ import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Dog, DogVaccination, VaccineType } from "@/lib/supabase/types";
 import { addDays, todayISO } from "@/lib/format";
-import { getBoardingRateCents, getFullDates } from "@/lib/settings";
+import {
+  DOG_WASH_PRICE_CENTS,
+  getBoardingRateCents,
+  getFullDates,
+} from "@/lib/settings";
 import { getPastDueUnpaid } from "@/lib/bookings.server";
 import { getEventsInRange } from "@/lib/events.server";
 import { getBlackoutsInRange, expandBlackoutDates } from "@/lib/blackouts.server";
@@ -135,6 +139,7 @@ export default async function BoardPage({
       <BoardForm
         dogs={dogs}
         rateCents={rateCents}
+        dogWashPriceCents={DOG_WASH_PRICE_CENTS}
         startDate={startDate}
         fullNights={fullNights}
         vaccineBlocks={vaccineBlocks}

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import type Stripe from "stripe";
 import { requireCustomer } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
@@ -12,6 +13,7 @@ import { getBlackoutDates } from "@/lib/blackouts.server";
 import { isTimeInWindow } from "@/lib/hours";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
+import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -25,6 +27,7 @@ export async function createBooking(formData: FormData) {
   )).sort();
   const drop_off_time = String(formData.get("drop_off_time") ?? "");
   const pickup_time = String(formData.get("pickup_time") ?? "");
+  const dogWash = String(formData.get("dog_wash") ?? "") === "1";
 
   if (!dog_id || dates.length === 0) {
     redirect("/book?error=Pick+a+dog+and+at+least+one+day");
@@ -147,20 +150,25 @@ export async function createBooking(formData: FormData) {
   // Insert package-funded bookings + decrement package balances.
   const confirmedPackageDates: string[] = [];
   const touchedPackageIds = new Set<string>();
+  let firstPackageBookingId: string | null = null;
   for (const a of packageAllocs) {
     const pkg = a.pkg!;
-    const { error: insErr } = await svc.from("bookings").insert({
-      customer_id: userId,
-      dog_id,
-      service_date: a.date,
-      service_end_date: addDays(a.date, 1),
-      drop_off_time,
-      pickup_time,
-      status: "reserved",
-      payment_kind: "package",
-      customer_package_id: pkg.id,
-      payment_status: "paid",
-    });
+    const { data: inserted, error: insErr } = await svc
+      .from("bookings")
+      .insert({
+        customer_id: userId,
+        dog_id,
+        service_date: a.date,
+        service_end_date: addDays(a.date, 1),
+        drop_off_time,
+        pickup_time,
+        status: "reserved",
+        payment_kind: "package",
+        customer_package_id: pkg.id,
+        payment_status: "paid",
+      })
+      .select("id")
+      .maybeSingle<{ id: string }>();
     if (insErr) {
       // If a uniqueness violation (already booked that day) — skip silently.
       if (!insErr.message.toLowerCase().includes("duplicate")) {
@@ -168,6 +176,7 @@ export async function createBooking(formData: FormData) {
       }
       continue;
     }
+    if (inserted && !firstPackageBookingId) firstPackageBookingId = inserted.id;
     confirmedPackageDates.push(a.date);
     touchedPackageIds.add(pkg.id);
     await svc
@@ -190,6 +199,27 @@ export async function createBooking(formData: FormData) {
       });
     }
     await maybeSendPackageLowAlerts(svc, userId, profile.email, profile.full_name, touchedPackageIds);
+
+    // Days are all package-covered, but a wash still needs paying — send the
+    // customer to a wash-only checkout. The webhook flips the add-on to paid.
+    if (dogWash && firstPackageBookingId) {
+      const stripe = getStripe();
+      const washSession = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: profile.email,
+        line_items: [dogWashLineItem(dog.name)],
+        success_url: `${appUrl()}/book?status=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl()}/book?error=Checkout+canceled`,
+        metadata: { kind: "addon", customer_id: userId, dog_id },
+      });
+      await addDogWash(svc, {
+        bookingId: firstPackageBookingId,
+        customerId: userId,
+        sessionId: washSession.id,
+      });
+      if (!washSession.url) redirect("/book?error=Stripe+session+failed");
+      redirect(washSession.url);
+    }
     redirect("/book?status=package_redeemed");
   }
 
@@ -223,10 +253,14 @@ export async function createBooking(formData: FormData) {
         },
         quantity: dropInAllocs.length,
       };
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+    dropInLineItem,
+  ];
+  if (dogWash) lineItems.push(dogWashLineItem(dog.name));
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: profile.email,
-    line_items: [dropInLineItem],
+    line_items: lineItems,
     success_url: `${appUrl()}/book?status=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl()}/book?error=Checkout+canceled`,
     metadata: {
@@ -238,19 +272,34 @@ export async function createBooking(formData: FormData) {
   });
 
   // Pre-create bookings as unpaid, linked to the session id, so the webhook flips them.
+  let firstDropInBookingId: string | null = null;
   for (const a of dropInAllocs) {
-    await svc.from("bookings").insert({
-      customer_id: userId,
-      dog_id,
-      service_date: a.date,
-      service_end_date: addDays(a.date, 1),
-      drop_off_time,
-      pickup_time,
-      status: "reserved",
-      payment_kind: "drop_in",
-      unit_price_cents: dropInPriceCents,
-      stripe_checkout_session_id: session.id,
-      payment_status: "unpaid",
+    const { data: inserted } = await svc
+      .from("bookings")
+      .insert({
+        customer_id: userId,
+        dog_id,
+        service_date: a.date,
+        service_end_date: addDays(a.date, 1),
+        drop_off_time,
+        pickup_time,
+        status: "reserved",
+        payment_kind: "drop_in",
+        unit_price_cents: dropInPriceCents,
+        stripe_checkout_session_id: session.id,
+        payment_status: "unpaid",
+      })
+      .select("id")
+      .maybeSingle<{ id: string }>();
+    if (inserted && !firstDropInBookingId) firstDropInBookingId = inserted.id;
+  }
+
+  // One wash per stay, riding on the same checkout as the drop-in days.
+  if (dogWash && firstDropInBookingId) {
+    await addDogWash(svc, {
+      bookingId: firstDropInBookingId,
+      customerId: userId,
+      sessionId: session.id,
     });
   }
 

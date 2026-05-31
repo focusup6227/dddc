@@ -4,9 +4,12 @@ import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateShort, formatMoney } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
+import { DOG_WASH_PRICE_CENTS } from "@/lib/settings";
 import { DogAvatar } from "@/components/DogAvatar";
+import { ToastNotifier } from "@/components/ToastNotifier";
 import type {
   Booking,
+  BookingAddon,
   CheckIn,
   Dog,
   DogVaccination,
@@ -17,7 +20,18 @@ import {
   summarizeCoverage,
   type VaccineCoverage,
 } from "@/lib/vaccines";
-import { kioskCheckIn, kioskCheckOut, kioskTakePayment } from "../../actions";
+import {
+  kioskAddDogWash,
+  kioskCheckIn,
+  kioskCheckOut,
+  kioskTakePayment,
+} from "../../actions";
+
+const TOASTS = [
+  { param: "paid", message: "Payment received." },
+  { param: "canceled", tone: "info" as const, message: "Payment canceled." },
+  { param: "error", tone: "error" as const },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -37,15 +51,22 @@ export default async function KioskBookingPage({
     .maybeSingle<Booking>();
   if (!booking) notFound();
 
-  const [{ data: dog }, { data: cust }, { data: ci }, { data: vaxRows }] =
+  const [{ data: dog }, { data: cust }, { data: ci }, { data: vaxRows }, { data: addonRows }] =
     await Promise.all([
       supabase.from("dogs").select("*").eq("id", booking.dog_id).maybeSingle<Dog>(),
       supabase.from("profiles").select("*").eq("id", booking.customer_id).maybeSingle<Profile>(),
       supabase.from("check_ins").select("*").eq("booking_id", booking.id).maybeSingle<CheckIn>(),
       supabase.from("dog_vaccinations").select("*").eq("dog_id", booking.dog_id),
+      supabase.from("booking_addons").select("*").eq("booking_id", booking.id),
     ]);
   if (!dog || !cust) notFound();
   const coverage = summarizeCoverage((vaxRows ?? []) as DogVaccination[]);
+
+  const washes = (addonRows ?? []) as BookingAddon[];
+  const paidWash = washes.some(
+    (a) => a.kind === "dog_wash" && a.payment_status === "paid",
+  );
+  const canAddWash = !paidWash && booking.status !== "canceled";
 
   const isPaid = booking.payment_status === "paid";
   const isCheckedIn = !!ci?.checked_in_at && !ci?.checked_out_at;
@@ -53,6 +74,7 @@ export default async function KioskBookingPage({
 
   return (
     <div className="space-y-6 animate-fade-up">
+      <ToastNotifier toasts={TOASTS} />
       <Link
         href="/kiosk"
         className="text-sm font-medium text-ink-700 hover:text-ink-900 hover:underline"
@@ -89,6 +111,7 @@ export default async function KioskBookingPage({
               >
                 {booking.payment_status}
               </span>
+              {paidWash && <span className="pill-success">Dog wash ✓</span>}
             </div>
             {(booking.drop_off_time || booking.pickup_time) && (
               <p className="mt-2 text-sm text-ink-500">
@@ -159,6 +182,18 @@ export default async function KioskBookingPage({
         isCheckedOut={isCheckedOut}
         ci={ci ?? null}
       />
+
+      {canAddWash && (
+        <form action={kioskAddDogWash}>
+          <input type="hidden" name="booking_id" value={booking.id} />
+          <button
+            type="submit"
+            className="w-full rounded-2xl border border-stone-200/80 bg-white px-6 py-4 font-display text-lg font-semibold text-ink-900 shadow-soft transition-all hover:bg-cream-50 active:translate-y-px"
+          >
+            + Add dog wash · {formatMoney(DOG_WASH_PRICE_CENTS)}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

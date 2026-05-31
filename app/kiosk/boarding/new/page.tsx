@@ -2,7 +2,11 @@ import Link from "next/link";
 import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, todayISO } from "@/lib/format";
-import { getBoardingRateCents, getFullDates } from "@/lib/settings";
+import {
+  DOG_WASH_PRICE_CENTS,
+  getBoardingRateCents,
+  getFullDates,
+} from "@/lib/settings";
 import type { Dog, Profile } from "@/lib/supabase/types";
 import { ToastNotifier } from "@/components/ToastNotifier";
 import { KioskBoardForm } from "./KioskBoardForm";
@@ -190,6 +194,7 @@ export default async function KioskNewBoardingPage({
             customerId={customer.id}
             dogs={dogs}
             rateCents={rateCents}
+            dogWashPriceCents={DOG_WASH_PRICE_CENTS}
             startDate={todayISO()}
             fullNights={fullNights}
           />

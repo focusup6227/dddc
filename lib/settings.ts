@@ -12,6 +12,10 @@ export const DEFAULT_BOARDING_RATE_CENTS = 3000;
 export const BOARDING_STRIPE_PRICE_ID = "price_1Tbx4YIt0IEhgtKThLzD4M2x";
 export const BOARDING_STRIPE_PRICE_AMOUNT_CENTS = 3000;
 
+// Optional dog-wash add-on, a flat one-time charge per booking. Billed via
+// ad-hoc Stripe price_data (no pre-made price), so changing it here is enough.
+export const DOG_WASH_PRICE_CENTS = 1000;
+
 /**
  * Get a setting by key. Falls back to the provided default.
  */

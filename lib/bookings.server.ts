@@ -9,12 +9,18 @@ import {
 } from "@/lib/email";
 import { addDays } from "@/lib/format";
 import {
+  dogWashLineItem,
+  getUnpaidAddonsForBookings,
+  stampAddonSession,
+} from "@/lib/addons.server";
+import {
   BOARDING_STRIPE_PRICE_AMOUNT_CENTS,
   BOARDING_STRIPE_PRICE_ID,
 } from "@/lib/settings";
 import { todayISO } from "@/lib/format";
 import type {
   Booking,
+  BookingAddon,
   CustomerPackage,
   Dog,
   Package,
@@ -191,6 +197,45 @@ export async function cancelBookingWithRefund(args: {
     })
     .eq("id", booking.id);
 
+  // Refund any paid dog wash on this booking under the same fraction as the
+  // stay. Each wash refunds against its own payment intent (which may be the
+  // booking's, for a bundled checkout, or a standalone one for an add-later).
+  let washRefundCents = 0;
+  const { data: paidWashes } = await svc
+    .from("booking_addons")
+    .select("*")
+    .eq("booking_id", booking.id)
+    .eq("kind", "dog_wash")
+    .eq("payment_status", "paid");
+  for (const wash of (paidWashes ?? []) as BookingAddon[]) {
+    const amount = Math.round(wash.amount_cents * fraction);
+    if (amount > 0 && wash.stripe_payment_intent_id) {
+      const stripe = getStripe();
+      await stripe.refunds.create({
+        payment_intent: wash.stripe_payment_intent_id,
+        amount,
+        reason: "requested_by_customer",
+        metadata: { booking_id: booking.id, addon_id: wash.id, canceled_by: actorId },
+      });
+      washRefundCents += amount;
+    }
+    await svc
+      .from("booking_addons")
+      .update({ payment_status: "refunded" })
+      .eq("id", wash.id);
+  }
+
+  // Drop any never-paid wash so it can't linger as a payable orphan on a
+  // canceled booking.
+  await svc
+    .from("booking_addons")
+    .delete()
+    .eq("booking_id", booking.id)
+    .eq("kind", "dog_wash")
+    .eq("payment_status", "unpaid");
+
+  const totalRefundCents = refundAmountCents + washRefundCents;
+
   // Fire the cancellation email (best-effort).
   const [{ data: profile }, { data: dog }] = await Promise.all([
     svc
@@ -213,7 +258,7 @@ export async function cancelBookingWithRefund(args: {
       serviceEndDate: booking.service_end_date,
       serviceKind: booking.service_kind,
       paymentKind: booking.payment_kind,
-      refundAmountCents,
+      refundAmountCents: totalRefundCents,
       packageDayRestored,
       refundFraction: fraction,
       actorRole,
@@ -222,8 +267,9 @@ export async function cancelBookingWithRefund(args: {
 
   return {
     ok: true,
-    refundFraction: refundAmountCents === 0 && !packageDayRestored ? 0 : fraction,
-    refundAmountCents,
+    refundFraction:
+      totalRefundCents === 0 && !packageDayRestored ? 0 : fraction,
+    refundAmountCents: totalRefundCents,
     stripeRefundId,
     packageDayRestored,
   };
@@ -309,6 +355,15 @@ export async function createBookingCheckoutSession(opts: {
   const creditToApply = useCoupon ? 0 : creditAvailable;
   const chargeAfterCredit = totalCents - discountCents;
 
+  // Any unpaid dog-wash riding on this booking gets re-bundled here so a
+  // customer who abandoned the original checkout still pays for it. Discounts
+  // (coupon/credit) only ever apply to the stay itself, never the wash.
+  const washAddons = await getUnpaidAddonsForBookings(svc, [booking.id]);
+  const washTotal = washAddons.reduce((s, a) => s + a.amount_cents, 0);
+
+  // The stay is fully covered by credit/coupon — settle it outside Stripe.
+  // (Discounts never touch the wash, so if there's an unpaid wash we still
+  // send the customer to a wash-only Checkout afterward.)
   if (chargeAfterCredit === 0 && discountCents > 0) {
     await svc
       .from("bookings")
@@ -347,7 +402,25 @@ export async function createBookingCheckoutSession(opts: {
       amountCents: totalCents,
       paidAt: new Date(),
     });
-    return opts.successUrl;
+
+    if (washTotal === 0) return opts.successUrl;
+
+    // Base settled by credit; collect the wash on its own Checkout.
+    const washStripe = getStripe();
+    const washSession = await washStripe.checkout.sessions.create({
+      mode: "payment",
+      customer_email: cust.email,
+      line_items: [dogWashLineItem(dog.name)],
+      success_url: opts.successUrl,
+      cancel_url: opts.cancelUrl,
+      metadata: { kind: "addon", customer_id: cust.id, dog_id: dog.id, source: opts.source },
+    });
+    await stampAddonSession(
+      svc,
+      washAddons.map((a) => a.id),
+      washSession.id,
+    );
+    return washSession.url ?? null;
   }
 
   // Stripe rejects unit_amount < 50¢ on most accounts. If a partial discount
@@ -401,11 +474,14 @@ export async function createBookingCheckoutSession(opts: {
     };
   }
 
+  const lineItems = [lineItem];
+  if (washTotal > 0) lineItems.push(dogWashLineItem(dog.name));
+
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer_email: cust.email,
-    line_items: [lineItem],
+    line_items: lineItems,
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     metadata: {
@@ -427,6 +503,13 @@ export async function createBookingCheckoutSession(opts: {
       credit_applied_cents: effectiveCreditApplied,
     })
     .eq("id", booking.id);
+
+  // Re-point the unpaid wash(es) at this fresh session so the webhook pays them.
+  await stampAddonSession(
+    svc,
+    washAddons.map((a) => a.id),
+    session.id,
+  );
 
   return session.url ?? null;
 }

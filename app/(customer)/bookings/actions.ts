@@ -16,9 +16,15 @@ import {
   settleUnpaidBookings,
 } from "@/lib/coupons.server";
 import { sendBookingConfirmation, sendPaymentReceipt } from "@/lib/email";
+import {
+  dogWashLineItem,
+  getUnpaidAddonsForBookings,
+  getUnpaidAddonsForCustomer,
+  stampAddonSession,
+} from "@/lib/addons.server";
 import { addDays } from "@/lib/format";
 import { appUrl, getStripe } from "@/lib/stripe";
-import type { Booking, Dog } from "@/lib/supabase/types";
+import type { Booking, BookingAddon, Dog } from "@/lib/supabase/types";
 
 export async function applyCouponToBooking(formData: FormData) {
   const { userId } = await requireCustomer();
@@ -144,9 +150,86 @@ export async function payBooking(formData: FormData) {
 }
 
 /**
+ * Pay an unpaid dog wash that's stranded on an already-paid booking (e.g. an
+ * add-later checkout the customer abandoned). The wash is its own $10 charge,
+ * so it gets its own wash-only Checkout.
+ */
+export async function payDogWash(formData: FormData) {
+  const { userId, profile } = await requireCustomer();
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/bookings");
+
+  const svc = createServiceClient();
+  const { data: booking } = await svc
+    .from("bookings")
+    .select("id")
+    .eq("id", id)
+    .eq("customer_id", userId)
+    .maybeSingle<{ id: string }>();
+  if (!booking) redirect("/bookings");
+
+  const washes = await getUnpaidAddonsForBookings(svc, [id]);
+  const url = await startWashCheckout(svc, {
+    customerId: userId,
+    customerEmail: profile.email,
+    washes,
+  });
+  if (!url) {
+    redirect("/bookings?error=" + encodeURIComponent("Nothing to pay."));
+  }
+  redirect(url);
+}
+
+/**
+ * Build a wash-only Stripe Checkout for a set of unpaid add-ons and point them
+ * at it. Returns the session URL, or null when there's nothing to charge.
+ */
+async function startWashCheckout(
+  svc: ReturnType<typeof createServiceClient>,
+  args: { customerId: string; customerEmail: string; washes: BookingAddon[] },
+): Promise<string | null> {
+  if (args.washes.length === 0) return null;
+
+  const bookingIds = Array.from(new Set(args.washes.map((w) => w.booking_id)));
+  const { data: brows } = await svc
+    .from("bookings")
+    .select("id, dog_id")
+    .in("id", bookingIds);
+  const dogIdByBooking = new Map(
+    ((brows ?? []) as { id: string; dog_id: string }[]).map((b) => [b.id, b.dog_id]),
+  );
+  const dogIds = Array.from(new Set(Array.from(dogIdByBooking.values())));
+  const { data: drows } = dogIds.length
+    ? await svc.from("dogs").select("id, name").in("id", dogIds)
+    : { data: [] };
+  const nameByDog = new Map(
+    ((drows ?? []) as Pick<Dog, "id" | "name">[]).map((d) => [d.id, d.name]),
+  );
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: args.customerEmail,
+    line_items: args.washes.map((w) =>
+      dogWashLineItem(nameByDog.get(dogIdByBooking.get(w.booking_id) ?? "") ?? "your dog"),
+    ),
+    success_url: `${appUrl()}/bookings?paid=1`,
+    cancel_url: `${appUrl()}/bookings?canceled=1`,
+    metadata: { kind: "addon", customer_id: args.customerId, source: "customer-portal" },
+  });
+  await stampAddonSession(
+    svc,
+    args.washes.map((a) => a.id),
+    session.id,
+  );
+  return session.url ?? null;
+}
+
+/**
  * Pay every unpaid booking for the customer in a single Stripe Checkout
  * session. The session id is stamped on each row so the existing webhook
- * marks them all paid in one shot.
+ * marks them all paid in one shot. Unpaid dog washes — including any stranded
+ * on already-paid stays — are bundled in so the charge matches the balance.
  */
 export async function payAllUnpaid() {
   const { userId, profile } = await requireCustomer();
@@ -160,11 +243,36 @@ export async function payAllUnpaid() {
     .eq("status", "reserved")
     .order("service_date");
   const unpaid = (bookingRows ?? []) as Booking[];
-  if (unpaid.length === 0) {
+
+  // All unpaid washes for the customer; "stranded" ones ride on a stay that's
+  // already paid, so the booking flows below won't pick them up on their own.
+  const allWashes = await getUnpaidAddonsForCustomer(svc, userId);
+  const unpaidIds = new Set(unpaid.map((b) => b.id));
+  const strandedWashes = allWashes.filter((a) => !unpaidIds.has(a.booking_id));
+
+  if (unpaid.length === 0 && allWashes.length === 0) {
     redirect("/bookings?error=Nothing+to+pay.");
   }
-  if (unpaid.length === 1) {
-    // Use the existing single-booking flow so we reuse the pre-made price IDs.
+
+  // Nothing but washes left to pay — wash-only checkout.
+  if (unpaid.length === 0) {
+    const url = await startWashCheckout(svc, {
+      customerId: userId,
+      customerEmail: profile.email,
+      washes: allWashes,
+    });
+    if (!url) {
+      redirect(
+        "/bookings?error=" +
+          encodeURIComponent("Couldn't start payment — please contact us."),
+      );
+    }
+    redirect(url);
+  }
+
+  // A single unpaid booking with no stranded washes → reuse the single-booking
+  // flow (keeps the pre-made Stripe price IDs; it bundles that booking's wash).
+  if (unpaid.length === 1 && strandedWashes.length === 0) {
     const url = await createBookingCheckoutSession({
       bookingId: unpaid[0].id,
       ownerCustomerId: userId,
@@ -181,7 +289,17 @@ export async function payAllUnpaid() {
     redirect(url);
   }
 
-  const dogIds = Array.from(new Set(unpaid.map((b) => b.dog_id)));
+  // Dog names cover both the unpaid stays and any stranded-wash bookings.
+  const washBookingIds = Array.from(new Set(allWashes.map((a) => a.booking_id)));
+  const { data: washBookingRows } = washBookingIds.length
+    ? await svc.from("bookings").select("id, dog_id").in("id", washBookingIds)
+    : { data: [] };
+  const dogIdByBooking = new Map<string, string>();
+  for (const b of unpaid) dogIdByBooking.set(b.id, b.dog_id);
+  for (const b of (washBookingRows ?? []) as { id: string; dog_id: string }[]) {
+    dogIdByBooking.set(b.id, b.dog_id);
+  }
+  const dogIds = Array.from(new Set(Array.from(dogIdByBooking.values())));
   const { data: dogRows } = await svc
     .from("dogs")
     .select("id, name")
@@ -306,7 +424,15 @@ export async function payAllUnpaid() {
     }
   }
 
-  // Everything was covered by discounts — nothing left to charge.
+  // Bundle every unpaid dog wash (stays + stranded) into the same checkout, so
+  // the charge matches the displayed balance. The webhook flips them by session
+  // id once payment lands.
+  for (const addon of allWashes) {
+    const dogId = dogIdByBooking.get(addon.booking_id);
+    lineItems.push(dogWashLineItem(dogName.get(dogId ?? "") ?? "your dog"));
+  }
+
+  // Everything was covered by discounts and there's no wash — nothing to charge.
   if (lineItems.length === 0) {
     revalidatePath("/bookings");
     redirect("/bookings?paid=1");
@@ -326,6 +452,12 @@ export async function payAllUnpaid() {
       booking_count: String(lineItems.length),
     },
   });
+
+  await stampAddonSession(
+    svc,
+    allWashes.map((a) => a.id),
+    session.id,
+  );
 
   // Stamp the session id + the credit each charged booking will burn on
   // success (the webhook deducts sum(credit_applied_cents) for this session).
