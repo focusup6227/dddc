@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateShort, formatMoney } from "@/lib/format";
-import { formatTime } from "@/lib/hours";
+import {
+  DEFAULT_DROP_OFF_TIME,
+  DEFAULT_PICKUP_TIME,
+  EARLIEST_TIME,
+  LATEST_TIME,
+  formatTime,
+} from "@/lib/hours";
 import { DOG_WASH_PRICE_CENTS } from "@/lib/settings";
 import { DogAvatar } from "@/components/DogAvatar";
 import { ToastNotifier } from "@/components/ToastNotifier";
@@ -25,13 +31,27 @@ import {
   kioskCheckIn,
   kioskCheckOut,
   kioskTakePayment,
+  kioskUpdateStay,
 } from "../../actions";
 
 const TOASTS = [
   { param: "paid", message: "Payment received." },
   { param: "canceled", tone: "info" as const, message: "Payment canceled." },
+  { param: "updated", message: "Stay updated." },
   { param: "error", tone: "error" as const },
 ];
+
+const hhmm = (t: string | null, fallback: string) =>
+  t ? t.slice(0, 5) : fallback;
+
+function nightCount(start: string, end: string): number {
+  const [y1, m1, d1] = start.split("-").map(Number);
+  const [y2, m2, d2] = end.split("-").map(Number);
+  return Math.max(
+    0,
+    Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000),
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -194,7 +214,111 @@ export default async function KioskBookingPage({
           </button>
         </form>
       )}
+
+      {booking.status !== "canceled" && booking.status !== "checked_out" && (
+        <EditStay booking={booking} />
+      )}
     </div>
+  );
+}
+
+function EditStay({ booking }: { booking: Booking }) {
+  const isBoarding = booking.service_kind === "boarding";
+  const nights = nightCount(booking.service_date, booking.service_end_date);
+  const isPaid = booking.payment_status === "paid";
+  return (
+    <details className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-soft">
+      <summary className="cursor-pointer list-none px-6 py-4 font-display text-lg font-semibold text-ink-900 hover:bg-cream-50">
+        Edit stay
+      </summary>
+      <form
+        action={kioskUpdateStay}
+        className="space-y-4 border-t border-stone-200/80 p-6"
+      >
+        <input type="hidden" name="booking_id" value={booking.id} />
+        {isBoarding ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="label">Check-in</span>
+              <input
+                type="date"
+                name="service_date"
+                defaultValue={booking.service_date}
+                className="input"
+                required
+              />
+            </label>
+            <label className="block">
+              <span className="label">Check-out</span>
+              <input
+                type="date"
+                name="service_end_date"
+                defaultValue={booking.service_end_date}
+                className="input"
+                required
+              />
+            </label>
+          </div>
+        ) : (
+          <label className="block">
+            <span className="label">Date</span>
+            <input
+              type="date"
+              name="service_date"
+              defaultValue={booking.service_date}
+              className="input"
+              required
+            />
+          </label>
+        )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">Drop-off time</span>
+            <input
+              type="time"
+              name="drop_off_time"
+              min={EARLIEST_TIME}
+              max={LATEST_TIME}
+              step={900}
+              defaultValue={hhmm(booking.drop_off_time, DEFAULT_DROP_OFF_TIME)}
+              className="input"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="label">Pickup time</span>
+            <input
+              type="time"
+              name="pickup_time"
+              min={EARLIEST_TIME}
+              max={LATEST_TIME}
+              step={900}
+              defaultValue={hhmm(booking.pickup_time, DEFAULT_PICKUP_TIME)}
+              className="input"
+              required
+            />
+          </label>
+        </div>
+        {isBoarding && (
+          <p className="text-xs text-ink-500">
+            Currently {nights} night{nights === 1 ? "" : "s"} ·{" "}
+            {formatMoney((booking.unit_price_cents ?? 0) * Math.max(1, nights))}{" "}
+            at the saved nightly rate. Changing the dates re-prices an unpaid
+            stay automatically.
+          </p>
+        )}
+        {isPaid && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            This stay is already paid. Changing the dates won&apos;t adjust what
+            was charged — collect or refund the difference manually if the night
+            count changes.
+          </p>
+        )}
+        <button type="submit" className="btn-primary w-full">
+          Save changes
+        </button>
+      </form>
+    </details>
   );
 }
 

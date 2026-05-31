@@ -677,3 +677,93 @@ export async function kioskAddDogWash(formData: FormData) {
   }
   redirect(session.url);
 }
+
+const MAX_STAY_NIGHTS = 30;
+
+/**
+ * Edit an existing booking's dates and times from the kiosk. For boarding both
+ * the check-in and check-out dates move; for daycare the single service day
+ * moves (its end stays check-in + 1). Capacity isn't hard-blocked — staff are
+ * making a deliberate change. The bill is night-based, so an unpaid stay
+ * re-prices automatically; an already-paid stay whose night count changes is
+ * flagged in the UI for staff to settle the difference.
+ */
+export async function kioskUpdateStay(formData: FormData) {
+  await requireFullStaff();
+  const booking_id = String(formData.get("booking_id") ?? "");
+  if (!booking_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  const { data: booking } = await svc
+    .from("bookings")
+    .select("*")
+    .eq("id", booking_id)
+    .maybeSingle<Booking>();
+  if (!booking || booking.status === "canceled") {
+    redirect(`/kiosk/booking/${booking_id}?error=Booking+not+found`);
+  }
+
+  const drop_off_time = String(formData.get("drop_off_time") ?? "");
+  const pickup_time = String(formData.get("pickup_time") ?? "");
+  if (!isTimeInWindow(drop_off_time) || !isTimeInWindow(pickup_time)) {
+    redirect(
+      `/kiosk/booking/${booking_id}?error=${encodeURIComponent("Pick a drop-off and pickup between 6 AM and 6 PM.")}`,
+    );
+  }
+
+  const serviceDate = String(formData.get("service_date") ?? "");
+  if (!ISO_RE.test(serviceDate)) {
+    redirect(`/kiosk/booking/${booking_id}?error=Pick+a+valid+date`);
+  }
+
+  const isBoarding = booking!.service_kind === "boarding";
+  let serviceEndDate: string;
+  if (isBoarding) {
+    serviceEndDate = String(formData.get("service_end_date") ?? "");
+    if (!ISO_RE.test(serviceEndDate) || serviceEndDate <= serviceDate) {
+      redirect(
+        `/kiosk/booking/${booking_id}?error=${encodeURIComponent("Check-out must be after check-in.")}`,
+      );
+    }
+    let cur = serviceDate;
+    let nights = 0;
+    while (cur < serviceEndDate) {
+      cur = addDays(cur, 1);
+      nights += 1;
+    }
+    if (nights > MAX_STAY_NIGHTS) {
+      redirect(
+        `/kiosk/booking/${booking_id}?error=${encodeURIComponent(`Stays are capped at ${MAX_STAY_NIGHTS} nights.`)}`,
+      );
+    }
+  } else {
+    // Daycare: a single day, dropped off and picked up the same day.
+    if (pickup_time <= drop_off_time) {
+      redirect(
+        `/kiosk/booking/${booking_id}?error=${encodeURIComponent("Pickup must be after drop-off.")}`,
+      );
+    }
+    serviceEndDate = addDays(serviceDate, 1);
+  }
+
+  const { error } = await svc
+    .from("bookings")
+    .update({
+      service_date: serviceDate,
+      service_end_date: serviceEndDate,
+      drop_off_time,
+      pickup_time,
+    })
+    .eq("id", booking_id);
+  if (error) {
+    // Most likely a uniqueness clash (daycare dog already booked that day).
+    const msg = error.message.toLowerCase().includes("duplicate")
+      ? "That dog already has a booking on that day."
+      : error.message;
+    redirect(`/kiosk/booking/${booking_id}?error=${encodeURIComponent(msg)}`);
+  }
+
+  revalidatePath(`/kiosk/booking/${booking_id}`);
+  revalidatePath("/kiosk");
+  redirect(`/kiosk/booking/${booking_id}?updated=1`);
+}
