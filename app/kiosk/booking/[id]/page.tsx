@@ -53,6 +53,15 @@ function nightCount(start: string, end: string): number {
   );
 }
 
+// Billable units for a stay: nights for boarding, a single day for daycare.
+// Mirrors createBookingCheckoutSession so the displayed total matches what
+// Stripe will actually collect.
+function stayUnits(b: Booking): number {
+  return b.service_kind === "boarding"
+    ? Math.max(1, nightCount(b.service_date, b.service_end_date))
+    : 1;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function KioskBookingPage({
@@ -382,7 +391,7 @@ async function ActionPanel({
         <BigButton tone="red">
           Take payment{" "}
           {booking.unit_price_cents
-            ? `· ${formatMoney(booking.unit_price_cents)}`
+            ? `· ${formatMoney(booking.unit_price_cents * stayUnits(booking))}`
             : ""}
         </BigButton>
       </form>
