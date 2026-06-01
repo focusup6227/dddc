@@ -131,7 +131,7 @@ export default async function KioskHomePage() {
         </div>
       </div>
 
-      <Section title="Arriving" count={arriving.length} accent="border-amber-300">
+      <Section title="Booked" count={arriving.length} accent="border-amber-300">
         {arriving.length === 0 ? (
           <Empty>No one expected.</Empty>
         ) : (
