@@ -3,8 +3,48 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatMoney } from "@/lib/format";
 import type { Package } from "@/lib/supabase/types";
+import {
+  PawIcon,
+  ShieldPaw,
+  HeartPaw,
+  MascotFace,
+  TennisBall,
+} from "@/components/illustrations";
 
 const BOARDING_RATE_CENTS = 3000;
+
+const FEATURES = [
+  {
+    Icon: MascotFace,
+    title: "Small-group play",
+    body: "We keep our pack intentionally small so every dog gets real attention, real play, and real rest.",
+  },
+  {
+    Icon: ShieldPaw,
+    title: "Safe & supervised",
+    body: "Fully fenced, always watched. You get photo report cards and an alert the moment anything comes up.",
+  },
+  {
+    Icon: HeartPaw,
+    title: "Treated like family",
+    body: "Belly rubs included. We track meals, meds, and routines so your dog's day feels just like home.",
+  },
+];
+
+const STEPS = [
+  { n: "01", title: "Create an account", body: "Add your dog's profile, vaccines, and the little things that make them them." },
+  { n: "02", title: "Book a day or a stay", body: "Pick day care or boarding, choose your dates, and you're on the calendar." },
+  { n: "03", title: "Drop off & relax", body: "Check in at the kiosk, then watch the photo updates roll in all day." },
+];
+
+const GALLERY = [
+  { src: "/photos/happy-lab.jpg", w: 960, h: 1280, caption: "Pickup-time smiles", alt: "Happy yellow Labrador grinning with its tongue out" },
+  { src: "/photos/play-yard.jpg", w: 552, h: 1196, caption: "Group play in the fenced yard", alt: "A black Lab and a golden retriever playing together in a fenced grassy yard" },
+  { src: "/photos/trail-walk.jpg", w: 960, h: 1280, caption: "Afternoon trail walks", alt: "Point-of-view of a husky on a leash hiking a shaded forest trail" },
+  { src: "/photos/boarding-livingroom.jpg", w: 960, h: 1280, caption: "Sleepovers, couches included", alt: "Three dogs relaxing on couches and a dog bed in a cozy living room" },
+  { src: "/photos/pack-walk.jpg", w: 960, h: 1280, caption: "The whole crew", alt: "Three kids walking three dogs on leashes down a tree-lined lane" },
+  { src: "/photos/couch-rest.jpg", w: 1536, h: 2048, caption: "Earned a good rest", alt: "A husky mix curled up resting on a grey couch" },
+];
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -16,47 +56,177 @@ export default async function HomePage() {
   const packages = (data ?? []) as Package[];
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-16">
-      <div className="text-center">
-        <Image
-          src="/logo.jpg"
-          alt="Dixon Doggy Day Care and Boarding"
-          width={240}
-          height={240}
-          priority
-          className="mx-auto h-44 w-44 rounded-full shadow-md sm:h-56 sm:w-56"
-        />
-        <p className="mt-6 text-sm font-semibold uppercase tracking-wider text-brand-600">
-          Dixon Doggy Day Care and Boarding
-        </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight text-stone-900 sm:text-5xl">
-          A second home for your best friend.
-        </h1>
-        <p className="mt-4 text-lg text-stone-600">
-          Day care, boarding, and a whole lot of belly rubs.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Link href="/signup" className="btn-primary">
-            Create an account
-          </Link>
-          <Link href="/login" className="btn-secondary">
-            Sign in
-          </Link>
-        </div>
-      </div>
+    <main className="relative overflow-hidden">
+      {/* Atmospheric background: warm fade + paw texture + soft glows */}
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-warm-fade" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-paw-pattern" />
+      <div className="pointer-events-none absolute -left-32 top-[-6rem] -z-10 h-96 w-96 rounded-full bg-brand-200/30 blur-3xl" />
+      <div className="pointer-events-none absolute -right-40 top-40 -z-10 h-[28rem] w-[28rem] rounded-full bg-cream-200/50 blur-3xl" />
 
-      <section className="mt-20">
+      {/* ───────────────────────── Hero ───────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 pb-12 pt-16 sm:pt-24">
+        <div className="grid items-center gap-12 md:grid-cols-2">
+          <div className="animate-fade-up text-center md:text-left">
+            <span className="pill-warm">
+              <PawIcon className="h-3.5 w-3.5" />
+              Day care · Boarding · Belly rubs
+            </span>
+            <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-tight text-ink-900 sm:text-5xl lg:text-6xl">
+              A second home for{" "}
+              <span className="relative whitespace-nowrap text-brand-600">
+                your best friend
+                <svg
+                  aria-hidden
+                  viewBox="0 0 300 16"
+                  className="absolute -bottom-2 left-0 h-3 w-full text-brand-300"
+                  fill="none"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    d="M3 11C60 4 140 3 297 8"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              .
+            </h1>
+            <p className="mt-6 text-lg leading-relaxed text-ink-700">
+              Dixon Doggy Day Care &amp; Boarding is a tiny, family-run spot where
+              your pup spends the day playing, napping, and getting spoiled — never
+              kenneled, never alone.
+            </p>
+            <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center md:justify-start">
+              <Link href="/signup" className="btn-primary px-5 py-3 text-base">
+                <PawIcon className="h-4 w-4" />
+                Create an account
+              </Link>
+              <Link href="/login" className="btn-secondary px-5 py-3 text-base">
+                Sign in
+              </Link>
+            </div>
+          </div>
+
+          {/* Logo + playful framing */}
+          <div className="relative mx-auto animate-fade-in">
+            <div className="absolute inset-0 -z-10 rotate-6 rounded-[2.5rem] bg-brand-100/70" />
+            <div className="rounded-[2.5rem] border border-stone-200/70 bg-white p-3 shadow-lift">
+              <Image
+                src="/logo.jpg"
+                alt="Dixon Doggy Day Care and Boarding"
+                width={420}
+                height={420}
+                priority
+                className="h-64 w-64 rounded-[2rem] object-cover sm:h-80 sm:w-80"
+              />
+            </div>
+            <div className="absolute -bottom-5 -left-5 flex items-center gap-2 rounded-2xl border border-stone-200/70 bg-white px-3.5 py-2.5 text-sm font-semibold text-ink-900 shadow-soft">
+              <TennisBall className="h-7 w-7 text-brand-600" />
+              Tails wagging since day one
+            </div>
+            <MascotFace className="absolute -right-4 -top-4 h-16 w-16 text-brand-500 drop-shadow-sm" />
+          </div>
+        </div>
+      </section>
+
+      {/* ──────────────────────── Features ─────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-16">
+        <div className="grid gap-6 md:grid-cols-3">
+          {FEATURES.map(({ Icon, title, body }) => (
+            <div key={title} className="card-lift">
+              <Icon className="h-14 w-14 text-brand-500" />
+              <h3 className="mt-4 text-lg font-semibold text-ink-900">{title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink-700">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ──────────────────────── Gallery ──────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-12">
         <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-stone-900">Pricing</h2>
-          <p className="mt-2 text-stone-600">
-            Simple, per-dog rates. Save with prepaid daycare packs.
+          <span className="pill-warm">
+            <PawIcon className="h-3.5 w-3.5" />
+            The pack
+          </span>
+          <h2 className="mt-4 text-3xl font-bold tracking-tight text-ink-900">
+            A few of our happy regulars
+          </h2>
+          <p className="mt-2 text-ink-700">
+            Real dogs, real days — playing, hiking, and napping like they own the place.
+          </p>
+        </div>
+
+        <div className="mt-10 columns-2 gap-3 sm:gap-4 md:columns-3 [&>*]:mb-3 sm:[&>*]:mb-4">
+          {GALLERY.map((photo) => (
+            <figure
+              key={photo.src}
+              className="group relative break-inside-avoid overflow-hidden rounded-2xl border border-stone-200/70 bg-white shadow-soft"
+            >
+              <Image
+                src={photo.src}
+                alt={photo.alt}
+                width={photo.w}
+                height={photo.h}
+                sizes="(min-width: 768px) 33vw, 50vw"
+                className="h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-900/55 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <figcaption className="text-sm font-medium text-white">
+                  {photo.caption}
+                </figcaption>
+              </div>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      {/* ─────────────────────── How it works ──────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-12">
+        <div className="text-center">
+          <span className="pill-neutral">How it works</span>
+          <h2 className="mt-4 text-3xl font-bold tracking-tight text-ink-900">
+            From stranger to regular in three steps
+          </h2>
+        </div>
+        <ol className="mt-12 grid gap-8 md:grid-cols-3">
+          {STEPS.map((s) => (
+            <li key={s.n} className="relative">
+              <span className="font-display text-5xl font-bold text-brand-200">
+                {s.n}
+              </span>
+              <h3 className="mt-2 text-lg font-semibold text-ink-900">{s.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink-700">{s.body}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* ───────────────────────── Pricing ─────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-16">
+        <div className="text-center">
+          <span className="pill-warm">
+            <PawIcon className="h-3.5 w-3.5" />
+            Pricing
+          </span>
+          <h2 className="mt-4 text-3xl font-bold tracking-tight text-ink-900">
+            Simple, honest rates
+          </h2>
+          <p className="mt-2 text-ink-700">
+            Per-dog pricing. Save when you prepay with a daycare pack.
           </p>
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="card">
-            <h3 className="text-lg font-semibold text-stone-900">Day Care</h3>
-            <p className="text-sm text-stone-600">Drop-off and pickup, group play all day.</p>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-ink-900">Day Care</h3>
+              <span className="pill-success">Most popular</span>
+            </div>
+            <p className="mt-1 text-sm text-ink-700">
+              Drop-off and pickup, group play all day long.
+            </p>
             <ul className="mt-4 divide-y divide-stone-200">
               {packages.map((p) => {
                 const perDay = Math.round(p.price_cents / p.days_included);
@@ -64,14 +234,14 @@ export default async function HomePage() {
                 return (
                   <li key={p.id} className="flex items-baseline justify-between py-3">
                     <div>
-                      <p className="font-medium text-stone-900">{p.name}</p>
-                      <p className="text-xs text-stone-500">
+                      <p className="font-medium text-ink-900">{p.name}</p>
+                      <p className="text-xs text-ink-500">
                         {isDropIn
                           ? "Pay-as-you-go"
                           : `${p.days_included} days · ${formatMoney(perDay)} / day`}
                       </p>
                     </div>
-                    <p className="text-lg font-semibold text-stone-900">
+                    <p className="text-lg font-semibold text-ink-900">
                       {formatMoney(p.price_cents)}
                     </p>
                   </li>
@@ -81,17 +251,17 @@ export default async function HomePage() {
           </div>
 
           <div className="card">
-            <h3 className="text-lg font-semibold text-stone-900">Boarding</h3>
-            <p className="text-sm text-stone-600">
+            <h3 className="text-lg font-semibold text-ink-900">Boarding</h3>
+            <p className="mt-1 text-sm text-ink-700">
               Overnight stays in our home. Includes day care during the stay.
             </p>
             <ul className="mt-4 divide-y divide-stone-200">
               <li className="flex items-baseline justify-between py-3">
                 <div>
-                  <p className="font-medium text-stone-900">Per night</p>
-                  <p className="text-xs text-stone-500">Per dog</p>
+                  <p className="font-medium text-ink-900">Per night</p>
+                  <p className="text-xs text-ink-500">Per dog</p>
                 </div>
-                <p className="text-lg font-semibold text-stone-900">
+                <p className="text-lg font-semibold text-ink-900">
                   {formatMoney(BOARDING_RATE_CENTS)}
                 </p>
               </li>
@@ -100,13 +270,51 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <p className="mt-16 text-center text-sm text-stone-500">
-        Staff member?{" "}
-        <Link href="/staff/login" className="font-medium text-brand-600 hover:text-brand-700">
-          Sign in to the operator dashboard
-        </Link>
-        .
-      </p>
+      {/* ──────────────────────── CTA band ─────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 pb-20">
+        <div className="relative overflow-hidden rounded-3xl bg-brand-600 px-8 py-14 text-center shadow-glow">
+          <div className="pointer-events-none absolute inset-0 bg-paw-pattern opacity-30 mix-blend-overlay" />
+          <PawIcon className="mx-auto h-10 w-10 text-brand-100" />
+          <h2 className="mt-4 text-3xl font-bold tracking-tight text-white">
+            Ready for a wagging-tail welcome?
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-brand-50">
+            Set up your dog&apos;s profile in a couple of minutes and book their first day.
+          </p>
+          <Link
+            href="/signup"
+            className="btn mt-7 bg-white px-6 py-3 text-base text-brand-700 shadow-soft hover:bg-cream-50 active:translate-y-px"
+          >
+            Get started
+          </Link>
+        </div>
+      </section>
+
+      {/* ───────────────────────── Footer ──────────────────────── */}
+      <footer className="border-t border-stone-200/70 py-10">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-6 text-center text-sm text-ink-500">
+          <Image
+            src="/logo.jpg"
+            alt="Dixon Doggy Day Care and Boarding"
+            width={56}
+            height={56}
+            className="h-12 w-12 rounded-full shadow-soft"
+          />
+          <p className="font-display text-base font-semibold text-ink-900">
+            Dixon Doggy Day Care &amp; Boarding
+          </p>
+          <p>
+            Staff member?{" "}
+            <Link
+              href="/staff/login"
+              className="font-medium text-brand-600 hover:text-brand-700"
+            >
+              Sign in to the operator dashboard
+            </Link>
+            .
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }
