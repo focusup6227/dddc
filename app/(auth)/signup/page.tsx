@@ -109,6 +109,19 @@ export default async function SignupPage({
               required
               className="input"
             />
+            <label className="mt-2.5 flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                name="sms_opt_in"
+                defaultChecked
+                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+              />
+              <span className="text-xs text-ink-500">
+                Text me booking confirmations, reminders, and report cards.
+                Message rates may apply; reply STOP to opt out. You can change
+                this anytime in your account.
+              </span>
+            </label>
           </div>
           <div>
             <label htmlFor="password" className="label">Password</label>

@@ -8,6 +8,7 @@ export async function signup(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const full_name = String(formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const smsOptIn = formData.get("sms_opt_in") != null;
   const ref = String(formData.get("ref") ?? "").trim().toUpperCase();
 
   if (password.length < 8) {
@@ -29,7 +30,13 @@ export async function signup(formData: FormData) {
 
   await supabase
     .from("profiles")
-    .update({ phone, full_name })
+    .update({
+      phone,
+      full_name,
+      sms_opt_in: smsOptIn,
+      // Record consent time as proof; notify_prefs keeps its all-on default.
+      sms_opt_in_at: smsOptIn ? new Date().toISOString() : null,
+    })
     .eq("id", data.user.id);
 
   if (ref) {
