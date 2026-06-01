@@ -12,9 +12,12 @@ import {
 } from "@/lib/hours";
 import { DOG_WASH_PRICE_CENTS } from "@/lib/settings";
 import { settleUnpaidBookings } from "@/lib/coupons.server";
+import { getBelongings, lastStayBelongings } from "@/lib/belongings.server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { DogAvatar } from "@/components/DogAvatar";
 import { ToastNotifier } from "@/components/ToastNotifier";
 import type {
+  Belonging,
   Booking,
   BookingAddon,
   CheckIn,
@@ -34,9 +37,13 @@ import {
   kioskCheckOutGroup,
   kioskPayGroup,
   kioskRemoveAddon,
+  kioskRemoveBelonging,
+  kioskReturnAllBelongings,
   kioskTakePayment,
+  kioskToggleBelongingReturned,
   kioskUpdateStay,
 } from "../../actions";
+import { BelongingsAdder } from "./BelongingsAdder";
 
 const TOASTS = [
   { param: "paid", message: "Payment received." },
@@ -102,6 +109,19 @@ export default async function KioskBookingPage({
     ]);
   if (!dog || !cust) notFound();
   const coverage = summarizeCoverage((vaxRows ?? []) as DogVaccination[]);
+
+  // Belongings checklist. When the list is empty, offer to prefill from the
+  // dog's last visit so a regular's usual items don't have to be re-typed.
+  const svc = createServiceClient();
+  const belongings = await getBelongings(svc, booking.id);
+  const prefillItems =
+    belongings.length === 0
+      ? await lastStayBelongings(svc, {
+          dogId: booking.dog_id,
+          excludeBookingId: booking.id,
+        })
+      : [];
+  const belongingsOutstanding = belongings.filter((b) => !b.returned_at).length;
 
   const washes = (addonRows ?? []) as BookingAddon[];
   const paidWash = washes.some(
@@ -259,6 +279,7 @@ export default async function KioskBookingPage({
         isCheckedIn={isCheckedIn}
         isCheckedOut={isCheckedOut}
         ci={ci ?? null}
+        belongingsOutstanding={belongingsOutstanding}
       />
 
       {groupSize > 1 && (
@@ -269,6 +290,12 @@ export default async function KioskBookingPage({
           unpaidCents={groupUnpaidCents}
         />
       )}
+
+      <Belongings
+        booking={booking}
+        items={belongings}
+        prefillItems={prefillItems}
+      />
 
       {canAddWash && (
         <form action={kioskAddDogWash}>
@@ -403,6 +430,136 @@ function Charges({
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function Belongings({
+  booking,
+  items,
+  prefillItems,
+}: {
+  booking: Booking;
+  items: Belonging[];
+  prefillItems: { label: string; quantity: number }[];
+}) {
+  const canEdit =
+    booking.status !== "canceled" && booking.status !== "checked_out";
+  const outstanding = items.filter((b) => !b.returned_at);
+  const returned = items.filter((b) => b.returned_at);
+
+  return (
+    <section
+      id="belongings"
+      className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-soft scroll-mt-4"
+    >
+      <div className="flex items-center justify-between gap-3 px-6 pt-5">
+        <h2 className="font-display text-lg font-semibold text-ink-900">
+          Belongings
+        </h2>
+        {items.length > 0 && (
+          <span className="text-sm text-ink-500">
+            {outstanding.length > 0
+              ? `${outstanding.length} to return`
+              : "All returned ✓"}
+          </span>
+        )}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="px-6 pt-2 text-sm text-ink-500">Nothing logged yet.</div>
+      ) : (
+        <ul className="mt-3 divide-y divide-stone-200/80">
+          {[...outstanding, ...returned].map((b) => {
+            const isReturned = !!b.returned_at;
+            return (
+              <li
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-6 py-3"
+              >
+                <div className="min-w-0">
+                  <p
+                    className={`font-medium ${isReturned ? "text-ink-400 line-through" : "text-ink-900"}`}
+                  >
+                    {b.label}
+                    {b.quantity > 1 && (
+                      <span className="ml-1 text-ink-500">× {b.quantity}</span>
+                    )}
+                  </p>
+                  {b.notes && (
+                    <p className="text-xs text-ink-500">{b.notes}</p>
+                  )}
+                  {isReturned && (
+                    <p className="text-xs text-emerald-700">Returned ✓</p>
+                  )}
+                </div>
+                {canEdit && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <form action={kioskToggleBelongingReturned}>
+                      <input type="hidden" name="belonging_id" value={b.id} />
+                      <input
+                        type="hidden"
+                        name="booking_id"
+                        value={booking.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="returned"
+                        value={isReturned ? "0" : "1"}
+                      />
+                      <button
+                        type="submit"
+                        className={
+                          isReturned
+                            ? "rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-semibold text-ink-600 transition-colors hover:bg-cream-50"
+                            : "rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                        }
+                      >
+                        {isReturned ? "Undo" : "Returned"}
+                      </button>
+                    </form>
+                    <form action={kioskRemoveBelonging}>
+                      <input type="hidden" name="belonging_id" value={b.id} />
+                      <input
+                        type="hidden"
+                        name="booking_id"
+                        value={booking.id}
+                      />
+                      <button
+                        type="submit"
+                        aria-label={`Remove ${b.label}`}
+                        className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-sm font-semibold text-ink-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {canEdit && outstanding.length > 1 && (
+        <div className="px-6 pt-3">
+          <form action={kioskReturnAllBelongings}>
+            <input type="hidden" name="booking_id" value={booking.id} />
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white shadow-soft transition-all hover:bg-emerald-700 active:translate-y-px"
+            >
+              Return all {outstanding.length}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="mt-4 border-t border-stone-200/80 bg-cream-50 p-6">
+          <BelongingsAdder bookingId={booking.id} prefillItems={prefillItems} />
+        </div>
+      )}
     </section>
   );
 }
@@ -553,12 +710,14 @@ async function ActionPanel({
   isCheckedIn,
   isCheckedOut,
   ci,
+  belongingsOutstanding,
 }: {
   booking: Booking;
   isPaid: boolean;
   isCheckedIn: boolean;
   isCheckedOut: boolean;
   ci: CheckIn | null;
+  belongingsOutstanding: number;
 }) {
   if (!isPaid) {
     return (
@@ -589,10 +748,22 @@ async function ActionPanel({
   }
   if (isCheckedIn) {
     return (
-      <form action={kioskCheckOut}>
-        <input type="hidden" name="booking_id" value={booking.id} />
-        <BigButton tone="emerald">Check out</BigButton>
-      </form>
+      <div className="space-y-3">
+        {belongingsOutstanding > 0 && (
+          <a
+            href="#belongings"
+            className="block rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-center font-semibold text-amber-900 transition-colors hover:bg-amber-100"
+          >
+            🧳 {belongingsOutstanding} belonging
+            {belongingsOutstanding === 1 ? "" : "s"} still here — send{" "}
+            {belongingsOutstanding === 1 ? "it" : "them"} home before checkout
+          </a>
+        )}
+        <form action={kioskCheckOut}>
+          <input type="hidden" name="booking_id" value={booking.id} />
+          <BigButton tone="emerald">Check out</BigButton>
+        </form>
+      </div>
     );
   }
   return (

@@ -21,6 +21,13 @@ import {
 import { isTimeInWindow } from "@/lib/hours";
 import { createBookingCheckoutSession } from "@/lib/bookings.server";
 import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
+import {
+  addBelonging,
+  lastStayBelongings,
+  removeBelonging,
+  returnAllBelongings,
+  setBelongingReturned,
+} from "@/lib/belongings.server";
 import type {
   Booking,
   BookingAddon,
@@ -59,8 +66,11 @@ export async function kioskCheckIn(formData: FormData) {
   }
   await supabase.from("bookings").update({ status: "checked_in" }).eq("id", booking_id);
 
+  // Checking in is the moment the dog's stuff comes through the door, so make
+  // logging belongings a deliberate step rather than a section staff might
+  // scroll past. The step screen has its own "Done" exit back to today.
   revalidatePath("/kiosk");
-  redirect("/kiosk");
+  redirect(`/kiosk/booking/${booking_id}/belongings`);
 }
 
 export async function kioskCheckOut(formData: FormData) {
@@ -1054,4 +1064,143 @@ export async function kioskPayGroup(formData: FormData) {
 
   if (!session.url) redirect("/kiosk?error=Stripe+session+failed");
   redirect(session.url);
+}
+
+// ---------------------------------------------------------------------------
+// Belongings checklist — the physical stuff (leash, bed, food bag, meds) that
+// comes in with a dog. Logged at drop-off, ticked off as returned at pickup, so
+// nothing goes home with the wrong dog or gets left behind.
+// ---------------------------------------------------------------------------
+
+const MAX_BELONGING_QTY = 99;
+
+/**
+ * Where a belongings action returns to. The forms post an optional `return_to`
+ * so the post-check-in step screen can keep you on itself instead of bouncing
+ * to the booking detail page. Anything not under /kiosk/ falls back to the
+ * booking's belongings section.
+ */
+function belongingsReturn(formData: FormData, bookingId: string): string {
+  const rt = String(formData.get("return_to") ?? "");
+  return rt.startsWith("/kiosk/")
+    ? rt
+    : `/kiosk/booking/${bookingId}#belongings`;
+}
+
+/** Log one item dropped off with a dog on this booking. */
+export async function kioskAddBelonging(formData: FormData) {
+  const { userId } = await requireFullStaff();
+  const booking_id = String(formData.get("booking_id") ?? "");
+  const label = String(formData.get("label") ?? "").trim();
+  if (!booking_id) redirect("/kiosk");
+  if (!label) {
+    redirect(`/kiosk/booking/${booking_id}?error=Name+the+item+to+add`);
+  }
+  const qtyRaw = Number(formData.get("quantity") ?? 1);
+  const quantity = Number.isFinite(qtyRaw)
+    ? Math.min(MAX_BELONGING_QTY, Math.max(1, Math.floor(qtyRaw)))
+    : 1;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  const svc = createServiceClient();
+  const { data: booking } = await svc
+    .from("bookings")
+    .select("id, dog_id, customer_id, status")
+    .eq("id", booking_id)
+    .maybeSingle<Pick<Booking, "id" | "dog_id" | "customer_id" | "status">>();
+  if (!booking || booking.status === "canceled") {
+    redirect(`/kiosk/booking/${booking_id}?error=Booking+not+found`);
+  }
+
+  await addBelonging(svc, {
+    bookingId: booking!.id,
+    dogId: booking!.dog_id,
+    customerId: booking!.customer_id,
+    label,
+    quantity,
+    notes,
+    staffId: userId,
+  });
+
+  const back = belongingsReturn(formData, booking_id);
+  revalidatePath(`/kiosk/booking/${booking_id}`);
+  redirect(back);
+}
+
+/** Prefill the checklist from the dog's most recent prior visit. */
+export async function kioskPrefillBelongings(formData: FormData) {
+  const { userId } = await requireFullStaff();
+  const booking_id = String(formData.get("booking_id") ?? "");
+  if (!booking_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  const { data: booking } = await svc
+    .from("bookings")
+    .select("id, dog_id, customer_id, status")
+    .eq("id", booking_id)
+    .maybeSingle<Pick<Booking, "id" | "dog_id" | "customer_id" | "status">>();
+  if (!booking || booking.status === "canceled") {
+    redirect(`/kiosk/booking/${booking_id}?error=Booking+not+found`);
+  }
+
+  const items = await lastStayBelongings(svc, {
+    dogId: booking!.dog_id,
+    excludeBookingId: booking!.id,
+  });
+  for (const item of items) {
+    await addBelonging(svc, {
+      bookingId: booking!.id,
+      dogId: booking!.dog_id,
+      customerId: booking!.customer_id,
+      label: item.label,
+      quantity: item.quantity,
+      staffId: userId,
+    });
+  }
+
+  const back = belongingsReturn(formData, booking_id);
+  revalidatePath(`/kiosk/booking/${booking_id}`);
+  redirect(back);
+}
+
+export async function kioskRemoveBelonging(formData: FormData) {
+  await requireFullStaff();
+  const id = String(formData.get("belonging_id") ?? "");
+  const booking_id = String(formData.get("booking_id") ?? "");
+  if (!id || !booking_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  await removeBelonging(svc, id);
+
+  const back = belongingsReturn(formData, booking_id);
+  revalidatePath(`/kiosk/booking/${booking_id}`);
+  redirect(back);
+}
+
+/** Toggle a single item returned / still-here. */
+export async function kioskToggleBelongingReturned(formData: FormData) {
+  const { userId } = await requireFullStaff();
+  const id = String(formData.get("belonging_id") ?? "");
+  const booking_id = String(formData.get("booking_id") ?? "");
+  const returned = String(formData.get("returned") ?? "") === "1";
+  if (!id || !booking_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  await setBelongingReturned(svc, { id, returned, staffId: userId });
+
+  revalidatePath(`/kiosk/booking/${booking_id}`);
+  redirect(`/kiosk/booking/${booking_id}#belongings`);
+}
+
+/** Mark every still-here item returned at once (whole pickup in one tap). */
+export async function kioskReturnAllBelongings(formData: FormData) {
+  const { userId } = await requireFullStaff();
+  const booking_id = String(formData.get("booking_id") ?? "");
+  if (!booking_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  await returnAllBelongings(svc, { bookingId: booking_id, staffId: userId });
+
+  revalidatePath(`/kiosk/booking/${booking_id}`);
+  redirect(`/kiosk/booking/${booking_id}#belongings`);
 }

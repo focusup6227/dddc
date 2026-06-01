@@ -164,6 +164,21 @@ export interface BookingAddon {
   created_at: string;
 }
 
+export interface Belonging {
+  id: string;
+  booking_id: string;
+  dog_id: string;
+  customer_id: string;
+  label: string;
+  quantity: number;
+  notes: string | null;
+  checked_in_at: string;
+  checked_in_by: string | null;
+  returned_at: string | null;
+  returned_by: string | null;
+  created_at: string;
+}
+
 export interface CheckIn {
   id: string;
   booking_id: string;
