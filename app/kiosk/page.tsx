@@ -17,6 +17,7 @@ const TOASTS = [
     message: "Checkout canceled.",
   },
   { param: "checkedout", message: "Checked out." },
+  { param: "booked", message: "Booked — payment due at pickup." },
 ];
 
 export const dynamic = "force-dynamic";

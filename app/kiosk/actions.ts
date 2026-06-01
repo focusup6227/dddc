@@ -356,6 +356,62 @@ export async function kioskCreateBooking(formData: FormData) {
   }
   await maybeSendPackageLowAlerts(svc, customer_id, profile!.email, profile!.full_name, touchedPackageIds);
 
+  // "Pay at pickup": book everything now but collect cash/card later. Charged
+  // days become unpaid reservations with no Stripe session; a wash rides along
+  // as an unpaid add-on. Staff settle it at pickup via the normal take-payment
+  // flow on the booking. No redirect to Stripe.
+  const deferPayment = String(formData.get("defer") ?? "") === "1";
+  if (deferPayment) {
+    let firstDropInId: string | null = null;
+    let deferredTotal = 0;
+    const deferredDates: string[] = [];
+    for (const a of dropInAllocs) {
+      const cents = chargeCentsFor(a.chargeFraction);
+      const { data: inserted } = await svc
+        .from("bookings")
+        .insert({
+          customer_id,
+          dog_id,
+          service_date: a.date,
+          service_end_date: addDays(a.date, 1),
+          drop_off_time,
+          pickup_time,
+          status: "reserved",
+          payment_kind: "drop_in",
+          customer_package_id: a.consumed[0]?.id ?? null,
+          package_days_used: Math.round((1 - a.chargeFraction) * 10) / 10,
+          unit_price_cents: cents,
+          stripe_checkout_session_id: null,
+          payment_status: "unpaid",
+        })
+        .select("id")
+        .maybeSingle<{ id: string }>();
+      if (inserted && !firstDropInId) firstDropInId = inserted.id;
+      deferredTotal += cents;
+      deferredDates.push(a.date);
+    }
+    const washHost = firstDropInId ?? firstPackageBookingId;
+    if (dogWash && washHost) {
+      await addDogWash(svc, {
+        bookingId: washHost,
+        customerId: customer_id,
+        sessionId: null,
+      });
+    }
+    if (deferredDates.length > 0) {
+      await sendBookingConfirmation({
+        to: profile!.email,
+        customerName: profile!.full_name ?? profile!.email,
+        dogName: dog!.name,
+        dates: deferredDates,
+        paidByPackageCount: 0,
+        dropInCount: deferredDates.length,
+        dropInTotalCents: deferredTotal,
+      });
+    }
+    redirect("/kiosk?booked=1");
+  }
+
   const stripe = getStripe();
 
   if (dropInAllocs.length === 0) {
@@ -593,6 +649,49 @@ export async function kioskCreateBoarding(formData: FormData) {
   }
 
   const rateCents = await getBoardingRateCents();
+
+  // "Pay at pickup": create the stay as an unpaid reservation with no Stripe
+  // session and settle it when the dog is collected, via the normal
+  // take-payment flow. No redirect to Stripe.
+  const deferPayment = String(formData.get("defer") ?? "") === "1";
+  if (deferPayment) {
+    const { data: stay } = await svc
+      .from("bookings")
+      .insert({
+        customer_id,
+        dog_id,
+        service_date: checkIn,
+        service_end_date: checkOut,
+        drop_off_time,
+        pickup_time,
+        service_kind: "boarding",
+        status: "reserved",
+        payment_kind: "drop_in",
+        unit_price_cents: rateCents,
+        stripe_checkout_session_id: null,
+        payment_status: "unpaid",
+      })
+      .select("id")
+      .maybeSingle<{ id: string }>();
+    if (dogWash && stay) {
+      await addDogWash(svc, {
+        bookingId: stay.id,
+        customerId: customer_id,
+        sessionId: null,
+      });
+    }
+    await sendBookingConfirmation({
+      to: profile!.email,
+      customerName: profile!.full_name ?? profile!.email,
+      dogName: dog!.name,
+      dates: nights,
+      paidByPackageCount: 0,
+      dropInCount: nights.length,
+      dropInTotalCents: rateCents * nights.length,
+    });
+    redirect("/kiosk?booked=1");
+  }
+
   const useStripeId = rateCents === BOARDING_STRIPE_PRICE_AMOUNT_CENTS;
 
   const stripe = getStripe();

@@ -217,6 +217,18 @@ export function KioskBoardForm({
           ? `Continue to checkout (${formatMoney(totalCents)})`
           : "Pick check-in and check-out"}
       </button>
+
+      {validRange && (
+        <button
+          type="submit"
+          name="defer"
+          value="1"
+          disabled={!dogId || !timesValid}
+          className="w-full rounded-2xl border border-stone-300 bg-white px-6 py-4 text-lg font-semibold text-ink-800 transition-colors hover:bg-cream-50 disabled:opacity-50"
+        >
+          Book now, pay at pickup
+        </button>
+      )}
     </form>
   );
 }
