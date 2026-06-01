@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const tz = process.env.DAYCARE_TIMEZONE ?? "America/Los_Angeles";
+  const tz = process.env.DAYCARE_TIMEZONE ?? "America/Chicago";
   const tomorrow = tomorrowISOInTZ(tz);
 
   const svc = createServiceClient();

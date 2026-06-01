@@ -58,9 +58,9 @@ export function formatDateShort(iso: string): string {
 export function todayISO(): string {
   // Resolve "today" in the daycare's local timezone, NOT the server's. On
   // Vercel the server runs in UTC, so a naive local date rolls over to
-  // tomorrow after ~4–5pm Pacific — which made the kiosk's "who's here today"
-  // query come up empty every evening. Mirrors the cron jobs' tz handling.
-  const tz = process.env.DAYCARE_TIMEZONE ?? "America/Los_Angeles";
+  // tomorrow in the evening local time — which made the kiosk's "who's here
+  // today" query come up empty. Mirrors the cron jobs' tz handling.
+  const tz = process.env.DAYCARE_TIMEZONE ?? "America/Chicago";
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
     year: "numeric",

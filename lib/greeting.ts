@@ -2,7 +2,7 @@
 // timezone so a server in another region still says "Good morning" at 9am
 // local for the user.
 export function getGreeting(date: Date = new Date()): string {
-  const tz = process.env.DAYCARE_TIMEZONE ?? "America/Los_Angeles";
+  const tz = process.env.DAYCARE_TIMEZONE ?? "America/Chicago";
   const hour = Number(
     new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
