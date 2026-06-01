@@ -4,6 +4,7 @@ import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Booking,
+  Coupon,
   CustomerPackage,
   Dog,
   Profile,
@@ -13,7 +14,12 @@ import { PlusCircle, CalendarPlus, Mail } from "lucide-react";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatDate, formatDateShort, formatMoney } from "@/lib/format";
 import { ToastNotifier } from "@/components/ToastNotifier";
-import { resendCustomerInvite, updateCustomer } from "../actions";
+import {
+  removeCustomerCoupon,
+  resendCustomerInvite,
+  setCustomerCoupon,
+  updateCustomer,
+} from "../actions";
 
 const TOASTS = [
   { param: "saved" },
@@ -60,6 +66,21 @@ export default async function StaffCustomerDetailPage({
   const bookings = (bookingsRes.data ?? []) as Booking[];
   const packages = (pkgsRes.data ?? []) as CustomerPackage[];
   const sigs = (sigsRes.data ?? []) as WaiverSignature[];
+
+  // Account-level coupon: the active codes staff can attach, plus the one
+  // currently on this account (fetched directly in case it's since gone inactive).
+  const [activeCouponsRes, acctCouponRes] = await Promise.all([
+    supabase.from("coupons").select("*").eq("active", true).order("code"),
+    customer.account_coupon_id
+      ? supabase
+          .from("coupons")
+          .select("*")
+          .eq("id", customer.account_coupon_id)
+          .maybeSingle<Coupon>()
+      : Promise.resolve({ data: null }),
+  ]);
+  const activeCoupons = (activeCouponsRes.data ?? []) as Coupon[];
+  const accountCoupon = (acctCouponRes.data ?? null) as Coupon | null;
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -163,6 +184,66 @@ export default async function StaffCustomerDetailPage({
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="card">
+        <h2 className="font-display text-lg font-semibold text-ink-900">
+          Account discount
+        </h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Attach a coupon so its per-day/night discount comes off this
+          customer&apos;s bookings automatically — no code needed.
+        </p>
+        {accountCoupon ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            <span>
+              <strong>{accountCoupon.code}</strong> —{" "}
+              {formatMoney(accountCoupon.discount_per_day_cents)} off per
+              day/night
+              {accountCoupon.description ? ` · ${accountCoupon.description}` : ""}
+              {!accountCoupon.active && " · (inactive)"}
+            </span>
+            <form action={removeCustomerCoupon}>
+              <input type="hidden" name="id" value={customer.id} />
+              <button
+                type="submit"
+                className="text-xs font-medium text-emerald-800 underline hover:text-emerald-900"
+              >
+                Remove
+              </button>
+            </form>
+          </div>
+        ) : activeCoupons.length === 0 ? (
+          <p className="mt-4 text-sm text-ink-500">
+            No active coupons.{" "}
+            <Link href="/staff/coupons" className="underline">
+              Create one
+            </Link>{" "}
+            first.
+          </p>
+        ) : (
+          <form action={setCustomerCoupon} className="mt-4 flex flex-wrap gap-2">
+            <input type="hidden" name="id" value={customer.id} />
+            <select
+              name="coupon_id"
+              required
+              defaultValue=""
+              className="input sm:max-w-xs"
+            >
+              <option value="" disabled>
+                Choose a coupon…
+              </option>
+              {activeCoupons.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {formatMoney(c.discount_per_day_cents)}/day
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="btn-primary">
+              Apply coupon
+            </button>
+          </form>
+        )}
       </section>
 
       <section>

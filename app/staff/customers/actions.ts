@@ -9,7 +9,11 @@ import { appUrl } from "@/lib/stripe";
 import { addDays } from "@/lib/format";
 import { isTimeInWindow } from "@/lib/hours";
 import { getBoardingRateCents } from "@/lib/settings";
-import type { Package, ServiceKind } from "@/lib/supabase/types";
+import {
+  applyAccountCouponToOpenBookings,
+  clearAccountCouponFromOpenBookings,
+} from "@/lib/coupons.server";
+import type { Coupon, Package, ServiceKind } from "@/lib/supabase/types";
 
 function str(v: FormDataEntryValue | null): string | null {
   if (v == null) return null;
@@ -192,6 +196,77 @@ export async function resendCustomerInvite(formData: FormData) {
   });
 
   redirect(`/staff/customers/${id}?saved=` + encodeURIComponent("Account link re-sent."));
+}
+
+/**
+ * Attach a coupon to a customer's account. Its per-day/night discount then
+ * auto-applies to their bookings — the DB trigger stamps new ones, and we
+ * back-fill any open (unpaid) bookings here. Swapping coupons clears the old
+ * one off those open bookings first.
+ */
+export async function setCustomerCoupon(formData: FormData) {
+  await requireFullStaff();
+  const id = str(formData.get("id"));
+  const coupon_id = str(formData.get("coupon_id"));
+  if (!id) listErr("Invalid request.");
+  if (!coupon_id) customerErr(id, "Pick a coupon.");
+
+  const svc = createServiceClient();
+  const { data: profile } = await svc
+    .from("profiles")
+    .select("role, account_coupon_id")
+    .eq("id", id)
+    .maybeSingle<{ role: string; account_coupon_id: string | null }>();
+  if (!profile || profile.role !== "customer") {
+    customerErr(id, "That account isn't a customer.");
+  }
+
+  const { data: coupon } = await svc
+    .from("coupons")
+    .select("*")
+    .eq("id", coupon_id)
+    .maybeSingle<Coupon>();
+  if (!coupon) customerErr(id, "Coupon not found.");
+  if (!coupon!.active) customerErr(id, "That coupon is inactive.");
+
+  // Clear a previously-attached coupon off open bookings before swapping.
+  if (profile!.account_coupon_id && profile!.account_coupon_id !== coupon_id) {
+    await clearAccountCouponFromOpenBookings(svc, id!, profile!.account_coupon_id);
+  }
+
+  await svc.from("profiles").update({ account_coupon_id: coupon_id }).eq("id", id!);
+  await applyAccountCouponToOpenBookings(svc, id!, coupon!);
+
+  revalidatePath(`/staff/customers/${id}`);
+  redirect(
+    `/staff/customers/${id}?saved=` +
+      encodeURIComponent(`Coupon ${coupon!.code} applied to the account.`),
+  );
+}
+
+/** Detach the account coupon and strip it from the customer's open bookings. */
+export async function removeCustomerCoupon(formData: FormData) {
+  await requireFullStaff();
+  const id = str(formData.get("id"));
+  if (!id) listErr("Invalid request.");
+
+  const svc = createServiceClient();
+  const { data: profile } = await svc
+    .from("profiles")
+    .select("account_coupon_id")
+    .eq("id", id)
+    .maybeSingle<{ account_coupon_id: string | null }>();
+
+  await svc.from("profiles").update({ account_coupon_id: null }).eq("id", id!);
+  if (profile?.account_coupon_id) {
+    await clearAccountCouponFromOpenBookings(svc, id!, profile.account_coupon_id);
+  }
+
+  revalidatePath(`/staff/customers/${id}`);
+  redirect(
+    `/staff/customers/${id}?saved=` +
+      encodeURIComponent("Account coupon removed."),
+  );
 }
 
 /** Add a dog to a customer's file (staff acting on their behalf). */

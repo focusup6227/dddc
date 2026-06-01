@@ -23,6 +23,7 @@ export interface Profile {
   emergency_contact_phone: string | null;
   referral_code: string | null;
   account_credit_cents: number;
+  account_coupon_id: string | null;
   sms_opt_in: boolean;
   sms_opt_in_at: string | null;
   sms_opt_out_at: string | null;

@@ -3,6 +3,60 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/format";
 import type { Booking, Coupon } from "@/lib/supabase/types";
 
+type Svc = ReturnType<typeof createServiceClient>;
+
+/**
+ * Stamp an account-level coupon onto a customer's currently-open bookings —
+ * the unpaid, chargeable, not-yet-couponed ones. New bookings get stamped by
+ * the apply_account_coupon DB trigger; this back-fills the ones that already
+ * exist when staff attach the coupon.
+ */
+export async function applyAccountCouponToOpenBookings(
+  svc: Svc,
+  customerId: string,
+  coupon: Coupon,
+): Promise<void> {
+  const { data } = await svc
+    .from("bookings")
+    .select("id, service_kind, service_date, service_end_date, unit_price_cents")
+    .eq("customer_id", customerId)
+    .eq("payment_status", "unpaid")
+    .eq("status", "reserved")
+    .is("coupon_id", null)
+    .neq("payment_kind", "package");
+  const open = (data ?? []) as Pick<
+    Booking,
+    "id" | "service_kind" | "service_date" | "service_end_date" | "unit_price_cents"
+  >[];
+  for (const b of open) {
+    const total = (b.unit_price_cents ?? 0) * couponUnitCount(b);
+    const discount = calcCouponDiscount(coupon, b, total);
+    await svc
+      .from("bookings")
+      .update({ coupon_id: coupon.id, coupon_discount_cents: discount })
+      .eq("id", b.id);
+  }
+}
+
+/**
+ * Reverse the above: clear a specific coupon off a customer's open bookings
+ * (used when staff swap or remove the account coupon). Only touches unpaid
+ * rows still carrying that coupon, never a paid/charged one.
+ */
+export async function clearAccountCouponFromOpenBookings(
+  svc: Svc,
+  customerId: string,
+  couponId: string,
+): Promise<void> {
+  await svc
+    .from("bookings")
+    .update({ coupon_id: null, coupon_discount_cents: 0 })
+    .eq("customer_id", customerId)
+    .eq("payment_status", "unpaid")
+    .eq("status", "reserved")
+    .eq("coupon_id", couponId);
+}
+
 /**
  * Look up an active, non-expired coupon by code. Service client so customers
  * can validate codes via server actions without needing read access to the
