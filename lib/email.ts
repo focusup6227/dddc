@@ -2,6 +2,8 @@ import "server-only";
 import { Resend } from "resend";
 import { appUrl } from "@/lib/stripe";
 import { formatDate, formatDateShort, formatMoney } from "@/lib/format";
+import { createServiceClient } from "@/lib/supabase/server";
+import type { NotifyPrefs } from "@/lib/supabase/types";
 
 declare global {
   var __resend: Resend | undefined;
@@ -45,6 +47,35 @@ async function send(args: SendArgs) {
     if (error) console.error("[email] resend error:", error);
   } catch (err) {
     console.error("[email] send threw:", err);
+  }
+}
+
+/**
+ * Whether the recipient has switched OFF a given discretionary email category
+ * in their account notification preferences. Only the three categories in
+ * NotifyPrefs are optional — confirmations, reminders, report cards. Essential
+ * mail (payment receipts, cancellations/refunds, the waiver receipt, account
+ * welcome, and time-sensitive waitlist offers the customer explicitly asked
+ * for) never calls this and always sends.
+ *
+ * Fails OPEN: if there's no matching profile or the lookup errors, we send —
+ * better a wanted email than a silently dropped one.
+ */
+async function optedOut(
+  to: string,
+  category: keyof NotifyPrefs,
+): Promise<boolean> {
+  try {
+    const svc = createServiceClient();
+    const { data } = await svc
+      .from("profiles")
+      .select("notify_prefs")
+      .eq("email", to)
+      .maybeSingle<{ notify_prefs: NotifyPrefs | null }>();
+    return data?.notify_prefs?.[category] === false;
+  } catch (err) {
+    console.error("[email] notify_prefs lookup failed:", err);
+    return false;
   }
 }
 
@@ -201,6 +232,7 @@ export async function sendBookingConfirmation(args: {
 }) {
   const { to, customerName, dogName, dates, paidByPackageCount, dropInCount, dropInTotalCents } =
     args;
+  if (await optedOut(to, "confirmations")) return;
 
   const summaryRows: Array<{ label: string; value: string }> = [
     { label: "Dog", value: escape(dogName) },
@@ -429,6 +461,7 @@ export async function sendBookingReminder(args: {
   serviceDate: string; // ISO YYYY-MM-DD
 }) {
   const { to, customerName, dogNames, serviceDate } = args;
+  if (await optedOut(to, "reminders")) return;
   const dogs = dogNames.length === 1 ? dogNames[0] : dogNames.join(", ");
   const verb = dogNames.length === 1 ? "is" : "are";
 
@@ -534,6 +567,7 @@ export async function sendVaccineExpiryReminder(args: {
   expiresOn: string; // ISO YYYY-MM-DD
 }) {
   const { to, customerName, dogName, vaccineLabels, expiresOn } = args;
+  if (await optedOut(to, "reminders")) return;
   const list =
     vaccineLabels.length === 1
       ? vaccineLabels[0]
@@ -576,6 +610,7 @@ export async function sendReportCardReady(args: {
 }) {
   const { to, customerName, dogName, serviceKind, serviceDate, serviceEndDate } =
     args;
+  if (await optedOut(to, "report_cards")) return;
 
   const dateLabel =
     serviceKind === "boarding"

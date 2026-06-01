@@ -144,6 +144,34 @@ export default async function AccountPage({
 
         <div className="border-t border-stone-200/80 pt-5">
           <h3 className="font-display text-lg font-semibold text-ink-900">
+            Email notifications
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
+            Choose which emails you&apos;d like to get. Receipts, cancellations,
+            and waitlist offers always send.
+          </p>
+          <fieldset className="mt-3 space-y-2">
+            <legend className="sr-only">Which emails?</legend>
+            <NotifyToggle
+              name="notify_confirmations"
+              label="Booking confirmations"
+              defaultChecked={profile.notify_prefs?.confirmations ?? true}
+            />
+            <NotifyToggle
+              name="notify_reminders"
+              label="Day-before reminders"
+              defaultChecked={profile.notify_prefs?.reminders ?? true}
+            />
+            <NotifyToggle
+              name="notify_report_cards"
+              label="Report card notifications"
+              defaultChecked={profile.notify_prefs?.report_cards ?? true}
+            />
+          </fieldset>
+        </div>
+
+        <div className="border-t border-stone-200/80 pt-5">
+          <h3 className="font-display text-lg font-semibold text-ink-900">
             Text notifications
           </h3>
           <p className="mt-1 text-sm text-ink-500">
@@ -164,24 +192,6 @@ export default async function AccountPage({
               </span>
             </span>
           </label>
-          <fieldset className="mt-3 space-y-2 pl-7">
-            <legend className="sr-only">Which texts?</legend>
-            <NotifyToggle
-              name="notify_confirmations"
-              label="Booking confirmations"
-              defaultChecked={profile.notify_prefs?.confirmations ?? true}
-            />
-            <NotifyToggle
-              name="notify_reminders"
-              label="Day-before reminders"
-              defaultChecked={profile.notify_prefs?.reminders ?? true}
-            />
-            <NotifyToggle
-              name="notify_report_cards"
-              label="Report card notifications"
-              defaultChecked={profile.notify_prefs?.report_cards ?? true}
-            />
-          </fieldset>
         </div>
 
         <div className="border-t border-stone-200/80 pt-5">
