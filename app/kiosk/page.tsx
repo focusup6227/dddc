@@ -25,11 +25,18 @@ export default async function KioskHomePage() {
   const supabase = await createClient();
   const today = todayISO();
 
+  // In attendance today: started on/before today AND either still in progress
+  // (service_end_date > today) OR a boarding stay checking out exactly today —
+  // boarders are physically here on departure morning and need a Check-out
+  // button. service_end_date is exclusive for daycare, so daycare correctly
+  // drops the day after its single day.
   const { data: bookingsData } = await supabase
     .from("bookings")
     .select("*")
     .lte("service_date", today)
-    .gt("service_end_date", today)
+    .or(
+      `service_end_date.gt.${today},and(service_kind.eq.boarding,service_end_date.eq.${today})`,
+    )
     .neq("status", "canceled")
     .order("drop_off_time", { nullsFirst: true });
   const bookings = (bookingsData ?? []) as Booking[];

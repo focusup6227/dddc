@@ -25,15 +25,17 @@ export default async function StaffTodayPage() {
   const supabase = await createClient();
   const today = todayISO();
 
-  // Bookings in attendance today: daycare for today plus any in-progress
-  // boarding stay. service_end_date is exclusive (daycare = next day, boarding
-  // = checkout date), so a multi-night boarder that checked in earlier still
-  // shows until checkout. Matches the kiosk's attendance query.
+  // Bookings in attendance today: daycare for today plus any boarding stay
+  // that's in progress OR checking out exactly today (boarders are still here
+  // on departure morning until pickup). service_end_date is exclusive for
+  // daycare, so a daycare day drops the day after. Matches the kiosk query.
   const { data: bookingsData } = await supabase
     .from("bookings")
     .select("*")
     .lte("service_date", today)
-    .gt("service_end_date", today)
+    .or(
+      `service_end_date.gt.${today},and(service_kind.eq.boarding,service_end_date.eq.${today})`,
+    )
     .neq("status", "canceled")
     .order("drop_off_time", { nullsFirst: true });
   const bookings = (bookingsData ?? []) as Booking[];
