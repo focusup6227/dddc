@@ -30,6 +30,7 @@ import {
   kioskAddDogWash,
   kioskCheckIn,
   kioskCheckOut,
+  kioskRemoveAddon,
   kioskTakePayment,
   kioskUpdateStay,
 } from "../../actions";
@@ -38,8 +39,16 @@ const TOASTS = [
   { param: "paid", message: "Payment received." },
   { param: "canceled", tone: "info" as const, message: "Payment canceled." },
   { param: "updated", message: "Stay updated." },
+  {
+    param: "charge_removed",
+    tone: "info" as const,
+    message: "Charge removed.",
+  },
   { param: "error", tone: "error" as const },
 ];
+
+const ADDON_LABELS: Record<string, string> = { dog_wash: "Dog wash" };
+const addonLabel = (kind: string) => ADDON_LABELS[kind] ?? kind;
 
 const hhmm = (t: string | null, fallback: string) =>
   t ? t.slice(0, 5) : fallback;
@@ -95,7 +104,11 @@ export default async function KioskBookingPage({
   const paidWash = washes.some(
     (a) => a.kind === "dog_wash" && a.payment_status === "paid",
   );
-  const canAddWash = !paidWash && booking.status !== "canceled";
+  const pendingWash = washes.some(
+    (a) => a.kind === "dog_wash" && a.payment_status === "unpaid",
+  );
+  const hasWash = paidWash || pendingWash;
+  const canAddWash = !hasWash && booking.status !== "canceled";
 
   const isPaid = booking.payment_status === "paid";
   const isCheckedIn = !!ci?.checked_in_at && !ci?.checked_out_at;
@@ -141,6 +154,9 @@ export default async function KioskBookingPage({
                 {booking.payment_status}
               </span>
               {paidWash && <span className="pill-success">Dog wash ✓</span>}
+              {!paidWash && pendingWash && (
+                <span className="pill-warn">Dog wash · unpaid</span>
+              )}
             </div>
             {(booking.drop_off_time || booking.pickup_time) && (
               <p className="mt-2 text-sm text-ink-500">
@@ -224,10 +240,82 @@ export default async function KioskBookingPage({
         </form>
       )}
 
+      <Charges booking={booking} washes={washes} />
+
       {booking.status !== "canceled" && booking.status !== "checked_out" && (
         <EditStay booking={booking} />
       )}
     </div>
+  );
+}
+
+function Charges({
+  booking,
+  washes,
+}: {
+  booking: Booking;
+  washes: BookingAddon[];
+}) {
+  const isBoarding = booking.service_kind === "boarding";
+  const units = stayUnits(booking);
+  const isPackage = booking.payment_kind === "package";
+  const stayLabel = isPackage
+    ? "Day care (package day)"
+    : isBoarding
+      ? `Boarding × ${units} night${units === 1 ? "" : "s"}`
+      : "Day care drop-in";
+  const stayAmount = isPackage ? 0 : (booking.unit_price_cents ?? 0) * units;
+
+  // Live charges only — refunded/failed add-ons aren't actionable here.
+  const items = washes.filter(
+    (a) => a.payment_status === "unpaid" || a.payment_status === "paid",
+  );
+  const canRemove = booking.status !== "canceled";
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-soft">
+      <h2 className="px-6 pt-5 font-display text-lg font-semibold text-ink-900">
+        Charges
+      </h2>
+      <ul className="mt-3 divide-y divide-stone-200/80">
+        <li className="flex items-center justify-between gap-3 px-6 py-3">
+          <div className="min-w-0">
+            <p className="font-medium text-ink-900">{stayLabel}</p>
+            <p className="text-xs text-ink-500">{booking.payment_status}</p>
+          </div>
+          <span className="shrink-0 font-semibold text-ink-900">
+            {isPackage ? "—" : formatMoney(stayAmount)}
+          </span>
+        </li>
+        {items.map((a) => (
+          <li
+            key={a.id}
+            className="flex flex-wrap items-center justify-between gap-3 px-6 py-3"
+          >
+            <div className="min-w-0">
+              <p className="font-medium text-ink-900">{addonLabel(a.kind)}</p>
+              <p className="text-xs text-ink-500">{a.payment_status}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="font-semibold text-ink-900">
+                {formatMoney(a.amount_cents)}
+              </span>
+              {canRemove && (
+                <form action={kioskRemoveAddon}>
+                  <input type="hidden" name="addon_id" value={a.id} />
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
+                  >
+                    {a.payment_status === "paid" ? "Remove · refund" : "Remove"}
+                  </button>
+                </form>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

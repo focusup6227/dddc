@@ -18,6 +18,7 @@ import { createBookingCheckoutSession } from "@/lib/bookings.server";
 import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
 import type {
   Booking,
+  BookingAddon,
   CheckIn,
   CustomerPackage,
   Dog,
@@ -766,4 +767,50 @@ export async function kioskUpdateStay(formData: FormData) {
   revalidatePath(`/kiosk/booking/${booking_id}`);
   revalidatePath("/kiosk");
   redirect(`/kiosk/booking/${booking_id}?updated=1`);
+}
+
+/**
+ * Remove a single charge (add-on line item) from a booking by its id. An unpaid
+ * add-on — e.g. one added by mistake — is deleted outright; a paid one is
+ * refunded to its payment intent and kept as a `refunded` record.
+ */
+export async function kioskRemoveAddon(formData: FormData) {
+  await requireFullStaff();
+  const addon_id = String(formData.get("addon_id") ?? "");
+  if (!addon_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  const { data: addon } = await svc
+    .from("booking_addons")
+    .select("*")
+    .eq("id", addon_id)
+    .maybeSingle<BookingAddon>();
+  if (!addon) redirect("/kiosk");
+
+  if (addon.payment_status === "paid") {
+    if (addon.stripe_payment_intent_id) {
+      const stripe = getStripe();
+      await stripe.refunds.create({
+        payment_intent: addon.stripe_payment_intent_id,
+        amount: addon.amount_cents,
+        reason: "requested_by_customer",
+        metadata: {
+          booking_id: addon.booking_id,
+          addon_id: addon.id,
+          removed: "kiosk",
+        },
+      });
+    }
+    await svc
+      .from("booking_addons")
+      .update({ payment_status: "refunded" })
+      .eq("id", addon.id);
+  } else if (addon.payment_status === "unpaid") {
+    // Never charged — just drop it.
+    await svc.from("booking_addons").delete().eq("id", addon.id);
+  }
+  // refunded / failed rows are left as-is.
+
+  revalidatePath(`/kiosk/booking/${addon.booking_id}`);
+  redirect(`/kiosk/booking/${addon.booking_id}?charge_removed=1`);
 }
