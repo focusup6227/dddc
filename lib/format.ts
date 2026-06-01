@@ -56,11 +56,17 @@ export function formatDateShort(iso: string): string {
 }
 
 export function todayISO(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  // Resolve "today" in the daycare's local timezone, NOT the server's. On
+  // Vercel the server runs in UTC, so a naive local date rolls over to
+  // tomorrow after ~4–5pm Pacific — which made the kiosk's "who's here today"
+  // query come up empty every evening. Mirrors the cron jobs' tz handling.
+  const tz = process.env.DAYCARE_TIMEZONE ?? "America/Los_Angeles";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date()); // en-CA formats as "YYYY-MM-DD"
 }
 
 export function addDays(isoOrDate: string | Date, days: number): string {
