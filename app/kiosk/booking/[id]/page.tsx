@@ -30,6 +30,8 @@ import {
   kioskAddDogWash,
   kioskCheckIn,
   kioskCheckOut,
+  kioskCheckOutGroup,
+  kioskPayGroup,
   kioskRemoveAddon,
   kioskTakePayment,
   kioskUpdateStay,
@@ -113,6 +115,30 @@ export default async function KioskBookingPage({
   const isPaid = booking.payment_status === "paid";
   const isCheckedIn = !!ci?.checked_in_at && !ci?.checked_out_at;
   const isCheckedOut = !!ci?.checked_out_at;
+
+  // Group pickup: every dog this customer currently has on site. When there's
+  // more than one, offer a combined pay/check-out so the whole pickup is one tap.
+  const { data: siblingRows } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("customer_id", booking.customer_id)
+    .eq("status", "checked_in");
+  const siblings = (siblingRows ?? []) as Booking[];
+  const groupSize = siblings.length;
+  let groupUnpaidCents = siblings
+    .filter((b) => b.payment_status !== "paid")
+    .reduce((sum, b) => sum + (b.unit_price_cents ?? 0) * stayUnits(b), 0);
+  if (groupSize > 1) {
+    const { data: sibAddons } = await supabase
+      .from("booking_addons")
+      .select("amount_cents")
+      .in("booking_id", siblings.map((b) => b.id))
+      .eq("payment_status", "unpaid");
+    groupUnpaidCents += ((sibAddons ?? []) as { amount_cents: number }[]).reduce(
+      (s, a) => s + a.amount_cents,
+      0,
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -228,6 +254,15 @@ export default async function KioskBookingPage({
         ci={ci ?? null}
       />
 
+      {groupSize > 1 && (
+        <GroupPickup
+          customerId={booking.customer_id}
+          customerName={cust.full_name || cust.email}
+          groupSize={groupSize}
+          unpaidCents={groupUnpaidCents}
+        />
+      )}
+
       {canAddWash && (
         <form action={kioskAddDogWash}>
           <input type="hidden" name="booking_id" value={booking.id} />
@@ -246,6 +281,52 @@ export default async function KioskBookingPage({
         <EditStay booking={booking} />
       )}
     </div>
+  );
+}
+
+function GroupPickup({
+  customerId,
+  customerName,
+  groupSize,
+  unpaidCents,
+}: {
+  customerId: string;
+  customerName: string;
+  groupSize: number;
+  unpaidCents: number;
+}) {
+  const allWord = groupSize === 2 ? "both" : `all ${groupSize}`;
+  return (
+    <section className="rounded-2xl border border-stone-200/80 bg-cream-50 p-5 shadow-soft">
+      <p className="font-display text-lg font-semibold text-ink-900">
+        {customerName} · {groupSize} dogs on site
+      </p>
+      <p className="mt-1 text-sm text-ink-500">
+        Handle the whole pickup at once.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {unpaidCents > 0 && (
+          <form action={kioskPayGroup}>
+            <input type="hidden" name="customer_id" value={customerId} />
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-red-600 px-5 py-4 font-display text-lg font-semibold text-white shadow-soft transition-all hover:bg-red-700 active:translate-y-px"
+            >
+              Pay {allWord} · {formatMoney(unpaidCents)}
+            </button>
+          </form>
+        )}
+        <form action={kioskCheckOutGroup}>
+          <input type="hidden" name="customer_id" value={customerId} />
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-emerald-600 px-5 py-4 font-display text-lg font-semibold text-white shadow-soft transition-all hover:bg-emerald-700 active:translate-y-px"
+          >
+            Check out {allWord}
+          </button>
+        </form>
+      </div>
+    </section>
   );
 }
 

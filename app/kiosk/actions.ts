@@ -814,3 +814,135 @@ export async function kioskRemoveAddon(formData: FormData) {
   revalidatePath(`/kiosk/booking/${addon.booking_id}`);
   redirect(`/kiosk/booking/${addon.booking_id}?charge_removed=1`);
 }
+
+/** Billable units for a stay: nights for boarding, one day for daycare. */
+function stayUnitsOf(b: Booking): number {
+  if (b.service_kind !== "boarding") return 1;
+  let cur = b.service_date;
+  let n = 0;
+  while (cur < b.service_end_date) {
+    cur = addDays(cur, 1);
+    n += 1;
+  }
+  return Math.max(1, n);
+}
+
+/**
+ * Check out every dog a customer currently has on site in one tap. Marks each
+ * checked-in booking checked out. Payment isn't required — anything still owed
+ * surfaces in the kiosk "Unpaid" list, same as a single unpaid checkout.
+ */
+export async function kioskCheckOutGroup(formData: FormData) {
+  const { userId } = await requireFullStaff();
+  const customer_id = String(formData.get("customer_id") ?? "");
+  if (!customer_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  const { data: rows } = await svc
+    .from("bookings")
+    .select("id")
+    .eq("customer_id", customer_id)
+    .eq("status", "checked_in");
+  const ids = ((rows ?? []) as { id: string }[]).map((b) => b.id);
+  if (ids.length === 0) redirect("/kiosk");
+
+  const now = new Date().toISOString();
+  await svc
+    .from("check_ins")
+    .update({ checked_out_at: now, checked_out_by: userId })
+    .in("booking_id", ids);
+  await svc.from("bookings").update({ status: "checked_out" }).in("id", ids);
+
+  revalidatePath("/kiosk");
+  redirect("/kiosk?checkedout=1");
+}
+
+/**
+ * Take a single combined payment for every on-site dog a customer still owes
+ * for — each unpaid stay plus any unpaid add-ons — in one Stripe Checkout. The
+ * session id is stamped on all of them so the webhook clears them together.
+ */
+export async function kioskPayGroup(formData: FormData) {
+  await requireFullStaff();
+  const customer_id = String(formData.get("customer_id") ?? "");
+  if (!customer_id) redirect("/kiosk");
+
+  const svc = createServiceClient();
+  const [{ data: profile }, { data: bookingRows }] = await Promise.all([
+    svc.from("profiles").select("email").eq("id", customer_id).maybeSingle<{ email: string }>(),
+    svc
+      .from("bookings")
+      .select("*")
+      .eq("customer_id", customer_id)
+      .eq("status", "checked_in"),
+  ]);
+  const bookings = (bookingRows ?? []) as Booking[];
+  if (bookings.length === 0) redirect("/kiosk");
+
+  const dogIds = Array.from(new Set(bookings.map((b) => b.dog_id)));
+  const { data: dogRows } = await svc.from("dogs").select("id, name").in("id", dogIds);
+  const dogName = new Map(
+    ((dogRows ?? []) as Pick<Dog, "id" | "name">[]).map((d) => [d.id, d.name]),
+  );
+
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  const stampBookingIds: string[] = [];
+  for (const b of bookings.filter((x) => x.payment_status !== "paid")) {
+    const units = stayUnitsOf(b);
+    const isBoarding = b.service_kind === "boarding";
+    lineItems.push({
+      price_data: {
+        currency: "usd" as const,
+        product_data: {
+          name: `${isBoarding ? "Boarding" : "Day care"} (${dogName.get(b.dog_id) ?? "Dog"})`,
+          description: isBoarding
+            ? `${units} night${units === 1 ? "" : "s"}: ${b.service_date} → ${b.service_end_date}`
+            : `Service date: ${b.service_date}`,
+        },
+        unit_amount: b.unit_price_cents ?? 0,
+      },
+      quantity: units,
+    });
+    stampBookingIds.push(b.id);
+  }
+
+  // Unpaid add-ons across all the on-site dogs (incl. one stranded on a paid stay).
+  const { data: washRows } = await svc
+    .from("booking_addons")
+    .select("*")
+    .in("booking_id", bookings.map((b) => b.id))
+    .eq("payment_status", "unpaid");
+  const washes = (washRows ?? []) as BookingAddon[];
+  for (const w of washes) {
+    const dogId = bookings.find((b) => b.id === w.booking_id)?.dog_id;
+    lineItems.push(dogWashLineItem(dogName.get(dogId ?? "") ?? "your dog"));
+  }
+
+  if (lineItems.length === 0) redirect("/kiosk?error=Nothing+to+pay");
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer_email: profile?.email,
+    line_items: lineItems,
+    success_url: `${appUrl()}/kiosk?paid=1`,
+    cancel_url: `${appUrl()}/kiosk?canceled=1`,
+    metadata: { kind: "drop_in", customer_id, source: "kiosk-group" },
+  });
+
+  if (stampBookingIds.length > 0) {
+    await svc
+      .from("bookings")
+      .update({ payment_kind: "drop_in", stripe_checkout_session_id: session.id })
+      .in("id", stampBookingIds);
+  }
+  if (washes.length > 0) {
+    await svc
+      .from("booking_addons")
+      .update({ stripe_checkout_session_id: session.id })
+      .in("id", washes.map((w) => w.id));
+  }
+
+  if (!session.url) redirect("/kiosk?error=Stripe+session+failed");
+  redirect(session.url);
+}

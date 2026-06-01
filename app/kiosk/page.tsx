@@ -16,6 +16,7 @@ const TOASTS = [
     tone: "info" as const,
     message: "Checkout canceled.",
   },
+  { param: "checkedout", message: "Checked out." },
 ];
 
 export const dynamic = "force-dynamic";
