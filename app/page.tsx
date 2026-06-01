@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney } from "@/lib/format";
-import type { Package } from "@/lib/supabase/types";
+import { formatMoney, todayISO, addDays } from "@/lib/format";
+import { getDayCounts, getMaxDogsPerDay, getMaxDogsPerNight } from "@/lib/settings";
+import type { Package, ServiceKind } from "@/lib/supabase/types";
 import {
   PawIcon,
   ShieldPaw,
@@ -54,6 +55,33 @@ const GALLERY = [
   { src: "/photos/couch-rest.jpg", w: 1536, h: 2048, caption: "Earned a good rest", alt: "A husky mix curled up resting on a grey couch" },
 ];
 
+type AvailStatus = "open" | "limited" | "full";
+
+function statusFor(count: number, max: number): AvailStatus {
+  const remaining = max - count;
+  if (remaining <= 0) return "full";
+  // Flag scarcity when a quarter or less of capacity is left.
+  if (remaining <= Math.max(1, Math.ceil(max * 0.25))) return "limited";
+  return "open";
+}
+
+const STATUS_META: Record<
+  AvailStatus,
+  { label: string; dot: string; text: string }
+> = {
+  open: { label: "Open", dot: "bg-emerald-500", text: "text-emerald-700" },
+  limited: { label: "Few spots", dot: "bg-amber-500", text: "text-amber-700" },
+  full: { label: "Full", dot: "bg-stone-400", text: "text-ink-400" },
+};
+
+const AVAIL_DAYS = 14;
+
+function dayParts(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return { weekday: dt.toLocaleDateString("en-US", { weekday: "short" }), day: d };
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
   const { data } = await supabase
@@ -62,6 +90,30 @@ export default async function HomePage() {
     .eq("active", true)
     .order("sort_order");
   const packages = (data ?? []) as Package[];
+
+  // Public, two-week availability — shown as Open / Few spots / Full so we
+  // signal scarcity without exposing exact headcounts.
+  const availDates = Array.from({ length: AVAIL_DAYS }, (_, i) =>
+    addDays(todayISO(), i),
+  );
+  const [dayCounts, nightCounts, maxDay, maxNight] = await Promise.all([
+    getDayCounts(availDates, "daycare"),
+    getDayCounts(availDates, "boarding"),
+    getMaxDogsPerDay(),
+    getMaxDogsPerNight(),
+  ]);
+  const availability: { kind: ServiceKind; label: string; days: { iso: string; status: AvailStatus }[] }[] = [
+    {
+      kind: "daycare",
+      label: "Day care",
+      days: availDates.map((d) => ({ iso: d, status: statusFor(dayCounts.get(d) ?? 0, maxDay) })),
+    },
+    {
+      kind: "boarding",
+      label: "Boarding",
+      days: availDates.map((d) => ({ iso: d, status: statusFor(nightCounts.get(d) ?? 0, maxNight) })),
+    },
+  ];
 
   return (
     <main className="relative overflow-hidden">
@@ -209,6 +261,77 @@ export default async function HomePage() {
             </li>
           ))}
         </ol>
+      </section>
+
+      {/* ────────────────────── Availability ───────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-16">
+        <div className="text-center">
+          <span className="pill-warm">
+            <PawIcon className="h-3.5 w-3.5" />
+            Plan your visit
+          </span>
+          <h2 className="mt-4 text-3xl font-bold tracking-tight text-ink-900">
+            Two weeks of availability
+          </h2>
+          <p className="mt-2 text-ink-700">
+            A quick look at what&apos;s open. Create an account to grab a spot.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-ink-600">
+            {(["open", "limited", "full"] as AvailStatus[]).map((s) => (
+              <span key={s} className="inline-flex items-center gap-1.5">
+                <span className={`h-2.5 w-2.5 rounded-full ${STATUS_META[s].dot}`} />
+                {STATUS_META[s].label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-10 space-y-6">
+          {availability.map((track) => (
+            <div key={track.kind} className="card">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-ink-900">{track.label}</h3>
+                <span className="text-xs text-ink-500">Next {AVAIL_DAYS} days</span>
+              </div>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+                {track.days.map(({ iso, status }) => {
+                  const { weekday, day } = dayParts(iso);
+                  const meta = STATUS_META[status];
+                  return (
+                    <div
+                      key={iso}
+                      className={`flex min-w-[3.75rem] flex-col items-center rounded-xl border border-stone-200 px-2 py-2.5 ${
+                        status === "full" ? "bg-stone-50" : "bg-white"
+                      }`}
+                    >
+                      <span className="text-[0.65rem] font-medium uppercase tracking-wide text-ink-400">
+                        {weekday}
+                      </span>
+                      <span
+                        className={`text-lg font-semibold ${
+                          status === "full" ? "text-ink-400" : "text-ink-900"
+                        }`}
+                      >
+                        {day}
+                      </span>
+                      <span className={`mt-1.5 h-2 w-2 rounded-full ${meta.dot}`} title={meta.label} />
+                      <span className={`mt-1 text-[0.6rem] font-medium ${meta.text}`}>
+                        {meta.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 text-center">
+          <Link href="/signup" className="btn-primary px-5 py-2.5">
+            <PawIcon className="h-4 w-4" />
+            Reserve a spot
+          </Link>
+        </div>
       </section>
 
       {/* ───────────────────────── Pricing ─────────────────────── */}
