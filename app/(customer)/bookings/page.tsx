@@ -6,6 +6,7 @@ import type {
   Dog,
   ReportCard,
   ReportCardPhoto,
+  WaitlistEntry,
 } from "@/lib/supabase/types";
 import { formatDateShort, formatMoney, todayISO } from "@/lib/format";
 import { formatTime } from "@/lib/hours";
@@ -17,6 +18,7 @@ import { ToastNotifier } from "@/components/ToastNotifier";
 import {
   applyCouponToBooking,
   cancelBooking,
+  leaveWaitlistEntry,
   payAllUnpaid,
   payBooking,
   payDogWash,
@@ -32,8 +34,22 @@ const TOASTS = [
     message: "Payment canceled. You can try again whenever you're ready.",
   },
   { param: "coupon", message: "Coupon applied." },
+  {
+    param: "left_waitlist",
+    tone: "info" as const,
+    message: "Removed from the waitlist.",
+  },
   { param: "error", tone: "error" as const },
 ];
+
+/** A reserved/unpaid booking that's actually a time-limited waitlist offer. */
+function isLiveOffer(b: Booking): boolean {
+  return (
+    !!b.waitlist_offer_expires_at &&
+    b.status === "reserved" &&
+    b.payment_status === "unpaid"
+  );
+}
 
 export default async function BookingsPage({
   searchParams,
@@ -43,6 +59,7 @@ export default async function BookingsPage({
     canceled?: string;
     error?: string;
     coupon?: string;
+    left_waitlist?: string;
   }>;
 }) {
   const { userId, profile } = await requireCustomer();
@@ -52,7 +69,7 @@ export default async function BookingsPage({
   // Keep the 28-day horizon of standing-schedule bookings up to date.
   await materializeForCustomer(userId);
 
-  const [bookingsRes, dogsRes] = await Promise.all([
+  const [bookingsRes, dogsRes, waitlistRes] = await Promise.all([
     supabase
       .from("bookings")
       .select("*")
@@ -60,10 +77,24 @@ export default async function BookingsPage({
       .order("service_date", { ascending: false })
       .limit(50),
     supabase.from("dogs").select("*").eq("owner_id", userId),
+    supabase
+      .from("waitlist_entries")
+      .select("*")
+      .eq("customer_id", userId)
+      .in("status", ["waiting", "offered"])
+      .order("created_at"),
   ]);
   const bookings = (bookingsRes.data ?? []) as Booking[];
   const dogs = (dogsRes.data ?? []) as Dog[];
+  const waitlistEntries = (waitlistRes.data ?? []) as WaitlistEntry[];
   const today = todayISO();
+
+  // Live waitlist offers are reserved/unpaid bookings, but they're optional and
+  // time-limited — keep them out of the normal lists and the balance; they get
+  // their own section with claim/decline.
+  const offerBookingIds = new Set(
+    bookings.filter(isLiveOffer).map((b) => b.id),
+  );
 
   // RLS only returns cards that are published AND on the customer's bookings,
   // so a simple "any card on these bookings" select is safe.
@@ -107,11 +138,23 @@ export default async function BookingsPage({
     map.set(a.booking_id, (map.get(a.booking_id) ?? 0) + a.amount_cents);
   }
 
-  const upcoming = bookings.filter((b) => b.service_date >= today && b.status !== "canceled");
-  const past = bookings.filter((b) => b.service_date < today || b.status === "canceled");
+  const upcoming = bookings.filter(
+    (b) =>
+      b.service_date >= today &&
+      b.status !== "canceled" &&
+      !offerBookingIds.has(b.id),
+  );
+  const past = bookings.filter(
+    (b) =>
+      (b.service_date < today || b.status === "canceled") &&
+      !offerBookingIds.has(b.id),
+  );
 
   const unpaidBookings = bookings.filter(
-    (b) => b.status === "reserved" && b.payment_status === "unpaid",
+    (b) =>
+      b.status === "reserved" &&
+      b.payment_status === "unpaid" &&
+      !offerBookingIds.has(b.id),
   );
   // Net of each booking's coupon AND the shared account-credit pool, using the
   // same helper payAllUnpaid charges with — so the displayed balance and the
@@ -176,6 +219,12 @@ export default async function BookingsPage({
         </section>
       )}
 
+      <WaitlistSection
+        entries={waitlistEntries}
+        bookings={bookings}
+        dogs={dogs}
+      />
+
       <Section
         title="Upcoming"
         bookings={upcoming}
@@ -198,6 +247,129 @@ export default async function BookingsPage({
         washUnpaidByBooking={washUnpaidByBooking}
       />
     </div>
+  );
+}
+
+function spanLabel(b: { service_kind: string; service_date: string; service_end_date: string }): string {
+  return b.service_kind === "boarding"
+    ? `${formatDateShort(b.service_date)} → ${formatDateShort(b.service_end_date)}`
+    : formatDateShort(b.service_date);
+}
+
+function WaitlistSection({
+  entries,
+  bookings,
+  dogs,
+}: {
+  entries: WaitlistEntry[];
+  bookings: Booking[];
+  dogs: Dog[];
+}) {
+  if (entries.length === 0) return null;
+  const bookingById = new Map(bookings.map((b) => [b.id, b]));
+  const dogName = (id: string) => dogs.find((d) => d.id === id)?.name ?? "Dog";
+
+  // An offered entry only counts as a live offer while its held booking is
+  // still reserved + unpaid (not yet claimed, declined, or expired).
+  const offers = entries.filter((e) => {
+    if (e.status !== "offered" || !e.offered_booking_id) return false;
+    const held = bookingById.get(e.offered_booking_id);
+    return !!held && held.status === "reserved" && held.payment_status === "unpaid";
+  });
+  const waiting = entries.filter((e) => e.status === "waiting");
+  if (offers.length === 0 && waiting.length === 0) return null;
+
+  const deadline = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleString([], {
+          weekday: "short",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
+
+  return (
+    <section>
+      <h2 className="font-display text-xl font-semibold text-ink-900">Waitlist</h2>
+
+      {offers.length > 0 && (
+        <ul className="mt-3 space-y-3">
+          {offers.map((e) => {
+            const held = bookingById.get(e.offered_booking_id!)!;
+            const units =
+              held.service_kind === "boarding"
+                ? Math.max(1, nightCount(held.service_date, held.service_end_date))
+                : 1;
+            const payNowCents = Math.max(
+              0,
+              (held.unit_price_cents ?? 0) * units -
+                (held.coupon_discount_cents ?? 0),
+            );
+            return (
+              <li
+                key={e.id}
+                className="rounded-2xl border border-emerald-300 bg-emerald-50/70 p-4 shadow-soft"
+              >
+                <p className="font-semibold text-emerald-900">
+                  🎉 A spot opened for {dogName(e.dog_id)} — {spanLabel(held)}
+                </p>
+                <p className="mt-0.5 text-sm text-emerald-800">
+                  We&apos;re holding it until {deadline(e.offer_expires_at)}. Pay
+                  to confirm before then, or it rolls to the next person.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <form action={payBooking}>
+                    <input type="hidden" name="id" value={held.id} />
+                    <button type="submit" className="btn-primary text-sm">
+                      Claim — pay {formatMoney(payNowCents)}
+                    </button>
+                  </form>
+                  <form action={leaveWaitlistEntry}>
+                    <input type="hidden" name="entry_id" value={e.id} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-stone-50"
+                    >
+                      Decline
+                    </button>
+                  </form>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {waiting.length > 0 && (
+        <ul className="mt-3 divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
+          {waiting.map((e) => (
+            <li
+              key={e.id}
+              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-ink-900">
+                  {spanLabel(e)} — {dogName(e.dog_id)}
+                </p>
+                <p className="text-sm text-ink-500">
+                  {e.service_kind === "boarding" ? "Boarding" : "Day care"} ·
+                  waiting for a spot
+                </p>
+              </div>
+              <form action={leaveWaitlistEntry}>
+                <input type="hidden" name="entry_id" value={e.id} />
+                <button
+                  type="submit"
+                  className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-stone-50"
+                >
+                  Leave
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

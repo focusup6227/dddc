@@ -17,6 +17,7 @@ import {
   VACCINE_LABEL,
 } from "@/lib/vaccines";
 import { ToastNotifier } from "@/components/ToastNotifier";
+import { WaitlistJoinForm } from "@/components/WaitlistJoinForm";
 import { BoardForm } from "./BoardForm";
 
 const TOASTS = [
@@ -24,6 +25,10 @@ const TOASTS = [
     param: "status",
     whenValue: "success",
     message: "Payment received — boarding is confirmed.",
+  },
+  {
+    param: "waitlisted",
+    message: "You're on the waitlist — we'll email you if a spot opens.",
   },
   { param: "error", tone: "error" as const },
 ];
@@ -146,6 +151,11 @@ export default async function BoardPage({
         vaccineLabels={VACCINE_LABEL}
         events={events}
         blackoutNights={blackoutNights}
+      />
+
+      <WaitlistJoinForm
+        kind="boarding"
+        dogs={dogs.map((d) => ({ id: d.id, name: d.name }))}
       />
     </div>
   );

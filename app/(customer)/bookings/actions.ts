@@ -24,7 +24,15 @@ import {
 } from "@/lib/addons.server";
 import { addDays } from "@/lib/format";
 import { appUrl, getStripe } from "@/lib/stripe";
-import type { Booking, BookingAddon, Dog } from "@/lib/supabase/types";
+import {
+  cancelWaitlistEntry,
+  createWaitlistEntry,
+  enumerateDates,
+  processWaitlist,
+} from "@/lib/waitlist.server";
+import type { Booking, BookingAddon, Dog, ServiceKind } from "@/lib/supabase/types";
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function applyCouponToBooking(formData: FormData) {
   const { userId } = await requireCustomer();
@@ -124,8 +132,78 @@ export async function cancelBooking(formData: FormData) {
 
   await cancelBookingWithRefund({ booking, actorId: userId, actorRole: "customer" });
 
+  // The freed spot may belong to someone waiting — offer it to the next in line.
+  try {
+    await processWaitlist(
+      booking.service_kind,
+      enumerateDates(booking.service_date, booking.service_end_date),
+    );
+  } catch (e) {
+    console.error("[waitlist] process after customer cancel failed", e);
+  }
+
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
+}
+
+/** Join the waitlist for a full daycare day or boarding span. */
+export async function joinWaitlist(formData: FormData) {
+  const { userId } = await requireCustomer();
+  const dog_id = String(formData.get("dog_id") ?? "");
+  const kind = (String(formData.get("kind") ?? "daycare") === "boarding"
+    ? "boarding"
+    : "daycare") as ServiceKind;
+  const backTo = kind === "boarding" ? "/board" : "/book";
+
+  let serviceDate: string;
+  let serviceEndDate: string;
+  if (kind === "boarding") {
+    serviceDate = String(formData.get("check_in") ?? "");
+    serviceEndDate = String(formData.get("check_out") ?? "");
+  } else {
+    serviceDate = String(formData.get("service_date") ?? "");
+    serviceEndDate = addDays(serviceDate, 1);
+  }
+  if (!dog_id || !ISO_RE.test(serviceDate) || !ISO_RE.test(serviceEndDate)) {
+    redirect(`${backTo}?error=${encodeURIComponent("Pick a dog and a valid date.")}`);
+  }
+
+  const result = await createWaitlistEntry({
+    customerId: userId,
+    dogId: dog_id,
+    kind,
+    serviceDate,
+    serviceEndDate,
+  });
+  if (!result.ok) {
+    redirect(`${backTo}?error=${encodeURIComponent(result.error)}`);
+  }
+
+  revalidatePath(backTo);
+  revalidatePath("/bookings");
+  redirect(`${backTo}?waitlisted=1`);
+}
+
+/** Leave the waitlist, or decline a live offer. */
+export async function leaveWaitlistEntry(formData: FormData) {
+  const { userId } = await requireCustomer();
+  const entry_id = String(formData.get("entry_id") ?? "");
+  if (!entry_id) redirect("/bookings");
+
+  const freed = await cancelWaitlistEntry({ entryId: entry_id, customerId: userId });
+  // Declining an offer frees the held spot — roll it to the next person.
+  if (freed) {
+    try {
+      await processWaitlist(freed.kind, freed.dates);
+    } catch (e) {
+      console.error("[waitlist] process after decline failed", e);
+    }
+  }
+
+  revalidatePath("/bookings");
+  revalidatePath("/book");
+  revalidatePath("/board");
+  redirect("/bookings?left_waitlist=1");
 }
 
 export async function payBooking(formData: FormData) {
@@ -241,6 +319,9 @@ export async function payAllUnpaid() {
     .eq("customer_id", userId)
     .eq("payment_status", "unpaid")
     .eq("status", "reserved")
+    // Waitlist offers are optional, time-limited holds — claimed explicitly via
+    // their own button, never force-swept into "pay everything".
+    .is("waitlist_offer_expires_at", null)
     .order("service_date");
   const unpaid = (bookingRows ?? []) as Booking[];
 

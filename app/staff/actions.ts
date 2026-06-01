@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireFullStaff, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cancelBookingWithRefund } from "@/lib/bookings.server";
+import { enumerateDates, processWaitlist } from "@/lib/waitlist.server";
 import type { Booking, CheckIn } from "@/lib/supabase/types";
 
 export async function checkInBooking(formData: FormData) {
@@ -82,6 +83,16 @@ export async function staffCancelBooking(formData: FormData) {
   if (!booking) return;
 
   await cancelBookingWithRefund({ booking, actorId: userId, actorRole: "staff", reason });
+
+  // Offer the freed spot to the next person waiting on those dates.
+  try {
+    await processWaitlist(
+      booking.service_kind,
+      enumerateDates(booking.service_date, booking.service_end_date),
+    );
+  } catch (e) {
+    console.error("[waitlist] process after staff cancel failed", e);
+  }
 
   revalidatePath("/staff/bookings");
   revalidatePath("/staff");

@@ -20,6 +20,7 @@ import {
   VACCINE_LABEL,
 } from "@/lib/vaccines";
 import { ToastNotifier } from "@/components/ToastNotifier";
+import { WaitlistJoinForm } from "@/components/WaitlistJoinForm";
 import { BookForm } from "./BookForm";
 
 const TOASTS = [
@@ -32,6 +33,10 @@ const TOASTS = [
     param: "status",
     whenValue: "success",
     message: "Payment received — your booking is confirmed.",
+  },
+  {
+    param: "waitlisted",
+    message: "You're on the waitlist — we'll email you if a spot opens.",
   },
   { param: "error", tone: "error" as const },
 ];
@@ -256,6 +261,11 @@ export default async function BookPage({
         eventDates={Array.from(eventDates)}
         blackoutDates={Array.from(blackoutDates)}
         blackoutReasonByDate={blackoutReasonByDate}
+      />
+
+      <WaitlistJoinForm
+        kind="daycare"
+        dogs={dogs.map((d) => ({ id: d.id, name: d.name }))}
       />
     </div>
   );

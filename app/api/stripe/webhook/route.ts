@@ -8,6 +8,7 @@ import {
   markAddonsPaidBySession,
 } from "@/lib/addons.server";
 import { sendStaffPush } from "@/lib/push.server";
+import { markOffersClaimed } from "@/lib/waitlist.server";
 import { addDays } from "@/lib/format";
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -171,6 +172,10 @@ async function handleCheckoutSucceeded(
       );
     const bookings = bookingRows ?? [];
     if (bookings.length === 0) return;
+
+    // If any of these were waitlist offers, this payment claims them — retire
+    // the entries and clear their offer markers so they read as ordinary stays.
+    await markOffersClaimed(bookings.map((b) => b.id));
 
     // Burn down account credit for whatever this session applied. Floor at
     // zero so concurrent sessions can't drive the balance negative.

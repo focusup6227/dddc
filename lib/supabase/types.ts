@@ -139,8 +139,32 @@ export interface Booking {
   cancellation_reason: string | null;
   refund_amount_cents: number | null;
   stripe_refund_id: string | null;
+  // Set when this reserved/unpaid row is a time-limited waitlist offer rather
+  // than an ordinary reservation. Null for ordinary bookings.
+  waitlist_offer_expires_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type WaitlistStatus =
+  | "waiting"
+  | "offered"
+  | "claimed"
+  | "expired"
+  | "canceled";
+
+export interface WaitlistEntry {
+  id: string;
+  customer_id: string;
+  dog_id: string;
+  service_kind: ServiceKind;
+  service_date: string;
+  service_end_date: string; // exclusive, same convention as Booking
+  status: WaitlistStatus;
+  offered_booking_id: string | null;
+  offer_expires_at: string | null;
+  offered_at: string | null;
+  created_at: string;
 }
 
 export interface StaffPushToken {

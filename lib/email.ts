@@ -604,6 +604,56 @@ export async function sendReportCardReady(args: {
   });
 }
 
+// --- Waitlist offer -------------------------------------------------------
+
+export async function sendWaitlistOffer(args: {
+  to: string;
+  customerName: string;
+  dogName: string;
+  serviceKind: "daycare" | "boarding";
+  dates: string[]; // ISO YYYY-MM-DD, the freed span
+  expiresAt: string; // ISO timestamp the offer lapses
+}) {
+  const { to, customerName, dogName, serviceKind, dates, expiresAt } = args;
+
+  const deadline = new Date(expiresAt).toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: process.env.DAYCARE_TIMEZONE ?? "America/Chicago",
+  });
+  const spanLabel =
+    serviceKind === "boarding" && dates.length > 1
+      ? `${formatDateShort(dates[0])} → ${formatDateShort(dates[dates.length - 1])}`
+      : formatDateShort(dates[0]);
+  const kindWord = serviceKind === "boarding" ? "boarding" : "day care";
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi ${escape(customerName)},</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">Good news — a ${kindWord} spot just opened up for <strong style="color:${COLOR.text};">${escape(dogName)}</strong>, and you're next in line. We're holding it for you until <strong style="color:${COLOR.text};">${escape(deadline)}</strong>.</p>
+    ${dateChips(dates)}
+    ${detailCard([
+      { label: "Dog", value: escape(dogName) },
+      { label: serviceKind === "boarding" ? "Stay" : "Day", value: escape(spanLabel) },
+      { label: "Claim by", value: escape(deadline) },
+    ])}
+    ${button(`${appUrl()}/bookings`, "Claim your spot")}
+    <p style="margin:14px 0 0;font-family:${FONT};font-size:14px;line-height:1.55;color:${COLOR.textMuted};">Pay to confirm before the deadline. If we don't hear from you, we'll offer the spot to the next person in line.</p>
+  `;
+
+  await send({
+    to,
+    subject: `A spot opened up for ${dogName}`,
+    html: shell({
+      preheader: `Claim ${dogName}'s ${kindWord} spot by ${deadline}.`,
+      heading: "A spot just opened up",
+      body,
+    }),
+  });
+}
+
 function escape(s: string): string {
   return s
     .replace(/&/g, "&amp;")
