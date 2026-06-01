@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { sendStaffPush } from "@/lib/push.server";
 
 export async function signup(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -56,6 +57,12 @@ export async function signup(formData: FormData) {
       });
     }
   }
+
+  await sendStaffPush({
+    title: "New customer",
+    body: `${full_name || email} just signed up`,
+    data: { type: "new_customer", customerId: data.user.id },
+  });
 
   redirect("/waiver");
 }

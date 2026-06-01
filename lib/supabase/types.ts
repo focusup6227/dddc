@@ -143,6 +143,15 @@ export interface Booking {
   updated_at: string;
 }
 
+export interface StaffPushToken {
+  id: string;
+  user_id: string;
+  token: string;
+  platform: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BookingAddon {
   id: string;
   booking_id: string;

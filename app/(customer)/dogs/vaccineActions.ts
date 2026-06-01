@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireCustomer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { REQUIRED_VACCINES, VACCINE_BUCKET } from "@/lib/vaccines";
+import { REQUIRED_VACCINES, VACCINE_BUCKET, VACCINE_LABEL } from "@/lib/vaccines";
+import { sendStaffPush } from "@/lib/push.server";
 import type { VaccineType } from "@/lib/supabase/types";
 
 const VACCINE_KEYS = new Set<VaccineType>(REQUIRED_VACCINES.map((v) => v.key));
@@ -38,10 +39,10 @@ export async function saveVaccineRecord(formData: FormData): Promise<
   // beats a generic permission failure.
   const { data: dog } = await supabase
     .from("dogs")
-    .select("id")
+    .select("id, name")
     .eq("id", dog_id)
     .eq("owner_id", userId)
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<{ id: string; name: string }>();
   if (!dog) return { ok: false, error: "Dog not found." };
 
   const { error } = await supabase.from("dog_vaccinations").insert({
@@ -53,6 +54,12 @@ export async function saveVaccineRecord(formData: FormData): Promise<
     status: "pending",
   });
   if (error) return { ok: false, error: error.message };
+
+  await sendStaffPush({
+    title: "Vaccine record to review",
+    body: `${VACCINE_LABEL[vaccine_type]} uploaded for ${dog.name}`,
+    data: { type: "vaccine_review", dogId: dog_id },
+  });
 
   revalidatePath(`/dogs/${dog_id}`);
   return { ok: true };

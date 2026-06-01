@@ -14,6 +14,7 @@ import { isTimeInWindow } from "@/lib/hours";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
+import { sendStaffPush } from "@/lib/push.server";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -184,6 +185,13 @@ export async function createBooking(formData: FormData) {
       .update({ days_remaining: pkg.days_remaining })
       .eq("id", pkg.id);
   }
+
+  // Let staff know a customer just booked day care.
+  await sendStaffPush({
+    title: "New day care booking",
+    body: `${profile.full_name ?? profile.email} booked ${dog.name} for ${dates.length} day${dates.length === 1 ? "" : "s"}`,
+    data: { type: "booking", customerId: userId, dogId: dog_id },
+  });
 
   // If no drop-in days, the booking is fully confirmed now — send the email.
   if (dropInAllocs.length === 0) {

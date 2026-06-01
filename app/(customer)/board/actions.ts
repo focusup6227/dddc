@@ -18,6 +18,7 @@ import { getBlackoutDates } from "@/lib/blackouts.server";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
+import { sendStaffPush } from "@/lib/push.server";
 import type { Dog } from "@/lib/supabase/types";
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -171,6 +172,12 @@ export async function createBoarding(formData: FormData) {
       sessionId: session.id,
     });
   }
+
+  await sendStaffPush({
+    title: "New boarding booking",
+    body: `${profile.full_name ?? profile.email} booked ${dog!.name} · ${nights.length} night${nights.length === 1 ? "" : "s"} (${checkIn} → ${checkOut})`,
+    data: { type: "booking", customerId: userId, dogId: dog_id },
+  });
 
   if (!session.url) redirect("/board?error=Stripe+session+failed");
   redirect(session.url);

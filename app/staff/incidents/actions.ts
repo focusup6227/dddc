@@ -6,6 +6,7 @@ import { requireFullStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { IncidentKind, IncidentSeverity } from "@/lib/supabase/types";
 import { INCIDENT_BUCKET } from "@/lib/incidents";
+import { sendStaffPush } from "@/lib/push.server";
 
 function str(v: FormDataEntryValue | null): string | null {
   if (v == null) return null;
@@ -71,6 +72,17 @@ export async function createIncident(formData: FormData) {
         encodeURIComponent(error?.message ?? "Could not save."),
     );
   }
+
+  const { data: dog } = await supabase
+    .from("dogs")
+    .select("name")
+    .eq("id", dog_id)
+    .maybeSingle<{ name: string }>();
+  await sendStaffPush({
+    title: `Incident reported (${severityRaw})`,
+    body: `${kindRaw} — ${dog?.name ?? "a dog"}`,
+    data: { type: "incident", incidentId: inserted.id, dogId: dog_id },
+  });
 
   revalidatePath("/staff/incidents");
   revalidatePath(`/staff/dogs/${dog_id}`);

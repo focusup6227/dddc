@@ -7,7 +7,10 @@ import {
   markAddonsFailedBySession,
   markAddonsPaidBySession,
 } from "@/lib/addons.server";
+import { sendStaffPush } from "@/lib/push.server";
 import { addDays } from "@/lib/format";
+
+const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 // Stripe sends raw bodies; opt out of body parsing.
 export const runtime = "nodejs";
@@ -52,6 +55,22 @@ export async function POST(req: NextRequest) {
       case "checkout.session.async_payment_failed": {
         const session = event.data.object as Stripe.Checkout.Session;
         await handleCheckoutFailed(svc, session);
+        break;
+      }
+      case "payment_intent.succeeded": {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        // Only in-person (Tap to Pay) intents are settled here; intents created
+        // by a Checkout Session are already handled by the session events above.
+        if (intent.metadata?.kind === "terminal") {
+          await handleTerminalSucceeded(svc, intent);
+        }
+        break;
+      }
+      case "payment_intent.payment_failed": {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        if (intent.metadata?.kind === "terminal") {
+          await handleTerminalFailed(svc, intent);
+        }
         break;
       }
       default:
@@ -210,8 +229,120 @@ async function handleCheckoutSucceeded(
       amountCents: totalCents + wash.totalCents || session.amount_total || 0,
       paidAt: new Date(),
     });
+    await sendStaffPush({
+      title: "Payment received",
+      body: `${profile.full_name ?? profile.email} — ${dollars(totalCents + wash.totalCents || session.amount_total || 0)} for ${dog.name}`,
+      data: { type: "payment", customerId },
+    });
     return;
   }
+}
+
+/**
+ * Settle an in-person (Tap to Pay) PaymentIntent. Mirrors the drop-in checkout
+ * branch but keys off the PI id stamped on the bookings/add-ons at intent
+ * creation, rather than a Checkout Session.
+ */
+async function handleTerminalSucceeded(svc: Svc, intent: Stripe.PaymentIntent) {
+  const { data: bookingRows } = await svc
+    .from("bookings")
+    .update({ payment_status: "paid" })
+    .eq("stripe_payment_intent_id", intent.id)
+    .eq("payment_status", "unpaid")
+    .select(
+      "id, customer_id, dog_id, service_kind, service_date, service_end_date, unit_price_cents, credit_applied_cents",
+    );
+  const bookings = bookingRows ?? [];
+
+  // Flip any add-ons paid by this intent and total them for the receipt.
+  const { data: addonRows } = await svc
+    .from("booking_addons")
+    .update({ payment_status: "paid" })
+    .eq("stripe_payment_intent_id", intent.id)
+    .eq("payment_status", "unpaid")
+    .select("amount_cents");
+  const washTotal = ((addonRows ?? []) as { amount_cents: number }[]).reduce(
+    (s, a) => s + a.amount_cents,
+    0,
+  );
+  const washCount = (addonRows ?? []).length;
+
+  if (bookings.length === 0) {
+    // Add-on-only tap (rare) — nothing more to do beyond marking it paid.
+    return;
+  }
+
+  const customerCreditUsed = bookings.reduce(
+    (sum, b) => sum + (b.credit_applied_cents ?? 0),
+    0,
+  );
+  if (customerCreditUsed > 0) {
+    await deductAccountCredit(svc, bookings[0].customer_id, customerCreditUsed);
+  }
+  await creditReferralIfFirstPaid(svc, bookings[0].customer_id);
+
+  const [{ data: profile }, { data: dog }] = await Promise.all([
+    svc.from("profiles").select("email, full_name").eq("id", bookings[0].customer_id).maybeSingle(),
+    svc.from("dogs").select("name").eq("id", bookings[0].dog_id).maybeSingle(),
+  ]);
+  if (!profile?.email || !dog) return;
+
+  const dates: string[] = [];
+  let totalCents = 0;
+  let unitCount = 0;
+  for (const b of bookings) {
+    let cur = b.service_date;
+    while (cur < b.service_end_date) {
+      dates.push(cur);
+      unitCount += 1;
+      totalCents += b.unit_price_cents ?? 0;
+      cur = addDays(cur, 1);
+    }
+  }
+  dates.sort();
+  const anyBoarding = bookings.some((b) => b.service_kind === "boarding");
+  const unit = anyBoarding ? "night" : "day";
+
+  await sendBookingConfirmation({
+    to: profile.email,
+    customerName: profile.full_name ?? profile.email,
+    dogName: dog.name,
+    dates,
+    paidByPackageCount: 0,
+    dropInCount: unitCount,
+    dropInTotalCents: totalCents,
+  });
+  await sendPaymentReceipt({
+    to: profile.email,
+    customerName: profile.full_name ?? profile.email,
+    description: `${anyBoarding ? "Boarding" : "Drop-in"} for ${dog.name} × ${unitCount} ${unit}${unitCount === 1 ? "" : "s"}${washCount > 0 ? " + dog wash" : ""} (tap to pay)`,
+    amountCents: intent.amount_received || intent.amount || totalCents + washTotal,
+    paidAt: new Date(),
+  });
+  await sendStaffPush({
+    title: "Payment received (tap)",
+    body: `${profile.full_name ?? profile.email} — ${dollars(intent.amount_received || intent.amount || totalCents + washTotal)} for ${dog.name}`,
+    data: { type: "payment", customerId: bookings[0].customer_id },
+  });
+}
+
+/** A failed in-person tap — leave bookings unpaid; clear the stamped intent. */
+async function handleTerminalFailed(svc: Svc, intent: Stripe.PaymentIntent) {
+  await svc
+    .from("bookings")
+    .update({ stripe_payment_intent_id: null })
+    .eq("stripe_payment_intent_id", intent.id)
+    .eq("payment_status", "unpaid");
+  await svc
+    .from("booking_addons")
+    .update({ stripe_payment_intent_id: null })
+    .eq("stripe_payment_intent_id", intent.id)
+    .eq("payment_status", "unpaid");
+  await sendStaffPush({
+    title: "Tap payment failed",
+    body: "An in-person payment didn't go through — try again or take another card.",
+    data: { type: "payment_failed" },
+  });
 }
 
 async function deductAccountCredit(
@@ -297,4 +428,9 @@ async function handleCheckoutFailed(
       .update({ payment_status: "failed", status: "canceled" })
       .eq("stripe_checkout_session_id", session.id);
   }
+  await sendStaffPush({
+    title: "Payment failed",
+    body: "A customer's payment didn't go through.",
+    data: { type: "payment_failed" },
+  });
 }
