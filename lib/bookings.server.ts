@@ -309,7 +309,10 @@ export async function createBookingCheckoutSession(opts: {
   if (opts.ownerCustomerId && booking.customer_id !== opts.ownerCustomerId) {
     return null;
   }
-  if (booking.status !== "reserved" || booking.payment_status === "paid") {
+  // Collect payment for any unpaid booking, whatever stage it's at — a dog can
+  // be checked in (or already checked out) and still owe, and payment is due at
+  // pickup. Only a canceled or already-paid booking has nothing to charge.
+  if (booking.status === "canceled" || booking.payment_status === "paid") {
     return null;
   }
 
