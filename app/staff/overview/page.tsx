@@ -147,7 +147,11 @@ export default async function StaffOverviewPage() {
       b.service_kind === "boarding"
         ? Math.max(1, nightCount(b.service_date, b.service_end_date))
         : 1;
-    const amount = (b.unit_price_cents ?? 0) * units;
+    // Net of any coupon stamped on the booking (a committed price cut, frozen
+    // at apply-time). Account credit isn't subtracted here — it's a live pool
+    // applied at the moment of payment, so this stays a "before-credit" figure.
+    const gross = (b.unit_price_cents ?? 0) * units;
+    const amount = Math.max(0, gross - (b.coupon_discount_cents ?? 0));
     unpaidTotal += amount;
     const cur = bumpCust(b.customer_id);
     cur.amount += amount;

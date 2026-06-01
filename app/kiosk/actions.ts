@@ -887,23 +887,46 @@ export async function kioskPayGroup(formData: FormData) {
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   const stampBookingIds: string[] = [];
+  const paidFreeIds: string[] = [];
   for (const b of bookings.filter((x) => x.payment_status !== "paid")) {
     const units = stayUnitsOf(b);
     const isBoarding = b.service_kind === "boarding";
+    const total = (b.unit_price_cents ?? 0) * units;
+    // Honor a coupon stamped on the booking (e.g. an account coupon). Discount
+    // is encoded into the per-unit amount so the line item charges the net.
+    const coupon = Math.min(Math.max(0, b.coupon_discount_cents ?? 0), total);
+    const chargeAfter = total - coupon;
+    if (chargeAfter <= 0) {
+      // Coupon fully covers the stay (rare) — settle it outside Stripe.
+      paidFreeIds.push(b.id);
+      continue;
+    }
+    const adjustedUnit = Math.max(50, Math.ceil(chargeAfter / units));
+    const baseDesc = isBoarding
+      ? `${units} night${units === 1 ? "" : "s"}: ${b.service_date} → ${b.service_end_date}`
+      : `Service date: ${b.service_date}`;
     lineItems.push({
       price_data: {
         currency: "usd" as const,
         product_data: {
           name: `${isBoarding ? "Boarding" : "Day care"} (${dogName.get(b.dog_id) ?? "Dog"})`,
-          description: isBoarding
-            ? `${units} night${units === 1 ? "" : "s"}: ${b.service_date} → ${b.service_end_date}`
-            : `Service date: ${b.service_date}`,
+          description:
+            coupon > 0
+              ? `${baseDesc} · $${(coupon / 100).toFixed(2)} coupon applied`
+              : baseDesc,
         },
-        unit_amount: b.unit_price_cents ?? 0,
+        unit_amount: adjustedUnit,
       },
       quantity: units,
     });
     stampBookingIds.push(b.id);
+  }
+
+  if (paidFreeIds.length > 0) {
+    await svc
+      .from("bookings")
+      .update({ payment_kind: "drop_in", payment_status: "paid" })
+      .in("id", paidFreeIds);
   }
 
   // Unpaid add-ons across all the on-site dogs (incl. one stranded on a paid stay).
@@ -918,7 +941,9 @@ export async function kioskPayGroup(formData: FormData) {
     lineItems.push(dogWashLineItem(dogName.get(dogId ?? "") ?? "your dog"));
   }
 
-  if (lineItems.length === 0) redirect("/kiosk?error=Nothing+to+pay");
+  if (lineItems.length === 0) {
+    redirect(paidFreeIds.length > 0 ? "/kiosk?paid=1" : "/kiosk?error=Nothing+to+pay");
+  }
 
   const stripe = getStripe();
   const session = await stripe.checkout.sessions.create({

@@ -21,7 +21,7 @@ export async function applyAccountCouponToOpenBookings(
     .select("id, service_kind, service_date, service_end_date, unit_price_cents")
     .eq("customer_id", customerId)
     .eq("payment_status", "unpaid")
-    .eq("status", "reserved")
+    .neq("status", "canceled")
     .is("coupon_id", null)
     .neq("payment_kind", "package");
   const open = (data ?? []) as Pick<
@@ -53,7 +53,7 @@ export async function clearAccountCouponFromOpenBookings(
     .update({ coupon_id: null, coupon_discount_cents: 0 })
     .eq("customer_id", customerId)
     .eq("payment_status", "unpaid")
-    .eq("status", "reserved")
+    .neq("status", "canceled")
     .eq("coupon_id", couponId);
 }
 

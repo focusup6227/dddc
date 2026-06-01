@@ -127,7 +127,15 @@ export default async function KioskBookingPage({
   const groupSize = siblings.length;
   let groupUnpaidCents = siblings
     .filter((b) => b.payment_status !== "paid")
-    .reduce((sum, b) => sum + (b.unit_price_cents ?? 0) * stayUnits(b), 0);
+    .reduce(
+      (sum, b) =>
+        sum +
+        Math.max(
+          0,
+          (b.unit_price_cents ?? 0) * stayUnits(b) - (b.coupon_discount_cents ?? 0),
+        ),
+      0,
+    );
   if (groupSize > 1) {
     const { data: sibAddons } = await supabase
       .from("booking_addons")
@@ -560,7 +568,7 @@ async function ActionPanel({
         <BigButton tone="red">
           Take payment{" "}
           {booking.unit_price_cents
-            ? `· ${formatMoney(booking.unit_price_cents * stayUnits(booking))}`
+            ? `· ${formatMoney(Math.max(0, booking.unit_price_cents * stayUnits(booking) - (booking.coupon_discount_cents ?? 0)))}`
             : ""}
         </BigButton>
       </form>
