@@ -11,6 +11,7 @@ import {
   formatTime,
 } from "@/lib/hours";
 import { DOG_WASH_PRICE_CENTS } from "@/lib/settings";
+import { settleUnpaidBookings } from "@/lib/coupons.server";
 import { DogAvatar } from "@/components/DogAvatar";
 import { ToastNotifier } from "@/components/ToastNotifier";
 import type {
@@ -125,17 +126,15 @@ export default async function KioskBookingPage({
     .eq("status", "checked_in");
   const siblings = (siblingRows ?? []) as Booking[];
   const groupSize = siblings.length;
-  let groupUnpaidCents = siblings
+  // Settle the unpaid stays against the customer's credit pool — coupon OR
+  // credit, never both — the same way kioskPayGroup charges, so they agree.
+  const unpaidSiblings = siblings
     .filter((b) => b.payment_status !== "paid")
-    .reduce(
-      (sum, b) =>
-        sum +
-        Math.max(
-          0,
-          (b.unit_price_cents ?? 0) * stayUnits(b) - (b.coupon_discount_cents ?? 0),
-        ),
-      0,
-    );
+    .sort((a, b) => a.service_date.localeCompare(b.service_date));
+  let groupUnpaidCents = settleUnpaidBookings(
+    unpaidSiblings,
+    cust.account_credit_cents ?? 0,
+  ).reduce((sum, s) => sum + s.chargeAfter, 0);
   if (groupSize > 1) {
     const { data: sibAddons } = await supabase
       .from("booking_addons")

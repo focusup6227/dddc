@@ -7,7 +7,12 @@ import { requireFullStaff } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { appUrl, getStripe } from "@/lib/stripe";
 import { addDays, todayISO } from "@/lib/format";
-import { sendBookingConfirmation, sendPackageLowAlert } from "@/lib/email";
+import {
+  sendBookingConfirmation,
+  sendPackageLowAlert,
+  sendPaymentReceipt,
+} from "@/lib/email";
+import { settleUnpaidBookings } from "@/lib/coupons.server";
 import {
   BOARDING_STRIPE_PRICE_AMOUNT_CENTS,
   BOARDING_STRIPE_PRICE_ID,
@@ -869,7 +874,15 @@ export async function kioskPayGroup(formData: FormData) {
 
   const svc = createServiceClient();
   const [{ data: profile }, { data: bookingRows }] = await Promise.all([
-    svc.from("profiles").select("email").eq("id", customer_id).maybeSingle<{ email: string }>(),
+    svc
+      .from("profiles")
+      .select("email, full_name, account_credit_cents")
+      .eq("id", customer_id)
+      .maybeSingle<{
+        email: string;
+        full_name: string | null;
+        account_credit_cents: number;
+      }>(),
     svc
       .from("bookings")
       .select("*")
@@ -885,51 +898,114 @@ export async function kioskPayGroup(formData: FormData) {
     ((dogRows ?? []) as Pick<Dog, "id" | "name">[]).map((d) => [d.id, d.name]),
   );
 
+  // Settle each unpaid stay against the customer's credit pool — its coupon OR
+  // account credit (whichever's bigger, never both), exactly like the customer
+  // portal. The displayed group total runs the same helper, so they agree.
+  const unpaid = bookings
+    .filter((b) => b.payment_status !== "paid")
+    .sort((a, b) => a.service_date.localeCompare(b.service_date));
+  const settlements = settleUnpaidBookings(
+    unpaid,
+    profile?.account_credit_cents ?? 0,
+  );
+
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
-  const stampBookingIds: string[] = [];
-  const paidFreeIds: string[] = [];
-  for (const b of bookings.filter((x) => x.payment_status !== "paid")) {
+  const creditByBooking = new Map<string, number>();
+  const freeSettlements: typeof settlements = [];
+
+  for (const s of settlements) {
+    const b = s.booking;
     const units = stayUnitsOf(b);
     const isBoarding = b.service_kind === "boarding";
-    const total = (b.unit_price_cents ?? 0) * units;
-    // Honor a coupon stamped on the booking (e.g. an account coupon). Discount
-    // is encoded into the per-unit amount so the line item charges the net.
-    const coupon = Math.min(Math.max(0, b.coupon_discount_cents ?? 0), total);
-    const chargeAfter = total - coupon;
-    if (chargeAfter <= 0) {
-      // Coupon fully covers the stay (rare) — settle it outside Stripe.
-      paidFreeIds.push(b.id);
+
+    // Fully covered by coupon/credit — can't be a $0 Stripe line. Settle now.
+    if (s.chargeAfter === 0 && s.discount > 0) {
+      freeSettlements.push(s);
       continue;
     }
-    const adjustedUnit = Math.max(50, Math.ceil(chargeAfter / units));
+
+    // Stripe rejects unit_amount < 50¢; round up so a partial discount still
+    // collects a token charge. Encode the discount into the per-unit amount.
+    const adjustedUnit = Math.max(50, Math.ceil(s.chargeAfter / units));
+    const effectiveDiscount =
+      s.discount > 0 ? Math.max(0, s.total - adjustedUnit * units) : 0;
+    const effectiveCredit = s.useCoupon ? 0 : effectiveDiscount;
+    creditByBooking.set(b.id, effectiveCredit);
+
     const baseDesc = isBoarding
       ? `${units} night${units === 1 ? "" : "s"}: ${b.service_date} → ${b.service_end_date}`
       : `Service date: ${b.service_date}`;
+    const description =
+      effectiveDiscount > 0
+        ? `${baseDesc} · $${(effectiveDiscount / 100).toFixed(2)} ${s.useCoupon ? "coupon" : "account credit"} applied`
+        : baseDesc;
     lineItems.push({
       price_data: {
         currency: "usd" as const,
         product_data: {
           name: `${isBoarding ? "Boarding" : "Day care"} (${dogName.get(b.dog_id) ?? "Dog"})`,
-          description:
-            coupon > 0
-              ? `${baseDesc} · $${(coupon / 100).toFixed(2)} coupon applied`
-              : baseDesc,
+          description,
         },
         unit_amount: adjustedUnit,
       },
       quantity: units,
     });
-    stampBookingIds.push(b.id);
   }
 
-  if (paidFreeIds.length > 0) {
+  // Bookings fully covered by discounts: mark paid + burn their credit now (no
+  // webhook fires for these), and send the confirmation/receipt the webhook
+  // would otherwise have sent.
+  if (freeSettlements.length > 0) {
     await svc
       .from("bookings")
-      .update({ payment_kind: "drop_in", payment_status: "paid" })
-      .in("id", paidFreeIds);
+      .update({
+        payment_kind: "drop_in",
+        payment_status: "paid",
+        stripe_checkout_session_id: null,
+      })
+      .in("id", freeSettlements.map((s) => s.booking.id));
+    const freeCredit = freeSettlements.reduce((sum, s) => sum + s.creditApplied, 0);
+    if (freeCredit > 0) {
+      const current = profile?.account_credit_cents ?? 0;
+      await svc
+        .from("profiles")
+        .update({ account_credit_cents: Math.max(0, current - freeCredit) })
+        .eq("id", customer_id);
+    }
+    if (profile?.email) {
+      for (const s of freeSettlements) {
+        const b = s.booking;
+        const dates: string[] = [];
+        let cur = b.service_date;
+        while (cur < b.service_end_date) {
+          dates.push(cur);
+          cur = addDays(cur, 1);
+        }
+        if (dates.length === 0) dates.push(b.service_date);
+        const isBoarding = b.service_kind === "boarding";
+        const dn = dogName.get(b.dog_id) ?? "Dog";
+        await sendBookingConfirmation({
+          to: profile.email,
+          customerName: profile.full_name || profile.email,
+          dogName: dn,
+          dates,
+          paidByPackageCount: 0,
+          dropInCount: dates.length,
+          dropInTotalCents: s.total,
+        });
+        await sendPaymentReceipt({
+          to: profile.email,
+          customerName: profile.full_name || profile.email,
+          description: `${isBoarding ? "Boarding" : "Drop-in"} for ${dn} × ${dates.length} ${isBoarding ? "night" : "day"}${dates.length === 1 ? "" : "s"} (${s.useCoupon ? "coupon" : "account credit"})`,
+          amountCents: s.total,
+          paidAt: new Date(),
+        });
+      }
+    }
   }
 
-  // Unpaid add-ons across all the on-site dogs (incl. one stranded on a paid stay).
+  // Unpaid add-ons across all the on-site dogs (incl. one stranded on a paid
+  // stay) — billed at full price, no discount.
   const { data: washRows } = await svc
     .from("booking_addons")
     .select("*")
@@ -942,7 +1018,9 @@ export async function kioskPayGroup(formData: FormData) {
   }
 
   if (lineItems.length === 0) {
-    redirect(paidFreeIds.length > 0 ? "/kiosk?paid=1" : "/kiosk?error=Nothing+to+pay");
+    redirect(
+      freeSettlements.length > 0 ? "/kiosk?paid=1" : "/kiosk?error=Nothing+to+pay",
+    );
   }
 
   const stripe = getStripe();
@@ -955,11 +1033,17 @@ export async function kioskPayGroup(formData: FormData) {
     metadata: { kind: "drop_in", customer_id, source: "kiosk-group" },
   });
 
-  if (stampBookingIds.length > 0) {
+  // Stamp the session + the credit each charged booking burns on success (the
+  // webhook deducts sum(credit_applied_cents) for this session).
+  for (const [bookingId, credit] of creditByBooking) {
     await svc
       .from("bookings")
-      .update({ payment_kind: "drop_in", stripe_checkout_session_id: session.id })
-      .in("id", stampBookingIds);
+      .update({
+        payment_kind: "drop_in",
+        stripe_checkout_session_id: session.id,
+        credit_applied_cents: credit,
+      })
+      .eq("id", bookingId);
   }
   if (washes.length > 0) {
     await svc
