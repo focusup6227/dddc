@@ -471,23 +471,46 @@ async function maybeSendPackageLowAlerts(
   }
 }
 
+// "Pay by phone": when a payment is initiated with via=qr, the customer scans
+// a QR of the Checkout URL and pays on their own phone. Their phone lands on a
+// public /pay-complete page after; the kiosk screen polls the session and shows
+// the ✓. Without via=qr, payment happens on the kiosk screen exactly as before.
+function isQrPay(formData: FormData): boolean {
+  return String(formData.get("via") ?? "") === "qr";
+}
+function qrSuccessUrls() {
+  return {
+    successUrl: `${appUrl()}/pay-complete`,
+    cancelUrl: `${appUrl()}/pay-complete?canceled=1`,
+  };
+}
+function qrPayPath(checkoutUrl: string): string {
+  return `/kiosk/pay?u=${encodeURIComponent(checkoutUrl)}`;
+}
+
 /**
  * Take payment for an existing booking that's still unpaid.
- * Re-creates a Stripe Checkout session and redirects.
+ * Re-creates a Stripe Checkout session and redirects — to the on-screen hosted
+ * checkout, or (via=qr) to a scan-to-pay screen the customer uses on their phone.
  */
 export async function kioskTakePayment(formData: FormData) {
   await requireFullStaff();
   const booking_id = String(formData.get("booking_id") ?? "");
   if (!booking_id) redirect("/kiosk");
+  const qr = isQrPay(formData);
 
   const url = await createBookingCheckoutSession({
     bookingId: booking_id,
-    successUrl: `${appUrl()}/kiosk?paid=1`,
-    cancelUrl: `${appUrl()}/kiosk?canceled=1`,
+    ...(qr
+      ? qrSuccessUrls()
+      : {
+          successUrl: `${appUrl()}/kiosk?paid=1`,
+          cancelUrl: `${appUrl()}/kiosk?canceled=1`,
+        }),
     source: "kiosk",
   });
   if (!url) redirect("/kiosk?canceled=1");
-  redirect(url);
+  redirect(qr ? qrPayPath(url) : url);
 }
 
 /**
@@ -881,6 +904,7 @@ export async function kioskPayGroup(formData: FormData) {
   await requireFullStaff();
   const customer_id = String(formData.get("customer_id") ?? "");
   if (!customer_id) redirect("/kiosk");
+  const qr = isQrPay(formData);
 
   const svc = createServiceClient();
   const [{ data: profile }, { data: bookingRows }] = await Promise.all([
@@ -1038,8 +1062,10 @@ export async function kioskPayGroup(formData: FormData) {
     mode: "payment",
     customer_email: profile?.email,
     line_items: lineItems,
-    success_url: `${appUrl()}/kiosk?paid=1`,
-    cancel_url: `${appUrl()}/kiosk?canceled=1`,
+    success_url: qr ? `${appUrl()}/pay-complete` : `${appUrl()}/kiosk?paid=1`,
+    cancel_url: qr
+      ? `${appUrl()}/pay-complete?canceled=1`
+      : `${appUrl()}/kiosk?canceled=1`,
     metadata: { kind: "drop_in", customer_id, source: "kiosk-group" },
   });
 
@@ -1063,7 +1089,7 @@ export async function kioskPayGroup(formData: FormData) {
   }
 
   if (!session.url) redirect("/kiosk?error=Stripe+session+failed");
-  redirect(session.url);
+  redirect(qr ? qrPayPath(session.url) : session.url);
 }
 
 // ---------------------------------------------------------------------------

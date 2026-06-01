@@ -340,15 +340,27 @@ function GroupPickup({
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {unpaidCents > 0 && (
-          <form action={kioskPayGroup}>
-            <input type="hidden" name="customer_id" value={customerId} />
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-red-600 px-5 py-4 font-display text-lg font-semibold text-white shadow-soft transition-all hover:bg-red-700 active:translate-y-px"
-            >
-              Pay {allWord} · {formatMoney(unpaidCents)}
-            </button>
-          </form>
+          <div className="space-y-2">
+            <form action={kioskPayGroup}>
+              <input type="hidden" name="customer_id" value={customerId} />
+              <button
+                type="submit"
+                className="w-full rounded-xl bg-red-600 px-5 py-4 font-display text-lg font-semibold text-white shadow-soft transition-all hover:bg-red-700 active:translate-y-px"
+              >
+                Pay {allWord} · {formatMoney(unpaidCents)}
+              </button>
+            </form>
+            <form action={kioskPayGroup}>
+              <input type="hidden" name="customer_id" value={customerId} />
+              <input type="hidden" name="via" value="qr" />
+              <button
+                type="submit"
+                className="w-full rounded-xl border border-stone-200/80 bg-white px-5 py-3 font-display text-base font-semibold text-ink-900 shadow-soft transition-all hover:bg-cream-50 active:translate-y-px"
+              >
+                📱 Pay by phone (QR)
+              </button>
+            </form>
+          </div>
         )}
         <form action={kioskCheckOutGroup}>
           <input type="hidden" name="customer_id" value={customerId} />
@@ -720,16 +732,26 @@ async function ActionPanel({
   belongingsOutstanding: number;
 }) {
   if (!isPaid) {
+    const amount = booking.unit_price_cents
+      ? `· ${formatMoney(Math.max(0, booking.unit_price_cents * stayUnits(booking) - (booking.coupon_discount_cents ?? 0)))}`
+      : "";
     return (
-      <form action={kioskTakePayment}>
-        <input type="hidden" name="booking_id" value={booking.id} />
-        <BigButton tone="red">
-          Take payment{" "}
-          {booking.unit_price_cents
-            ? `· ${formatMoney(Math.max(0, booking.unit_price_cents * stayUnits(booking) - (booking.coupon_discount_cents ?? 0)))}`
-            : ""}
-        </BigButton>
-      </form>
+      <div className="space-y-3">
+        <form action={kioskTakePayment}>
+          <input type="hidden" name="booking_id" value={booking.id} />
+          <BigButton tone="red">Take payment {amount}</BigButton>
+        </form>
+        <form action={kioskTakePayment}>
+          <input type="hidden" name="booking_id" value={booking.id} />
+          <input type="hidden" name="via" value="qr" />
+          <button
+            type="submit"
+            className="w-full rounded-2xl border border-stone-200/80 bg-white px-6 py-4 font-display text-lg font-semibold text-ink-900 shadow-soft transition-all hover:bg-cream-50 active:translate-y-px"
+          >
+            📱 Pay by phone (QR)
+          </button>
+        </form>
+      </div>
     );
   }
   if (isCheckedOut) {
