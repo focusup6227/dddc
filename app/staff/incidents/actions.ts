@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { IncidentKind, IncidentSeverity } from "@/lib/supabase/types";
 import { INCIDENT_BUCKET } from "@/lib/incidents";
 import { sendStaffPush } from "@/lib/push.server";
+import { sendIncidentNotification } from "@/lib/email";
 
 function str(v: FormDataEntryValue | null): string | null {
   if (v == null) return null;
@@ -31,17 +32,29 @@ const SEVERITIES: ReadonlySet<IncidentSeverity> = new Set([
 export async function createIncident(formData: FormData) {
   const { userId } = await requireFullStaff();
 
-  const dog_id = str(formData.get("dog_id"));
+  // One incident can involve several dogs (e.g. a scuffle). The first selected
+  // dog becomes the "primary" stored on incidents.dog_id; all involved dogs are
+  // recorded in the incident_dogs junction.
+  const dogIds = Array.from(
+    new Set(
+      formData
+        .getAll("dog_id")
+        .map((v) => String(v).trim())
+        .filter(Boolean),
+    ),
+  );
   const occurred_on = str(formData.get("occurred_on"));
   const kindRaw = str(formData.get("kind"));
   const severityRaw = str(formData.get("severity")) ?? "low";
   const description = str(formData.get("description"));
   const notify = formData.get("customer_notified") === "yes";
 
-  if (!dog_id || !occurred_on || !kindRaw || !description) {
+  if (dogIds.length === 0 || !occurred_on || !kindRaw || !description) {
     redirect(
       "/staff/incidents/new?error=" +
-        encodeURIComponent("Dog, date, type, and description are required."),
+        encodeURIComponent(
+          "At least one dog, a date, type, and description are required.",
+        ),
     );
   }
   if (!KINDS.has(kindRaw as IncidentKind)) {
@@ -51,11 +64,12 @@ export async function createIncident(formData: FormData) {
     redirect("/staff/incidents/new?error=Invalid+severity.");
   }
 
+  const primaryDogId = dogIds[0];
   const supabase = await createClient();
   const { data: inserted, error } = await supabase
     .from("incidents")
     .insert({
-      dog_id,
+      dog_id: primaryDogId,
       occurred_on,
       kind: kindRaw as IncidentKind,
       severity: severityRaw as IncidentSeverity,
@@ -73,19 +87,65 @@ export async function createIncident(formData: FormData) {
     );
   }
 
-  const { data: dog } = await supabase
+  await supabase
+    .from("incident_dogs")
+    .insert(dogIds.map((dog_id) => ({ incident_id: inserted.id, dog_id })));
+
+  const { data: dogs } = await supabase
     .from("dogs")
-    .select("name")
-    .eq("id", dog_id)
-    .maybeSingle<{ name: string }>();
+    .select("id, name, owner_id")
+    .in("id", dogIds);
+  const involvedDogs = (dogs ?? []) as {
+    id: string;
+    name: string;
+    owner_id: string;
+  }[];
+  const primaryDog = involvedDogs.find((d) => d.id === primaryDogId);
+  const others = involvedDogs.length - 1;
   await sendStaffPush({
     title: `Incident reported (${severityRaw})`,
-    body: `${kindRaw} — ${dog?.name ?? "a dog"}`,
-    data: { type: "incident", incidentId: inserted.id, dogId: dog_id },
+    body: `${kindRaw} — ${primaryDog?.name ?? "a dog"}${others > 0 ? ` +${others} more` : ""}`,
+    data: { type: "incident", incidentId: inserted.id, dogId: primaryDogId },
   });
 
+  // Notify each involved dog's owner when staff left the "notify owner" box
+  // checked. This is essential mail — sendIncidentNotification ignores
+  // notify_prefs. Each email is about a specific dog, so an owner with two dogs
+  // in the same incident gets one email per dog. A failed send is logged inside
+  // the email helper and never blocks the insert.
+  if (notify && involvedDogs.length > 0) {
+    const ownerIds = Array.from(new Set(involvedDogs.map((d) => d.owner_id)));
+    const { data: ownerRows } = await supabase
+      .from("profiles")
+      .select("id, email, full_name")
+      .in("id", ownerIds);
+    const ownerById = new Map(
+      (ownerRows ?? []).map((o) => [
+        o.id,
+        o as { id: string; email: string | null; full_name: string | null },
+      ]),
+    );
+    await Promise.all(
+      involvedDogs.map((dog) => {
+        const owner = ownerById.get(dog.owner_id);
+        if (!owner?.email) return Promise.resolve();
+        return sendIncidentNotification({
+          to: owner.email,
+          customerName: owner.full_name ?? owner.email,
+          dogName: dog.name,
+          kind: kindRaw,
+          severity: severityRaw,
+          occurredOn: occurred_on,
+          description,
+        });
+      }),
+    );
+  }
+
   revalidatePath("/staff/incidents");
-  revalidatePath(`/staff/dogs/${dog_id}`);
+  for (const dog_id of dogIds) {
+    revalidatePath(`/staff/dogs/${dog_id}`);
+  }
   redirect(`/staff/incidents/${inserted.id}`);
 }
 

@@ -61,41 +61,53 @@ export default async function NewIncidentPage({
       <ToastNotifier toasts={TOASTS} />
 
       <form action={createIncident} className="card space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="dog_id" className="label">Dog</label>
-            <select
-              id="dog_id"
-              name="dog_id"
-              required
-              defaultValue={params.dog ?? ""}
-              className="input"
-            >
-              <option value="">Pick a dog…</option>
-              {dogs.map((d) => {
-                const owner = ownerById.get(d.owner_id);
-                const label = owner
-                  ? `${d.name} (${owner.full_name || owner.email})`
-                  : d.name;
-                return (
-                  <option key={d.id} value={d.id}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
+        <div>
+          <label className="label">Dogs involved</label>
+          <p className="-mt-1 mb-2 text-xs text-ink-500">
+            Pick everyone involved — each dog&apos;s owner can be notified.
+          </p>
+          <div className="max-h-64 overflow-y-auto rounded-lg border border-stone-200 bg-white">
+            {dogs.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-ink-500">No active dogs.</p>
+            ) : (
+              <ul className="divide-y divide-stone-100">
+                {dogs.map((d) => {
+                  const owner = ownerById.get(d.owner_id);
+                  return (
+                    <li key={d.id}>
+                      <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm hover:bg-cream-50">
+                        <input
+                          type="checkbox"
+                          name="dog_id"
+                          value={d.id}
+                          defaultChecked={params.dog === d.id}
+                          className="h-4 w-4 rounded border-stone-300"
+                        />
+                        <span className="text-ink-900">{d.name}</span>
+                        {owner && (
+                          <span className="text-xs text-ink-500">
+                            {owner.full_name || owner.email}
+                          </span>
+                        )}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
-          <div>
-            <label htmlFor="occurred_on" className="label">Date</label>
-            <input
-              id="occurred_on"
-              name="occurred_on"
-              type="date"
-              required
-              defaultValue={todayISO()}
-              className="input"
-            />
-          </div>
+        </div>
+
+        <div>
+          <label htmlFor="occurred_on" className="label">Date</label>
+          <input
+            id="occurred_on"
+            name="occurred_on"
+            type="date"
+            required
+            defaultValue={todayISO()}
+            className="input"
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -133,14 +145,20 @@ export default async function NewIncidentPage({
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-ink-700">
+        <label className="flex items-start gap-2 text-sm text-ink-700">
           <input
             type="checkbox"
             name="customer_notified"
             value="yes"
-            className="h-4 w-4 rounded border-stone-300"
+            defaultChecked
+            className="mt-0.5 h-4 w-4 rounded border-stone-300"
           />
-          I&apos;ve already notified the owner
+          <span>
+            Email the owner about this incident
+            <span className="block text-xs text-ink-500">
+              On by default. Uncheck for minor things you&apos;ll mention at pickup.
+            </span>
+          </span>
         </label>
 
         <div className="flex justify-end gap-3">

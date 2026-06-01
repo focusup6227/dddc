@@ -34,6 +34,7 @@ export default async function StaffOverviewPage() {
     packagesRes,
     custsRes,
     activePackagesRes,
+    liabilityRes,
     maxDay,
     maxNight,
     daycareCounts,
@@ -56,6 +57,13 @@ export default async function StaffOverviewPage() {
       .eq("payment_status", "paid")
       .gt("days_remaining", 0)
       .lte("days_remaining", 2),
+    // All-time prepaid liability: every paid package with days left, regardless
+    // of when it was bought.
+    supabase
+      .from("customer_packages")
+      .select("days_remaining, days_total, amount_paid_cents")
+      .eq("payment_status", "paid")
+      .gt("days_remaining", 0),
     getMaxDogsPerDay(),
     getMaxDogsPerNight(),
     getDayCounts([today, addDays(today, 1)], "daycare"),
@@ -75,13 +83,29 @@ export default async function StaffOverviewPage() {
   let refunds = 0;
   let daycareCount = 0;
   let boardingCount = 0;
+  // Attendance + cancellation health. Denominator for the no-show rate is
+  // bookings whose day actually came (checked in/out or no-showed) — future
+  // reservations aren't resolved yet, so they'd only dilute the figure.
+  let noShowCount = 0;
+  let attendedCount = 0; // checked_in or checked_out
+  let canceledCount = 0;
+  let canceledByCustomer = 0;
+  let canceledByStaff = 0;
   for (const b of monthBookings) {
     if (b.status === "canceled") {
       refunds += b.refund_amount_cents ?? 0;
+      canceledCount += 1;
+      // The cancel action stamps canceled_by with the actor's profile id.
+      // If that's the booking's own customer it was self-service; otherwise
+      // staff canceled on their behalf.
+      if (b.canceled_by && b.canceled_by === b.customer_id) canceledByCustomer += 1;
+      else canceledByStaff += 1;
       continue;
     }
     if (b.service_kind === "daycare") daycareCount += 1;
     else boardingCount += 1;
+    if (b.status === "no_show") noShowCount += 1;
+    else if (b.status === "checked_in" || b.status === "checked_out") attendedCount += 1;
     if (b.payment_status === "paid" && b.payment_kind === "drop_in" && b.unit_price_cents) {
       const nights = Math.max(1, nightCount(b.service_date, b.service_end_date));
       bookingRevenue += b.unit_price_cents * nights;
@@ -89,6 +113,30 @@ export default async function StaffOverviewPage() {
     if ((b.refund_amount_cents ?? 0) > 0) {
       refunds += b.refund_amount_cents ?? 0;
     }
+  }
+
+  const resolvedCount = attendedCount + noShowCount;
+  const noShowRate = resolvedCount > 0 ? noShowCount / resolvedCount : 0;
+  const cancellationRate =
+    monthBookings.length > 0 ? canceledCount / monthBookings.length : 0;
+
+  // Outstanding prepaid liability: money already collected for package days not
+  // yet redeemed. Each remaining day is valued at what the customer actually
+  // paid per day (amount_paid / days_total), so coupons/discounts are honored.
+  const liabilityRows = (liabilityRes.data ?? []) as {
+    days_remaining: number;
+    days_total: number;
+    amount_paid_cents: number;
+  }[];
+  let packageLiability = 0;
+  let liabilityDays = 0;
+  for (const p of liabilityRows) {
+    if (p.days_total > 0) {
+      packageLiability += Math.round(
+        (p.amount_paid_cents / p.days_total) * p.days_remaining,
+      );
+    }
+    liabilityDays += p.days_remaining;
   }
   const packageRevenue = monthPackages
     .filter((p) => p.payment_status === "paid")
@@ -210,6 +258,21 @@ export default async function StaffOverviewPage() {
           title="Refunds"
           value={formatMoney(refunds)}
           hint="this month"
+        />
+        <StatCard
+          title="No-show rate"
+          value={formatPct(noShowRate)}
+          hint={`${noShowCount} of ${resolvedCount} completed`}
+        />
+        <StatCard
+          title="Cancellation rate"
+          value={formatPct(cancellationRate)}
+          hint={`${canceledCount} of ${monthBookings.length} · ${canceledByCustomer} by customer, ${canceledByStaff} by us`}
+        />
+        <StatCard
+          title="Prepaid liability"
+          value={formatMoney(packageLiability)}
+          hint={`${liabilityDays} unredeemed package day${liabilityDays === 1 ? "" : "s"}`}
         />
         <UnpaidCard
           total={unpaidTotal}
@@ -447,6 +510,10 @@ function OccupancyCard({
       </div>
     </div>
   );
+}
+
+function formatPct(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
 }
 
 function nightCount(start: string, end: string): number {

@@ -38,12 +38,11 @@ export default async function StaffIncidentDetailPage({
     .maybeSingle<Incident>();
   if (!incident) notFound();
 
-  const [dogRes, photoRes, reporterRes] = await Promise.all([
+  const [linkRes, photoRes, reporterRes] = await Promise.all([
     supabase
-      .from("dogs")
-      .select("id, name, owner_id")
-      .eq("id", incident.dog_id)
-      .maybeSingle<Pick<Dog, "id" | "name" | "owner_id">>(),
+      .from("incident_dogs")
+      .select("dog_id")
+      .eq("incident_id", id),
     supabase
       .from("incident_photos")
       .select("*")
@@ -57,18 +56,34 @@ export default async function StaffIncidentDetailPage({
           .maybeSingle<Pick<Profile, "id" | "full_name" | "email">>()
       : Promise.resolve({ data: null }),
   ]);
-  const dog = dogRes.data;
   const reporter = reporterRes.data;
   const photos = (photoRes.data ?? []) as IncidentPhoto[];
 
-  const ownerRes = dog
+  // Every dog involved (junction), falling back to the primary dog_id for
+  // incidents predating the junction backfill.
+  const linkedDogIds = ((linkRes.data ?? []) as { dog_id: string }[]).map(
+    (l) => l.dog_id,
+  );
+  const dogIds = linkedDogIds.length ? linkedDogIds : [incident.dog_id];
+  const { data: dogRows } = await supabase
+    .from("dogs")
+    .select("id, name, owner_id")
+    .in("id", dogIds);
+  const dogs = (dogRows ?? []) as Pick<Dog, "id" | "name" | "owner_id">[];
+
+  const ownerIds = Array.from(new Set(dogs.map((d) => d.owner_id)));
+  const { data: ownerRows } = ownerIds.length
     ? await supabase
         .from("profiles")
         .select("id, full_name, email, phone")
-        .eq("id", dog.owner_id)
-        .maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "phone">>()
-    : { data: null };
-  const owner = ownerRes.data;
+        .in("id", ownerIds)
+    : { data: [] as Pick<Profile, "id" | "full_name" | "email" | "phone">[] };
+  const ownerById = new Map(
+    (ownerRows ?? []).map((o) => [
+      o.id,
+      o as Pick<Profile, "id" | "full_name" | "email" | "phone">,
+    ]),
+  );
 
   const signedUrls = await Promise.all(
     photos.map((p) =>
@@ -92,27 +107,34 @@ export default async function StaffIncidentDetailPage({
           <h1 className="font-display text-3xl font-bold text-ink-900">
             Incident
           </h1>
-          {dog && (
-            <p className="mt-1 text-ink-700">
-              <Link
-                href={`/staff/dogs/${dog.id}`}
-                className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
-              >
-                {dog.name}
-              </Link>
-              {owner && (
-                <>
-                  {" · "}
-                  <Link
-                    href={`/staff/customers/${owner.id}`}
-                    className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
-                  >
-                    {owner.full_name || owner.email}
-                  </Link>
-                  {owner.phone ? ` · ${owner.phone}` : ""}
-                </>
-              )}
-            </p>
+          {dogs.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {dogs.map((d) => {
+                const owner = ownerById.get(d.owner_id);
+                return (
+                  <li key={d.id} className="text-ink-700">
+                    <Link
+                      href={`/staff/dogs/${d.id}`}
+                      className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
+                    >
+                      {d.name}
+                    </Link>
+                    {owner && (
+                      <>
+                        {" · "}
+                        <Link
+                          href={`/staff/customers/${owner.id}`}
+                          className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
+                        >
+                          {owner.full_name || owner.email}
+                        </Link>
+                        {owner.phone ? ` · ${owner.phone}` : ""}
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
         <Link

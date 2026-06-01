@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { formatTime } from "@/lib/hours";
 import type { Booking, Chore, Dog } from "@/lib/supabase/types";
 
 // Generate any missing auto chores for `date`. Idempotent — relies on the
@@ -21,12 +22,19 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
   const dogsRes = dogIds.length
     ? await supabase
         .from("dogs")
-        .select("id, name, feeding_notes, medications")
+        .select(
+          "id, name, feeding_notes, medications, feeding_schedule, medication_schedule",
+        )
         .in("id", dogIds)
     : { data: [] };
   const dogs = (dogsRes.data ?? []) as Pick<
     Dog,
-    "id" | "name" | "feeding_notes" | "medications"
+    | "id"
+    | "name"
+    | "feeding_notes"
+    | "medications"
+    | "feeding_schedule"
+    | "medication_schedule"
   >[];
   const dogName = new Map(dogs.map((d) => [d.id, d.name]));
 
@@ -54,38 +62,71 @@ export async function ensureAutoChoresForDate(date: string): Promise<void> {
     },
   ]);
 
-  // --- Feeding (Breakfast + Dinner per boarder) -----------------------------
+  // --- Feeding (per boarder) ------------------------------------------------
+  // A structured feeding_schedule emits one chore per entry; otherwise we fall
+  // back to the classic Breakfast + Dinner pair driven by the free-text notes.
   const boarders = dogs.filter((d) => boardingDogIds.has(d.id));
-  const feedingRows = boarders.flatMap((d) => [
-    {
-      kind: "feeding" as const,
-      title: `Breakfast — ${d.name}`,
-      description: d.feeding_notes,
-      due_date: date,
-      dog_id: d.id,
-      auto_key: "feed_am",
-    },
-    {
-      kind: "feeding" as const,
-      title: `Dinner — ${d.name}`,
-      description: d.feeding_notes,
-      due_date: date,
-      dog_id: d.id,
-      auto_key: "feed_pm",
-    },
-  ]);
+  const feedingRows = boarders.flatMap((d) => {
+    const schedule = d.feeding_schedule ?? [];
+    if (schedule.length > 0) {
+      return schedule.map((entry, i) => ({
+        kind: "feeding" as const,
+        title: `Feeding ${formatTime(entry.time) || "—"} — ${d.name}`,
+        description: entry.amount || d.feeding_notes,
+        due_date: date,
+        dog_id: d.id,
+        auto_key: `feed_${i}`,
+      }));
+    }
+    return [
+      {
+        kind: "feeding" as const,
+        title: `Breakfast — ${d.name}`,
+        description: d.feeding_notes,
+        due_date: date,
+        dog_id: d.id,
+        auto_key: "feed_am",
+      },
+      {
+        kind: "feeding" as const,
+        title: `Dinner — ${d.name}`,
+        description: d.feeding_notes,
+        due_date: date,
+        dog_id: d.id,
+        auto_key: "feed_pm",
+      },
+    ];
+  });
 
-  // --- Medication (one per boarder that has meds on file) -------------------
-  const medRows = boarders
-    .filter((d) => (d.medications ?? "").trim().length > 0)
-    .map((d) => ({
-      kind: "medication" as const,
-      title: `Meds — ${d.name}`,
-      description: d.medications,
-      due_date: date,
-      dog_id: d.id,
-      auto_key: "meds",
-    }));
+  // --- Medication (per boarder) ---------------------------------------------
+  // Same pattern: one chore per scheduled dose when present, else a single
+  // free-text reminder for boarders that have any medications on file.
+  const medRows = boarders.flatMap((d) => {
+    const schedule = d.medication_schedule ?? [];
+    if (schedule.length > 0) {
+      return schedule.map((entry, i) => ({
+        kind: "medication" as const,
+        title: `Meds ${formatTime(entry.time) || "—"} — ${d.name}: ${entry.name || "medication"}`,
+        description: entry.dose || d.medications,
+        due_date: date,
+        dog_id: d.id,
+        auto_key: `meds_${i}`,
+      }));
+    }
+    if ((d.medications ?? "").trim().length > 0) {
+      return [
+        {
+          kind: "medication" as const,
+          title: `Meds — ${d.name}`,
+          description: d.medications,
+          due_date: date,
+          dog_id: d.id,
+          auto_key: "meds",
+        },
+      ];
+    }
+    return [];
+  });
 
   // --- Backyard sanitize: weekly, Mondays only ------------------------------
   const sanitizeRows: Array<{

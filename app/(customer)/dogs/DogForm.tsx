@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { Dog } from "@/lib/supabase/types";
+import type {
+  Dog,
+  FeedingScheduleItem,
+  MedicationScheduleItem,
+} from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
 
 const GETS_ALONG_OPTIONS = [
@@ -24,6 +29,12 @@ export function DogForm({
   const [photoPath, setPhotoPath] = useState<string | null>(dog?.photo_path ?? null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feeding, setFeeding] = useState<FeedingScheduleItem[]>(
+    dog?.feeding_schedule ?? [],
+  );
+  const [meds, setMeds] = useState<MedicationScheduleItem[]>(
+    dog?.medication_schedule ?? [],
+  );
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -154,7 +165,7 @@ export function DogForm({
         />
         <Textarea
           name="medications"
-          label="Does your dog take any medications?"
+          label="Medication notes (vet instructions, context — set exact doses below)"
           defaultValue={dog?.medications ?? ""}
         />
         {!dog && (
@@ -165,11 +176,149 @@ export function DogForm({
         )}
       </section>
 
-      <section className="card space-y-4">
+      <section className="card space-y-5">
         <h3 className="font-display text-lg font-semibold text-ink-900">Care notes</h3>
+
+        <div>
+          <label className="label">Feeding schedule</label>
+          <p className="-mt-1 mb-2 text-xs text-ink-500">
+            Add a row per meal — each becomes a checklist item for our staff.
+          </p>
+          <div className="space-y-2">
+            {feeding.map((row, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2">
+                <input
+                  type="time"
+                  name="feeding_time"
+                  value={row.time}
+                  onChange={(e) =>
+                    setFeeding((rows) =>
+                      rows.map((r, j) =>
+                        j === i ? { ...r, time: e.target.value } : r,
+                      ),
+                    )
+                  }
+                  className="input w-32"
+                  aria-label="Feeding time"
+                />
+                <input
+                  type="text"
+                  name="feeding_amount"
+                  value={row.amount}
+                  placeholder="1 cup kibble"
+                  onChange={(e) =>
+                    setFeeding((rows) =>
+                      rows.map((r, j) =>
+                        j === i ? { ...r, amount: e.target.value } : r,
+                      ),
+                    )
+                  }
+                  className="input min-w-0 flex-1"
+                  aria-label="Feeding amount"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFeeding((rows) => rows.filter((_, j) => j !== i))
+                  }
+                  className="rounded-md border border-stone-300 p-2 text-ink-500 hover:bg-stone-50"
+                  aria-label="Remove feeding"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setFeeding((rows) => [...rows, { time: "", amount: "" }])
+            }
+            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-900"
+          >
+            <Plus size={15} /> Add feeding time
+          </button>
+        </div>
+
+        <div>
+          <label className="label">Medication schedule</label>
+          <p className="-mt-1 mb-2 text-xs text-ink-500">
+            Add each dose — time, medication, and how much.
+          </p>
+          <div className="space-y-2">
+            {meds.map((row, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2">
+                <input
+                  type="time"
+                  name="med_time"
+                  value={row.time}
+                  onChange={(e) =>
+                    setMeds((rows) =>
+                      rows.map((r, j) =>
+                        j === i ? { ...r, time: e.target.value } : r,
+                      ),
+                    )
+                  }
+                  className="input w-32"
+                  aria-label="Medication time"
+                />
+                <input
+                  type="text"
+                  name="med_name"
+                  value={row.name}
+                  placeholder="Rimadyl"
+                  onChange={(e) =>
+                    setMeds((rows) =>
+                      rows.map((r, j) =>
+                        j === i ? { ...r, name: e.target.value } : r,
+                      ),
+                    )
+                  }
+                  className="input min-w-0 flex-1"
+                  aria-label="Medication name"
+                />
+                <input
+                  type="text"
+                  name="med_dose"
+                  value={row.dose}
+                  placeholder="1 tablet"
+                  onChange={(e) =>
+                    setMeds((rows) =>
+                      rows.map((r, j) =>
+                        j === i ? { ...r, dose: e.target.value } : r,
+                      ),
+                    )
+                  }
+                  className="input w-32"
+                  aria-label="Medication dose"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMeds((rows) => rows.filter((_, j) => j !== i))
+                  }
+                  className="rounded-md border border-stone-300 p-2 text-ink-500 hover:bg-stone-50"
+                  aria-label="Remove medication"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setMeds((rows) => [...rows, { time: "", name: "", dose: "" }])
+            }
+            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-900"
+          >
+            <Plus size={15} /> Add medication
+          </button>
+        </div>
+
         <Textarea
           name="feeding_notes"
-          label="Feeding instructions"
+          label="Other feeding notes (optional)"
           defaultValue={dog?.feeding_notes ?? ""}
         />
         <Textarea

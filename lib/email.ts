@@ -689,6 +689,68 @@ export async function sendWaitlistOffer(args: {
   });
 }
 
+// --- Incident report ------------------------------------------------------
+
+const INCIDENT_KIND_LABEL: Record<string, string> = {
+  bite: "a bite",
+  injury: "an injury",
+  escape: "an escape attempt",
+  illness: "an illness",
+  property_damage: "property damage",
+  other: "an incident",
+};
+
+const INCIDENT_SEVERITY_LABEL: Record<string, string> = {
+  low: "Minor",
+  medium: "Moderate",
+  high: "Serious",
+};
+
+/**
+ * Notifies an owner that an incident involving their dog was logged. This is
+ * ESSENTIAL mail — like payment receipts and cancellations, it never checks
+ * notify_prefs. Owners should always hear when their dog was hurt, fell ill,
+ * or was involved in an incident. Tone is calm and factual, not alarming.
+ */
+export async function sendIncidentNotification(args: {
+  to: string;
+  customerName: string;
+  dogName: string;
+  kind: string;
+  severity: string;
+  occurredOn: string; // ISO YYYY-MM-DD
+  description: string;
+}) {
+  const { to, customerName, dogName, kind, severity, occurredOn, description } =
+    args;
+
+  const kindLabel = INCIDENT_KIND_LABEL[kind] ?? "an incident";
+  const severityLabel = INCIDENT_SEVERITY_LABEL[severity] ?? "Logged";
+
+  const body = `
+    <p style="margin:0 0 18px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.text};">Hi ${escape(customerName)},</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:16px;line-height:1.55;color:${COLOR.textMuted};">We're letting you know that we logged ${escape(kindLabel)} involving <strong style="color:${COLOR.text};">${escape(dogName)}</strong> during their visit. We document these so you always have the full picture of your dog's time with us.</p>
+    ${detailCard([
+      { label: "Dog", value: escape(dogName) },
+      { label: "Date", value: escape(formatDateShort(occurredOn)) },
+      { label: "Severity", value: escape(severityLabel) },
+    ])}
+    <p style="margin:16px 0 6px;font-family:${FONT};font-size:14px;font-weight:600;color:${COLOR.text};">What happened</p>
+    <p style="margin:0 0 14px;font-family:${FONT};font-size:15px;line-height:1.6;color:${COLOR.textMuted};white-space:pre-wrap;">${escape(description)}</p>
+    <p style="margin:14px 0 0;font-family:${FONT};font-size:14px;line-height:1.55;color:${COLOR.textMuted};">If you have any questions, just reply to this email or give us a call — we're happy to walk you through it.</p>
+  `;
+
+  await send({
+    to,
+    subject: `An incident report for ${dogName}`,
+    html: shell({
+      preheader: `We logged ${kindLabel} involving ${dogName} on ${formatDateShort(occurredOn)}.`,
+      heading: "Incident report",
+      body,
+    }),
+  });
+}
+
 function escape(s: string): string {
   return s
     .replace(/&/g, "&amp;")

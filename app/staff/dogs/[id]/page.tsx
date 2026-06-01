@@ -12,6 +12,7 @@ import type {
 } from "@/lib/supabase/types";
 import { DogAvatar } from "@/components/DogAvatar";
 import { formatDate, formatDateShort } from "@/lib/format";
+import { formatTime } from "@/lib/hours";
 import {
   REQUIRED_VACCINES,
   summarizeCoverage,
@@ -55,18 +56,29 @@ export default async function StaffDogDetailPage({
       .order("service_date", { ascending: false })
       .limit(20),
     supabase.from("dog_vaccinations").select("*").eq("dog_id", id),
+    // Incidents where this dog is involved (primary or otherwise), via junction.
     supabase
-      .from("incidents")
-      .select("*")
-      .eq("dog_id", id)
-      .order("occurred_on", { ascending: false })
-      .limit(10),
+      .from("incident_dogs")
+      .select("incident_id")
+      .eq("dog_id", id),
   ]);
   const owner = ownerRes.data ?? null;
   const notes = (notesRes.data ?? []) as DogNote[];
   const bookings = (bookingsRes.data ?? []) as Booking[];
   const coverage = summarizeCoverage((vaxRes.data ?? []) as DogVaccination[]);
-  const incidents = (incidentRes.data ?? []) as Incident[];
+
+  const incidentIds = ((incidentRes.data ?? []) as { incident_id: string }[]).map(
+    (l) => l.incident_id,
+  );
+  const { data: incidentRows } = incidentIds.length
+    ? await supabase
+        .from("incidents")
+        .select("*")
+        .in("id", incidentIds)
+        .order("occurred_on", { ascending: false })
+        .limit(10)
+    : { data: [] as Incident[] };
+  const incidents = (incidentRows ?? []) as Incident[];
 
   return (
     <div className="space-y-8 animate-fade-up">
@@ -107,6 +119,22 @@ export default async function StaffDogDetailPage({
             <Row label="Vet" value={dog.vet_name} />
             <Row label="Vet phone" value={dog.vet_phone} />
           </dl>
+          {dog.medication_schedule && dog.medication_schedule.length > 0 && (
+            <div className="mt-4 rounded-lg border border-stone-200 bg-cream-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                Medication schedule
+              </p>
+              <ul className="mt-1.5 space-y-1 text-sm text-ink-900">
+                {dog.medication_schedule.map((m, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{formatTime(m.time) || "—"}</span>{" "}
+                    {m.name}
+                    {m.dose ? ` · ${m.dose}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="mt-5 border-t border-stone-200/80 pt-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-ink-900">Vaccines</h3>
@@ -140,8 +168,23 @@ export default async function StaffDogDetailPage({
           <h2 className="font-display text-lg font-semibold text-ink-900">
             Care
           </h2>
+          {dog.feeding_schedule && dog.feeding_schedule.length > 0 && (
+            <div className="mt-3 rounded-lg border border-stone-200 bg-cream-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                Feeding schedule
+              </p>
+              <ul className="mt-1.5 space-y-1 text-sm text-ink-900">
+                {dog.feeding_schedule.map((f, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{formatTime(f.time) || "—"}</span>{" "}
+                    {f.amount}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <dl className="mt-3 space-y-2 text-sm">
-            <Row label="Feeding" value={dog.feeding_notes} />
+            <Row label="Feeding notes" value={dog.feeding_notes} />
             <Row label="Behavior" value={dog.behavior_notes} />
           </dl>
         </section>

@@ -7,6 +7,7 @@ import type {
 import { addDays, todayISO } from "@/lib/format";
 import { getFullDates } from "@/lib/settings";
 import { getBlackoutDates } from "@/lib/blackouts.server";
+import { consumePackageDay } from "@/lib/packageAllocation";
 
 const HORIZON_DAYS = 28;
 
@@ -110,7 +111,6 @@ export async function materializeForCustomer(customerId: string): Promise<{
   // Sort candidates by date so package days go to the earliest occurrences.
   candidates.sort((a, b) => a.date.localeCompare(b.date));
 
-  let cursor = 0;
   let created = 0;
   for (const c of candidates) {
     if (!dogOk.has(c.schedule.dog_id)) continue;
@@ -118,10 +118,14 @@ export async function materializeForCustomer(customerId: string): Promise<{
     if (fullDates.has(c.date)) continue;
     if (blackoutDates.has(c.date)) continue;
 
-    while (cursor < packages.length && packages[cursor].days_remaining <= 0) {
-      cursor += 1;
-    }
-    const pkg = cursor < packages.length ? packages[cursor] : null;
+    // Consume up to a full day from packages (fractional balances allowed); the
+    // uncovered remainder, if any, is an unpaid drop-in. Snapshot first so we
+    // can roll back the in-memory consumption if the insert is skipped.
+    const before = packages.map((p) => p.days_remaining);
+    const { chargeFraction, consumed } = consumePackageDay(packages);
+    const restore = () => {
+      packages.forEach((p, i) => (p.days_remaining = before[i]));
+    };
 
     const insertBase = {
       customer_id: customerId,
@@ -134,27 +138,33 @@ export async function materializeForCustomer(customerId: string): Promise<{
     };
 
     let insertRow: Record<string, unknown>;
-    if (pkg) {
+    if (chargeFraction === 0) {
       insertRow = {
         ...insertBase,
         payment_kind: "package",
-        customer_package_id: pkg.id,
+        customer_package_id: consumed[0]!.id,
+        package_days_used: 1,
         payment_status: "paid",
       };
     } else if (dropInPriceCents !== null) {
       insertRow = {
         ...insertBase,
         payment_kind: "drop_in",
-        unit_price_cents: dropInPriceCents,
+        customer_package_id: consumed[0]?.id ?? null,
+        package_days_used: Math.round((1 - chargeFraction) * 10) / 10,
+        unit_price_cents: Math.round(dropInPriceCents * chargeFraction),
         payment_status: "unpaid",
       };
     } else {
-      // No drop-in price configured — skip rather than insert an unpriced row.
+      // No drop-in price configured — can't price the cash remainder. Restore
+      // any consumed fraction and skip rather than insert an unpriced row.
+      restore();
       continue;
     }
 
     const { error: insErr } = await svc.from("bookings").insert(insertRow);
     if (insErr) {
+      restore();
       if (insErr.message.toLowerCase().includes("duplicate")) continue;
       // Skip on other errors so one bad row doesn't abort the whole pass.
       console.error("recurring materialize insert failed:", insErr);
@@ -162,12 +172,14 @@ export async function materializeForCustomer(customerId: string): Promise<{
     }
     created += 1;
 
-    if (pkg) {
-      pkg.days_remaining -= 1;
-      await svc
-        .from("customer_packages")
-        .update({ days_remaining: pkg.days_remaining })
-        .eq("id", pkg.id);
+    // Persist whatever package balances this day changed.
+    for (let i = 0; i < packages.length; i++) {
+      if (packages[i].days_remaining !== before[i]) {
+        await svc
+          .from("customer_packages")
+          .update({ days_remaining: packages[i].days_remaining })
+          .eq("id", packages[i].id);
+      }
     }
   }
 

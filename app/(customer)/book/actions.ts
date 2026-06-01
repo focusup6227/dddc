@@ -14,6 +14,7 @@ import { isTimeInWindow } from "@/lib/hours";
 import { VACCINE_LABEL } from "@/lib/vaccines";
 import { assertDogReadyToBook } from "@/lib/vaccines.server";
 import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
+import { consumePackageDay } from "@/lib/packageAllocation";
 import { sendStaffPush } from "@/lib/push.server";
 import type { CustomerPackage, Dog, Package } from "@/lib/supabase/types";
 
@@ -99,7 +100,9 @@ export async function createBooking(formData: FormData) {
     );
   }
 
-  // Pull paid packages with remaining days, oldest first (FIFO).
+  // Pull paid packages with any remaining balance, oldest first (FIFO). A
+  // fractional balance (from a late-reschedule half-day penalty) is usable —
+  // it covers part of a day, and the rest is charged as cash.
   const { data: pkgRows } = await supabase
     .from("customer_packages")
     .select("*")
@@ -108,24 +111,18 @@ export async function createBooking(formData: FormData) {
     .gt("days_remaining", 0)
     .order("created_at");
   const packages = (pkgRows ?? []) as CustomerPackage[];
+  const startBalances = new Map(packages.map((p) => [p.id, p.days_remaining]));
 
-  // Allocate package days first.
-  const allocations: { date: string; pkg: CustomerPackage | null }[] = [];
-  let cursor = 0;
-  for (const date of dates) {
-    while (cursor < packages.length && packages[cursor].days_remaining <= 0) cursor++;
-    if (cursor < packages.length) {
-      allocations.push({ date, pkg: packages[cursor] });
-      packages[cursor].days_remaining -= 1;
-    } else {
-      allocations.push({ date, pkg: null });
-    }
-  }
+  // Per-day allocation: consume up to a full day from packages, charge cash for
+  // any uncovered fraction. chargeFraction 0 = free, 0.5 = half, 1 = full.
+  const perDay = dates.map((date) => {
+    const { chargeFraction, consumed } = consumePackageDay(packages);
+    return { date, chargeFraction, consumed };
+  });
+  const packageAllocs = perDay.filter((a) => a.chargeFraction === 0);
+  const dropInAllocs = perDay.filter((a) => a.chargeFraction > 0);
 
-  const packageAllocs = allocations.filter((a) => a.pkg);
-  const dropInAllocs = allocations.filter((a) => !a.pkg);
-
-  // Look up the 1-day "drop in" package price.
+  // Look up the full 1-day "drop in" price; any cash charge is a fraction of it.
   let dropInPriceCents: number | null = null;
   let dropInPriceId: string | null = null;
   if (dropInAllocs.length > 0) {
@@ -143,17 +140,22 @@ export async function createBooking(formData: FormData) {
     dropInPriceCents = dropInPkg!.price_cents;
     dropInPriceId = dropInPkg!.stripe_price_id;
   }
+  // The cents charged for a given day = full rate × the uncovered fraction.
+  const chargeCentsFor = (fraction: number) =>
+    Math.round((dropInPriceCents ?? 0) * fraction);
 
   // Use service client to decrement package days + insert bookings transactionally-ish.
   // (Two RPCs would be cleaner but service client lets us bypass RLS for the package update.)
   const svc = createServiceClient();
 
-  // Insert package-funded bookings + decrement package balances.
+  // Insert package-funded (fully covered) bookings. The primary package — the
+  // first one that contributed — is recorded on the row; a day can draw on two
+  // packages (combining half-days), but only the primary restores on cancel.
   const confirmedPackageDates: string[] = [];
   const touchedPackageIds = new Set<string>();
   let firstPackageBookingId: string | null = null;
   for (const a of packageAllocs) {
-    const pkg = a.pkg!;
+    const primaryPkgId = a.consumed[0]!.id;
     const { data: inserted, error: insErr } = await svc
       .from("bookings")
       .insert({
@@ -165,7 +167,8 @@ export async function createBooking(formData: FormData) {
         pickup_time,
         status: "reserved",
         payment_kind: "package",
-        customer_package_id: pkg.id,
+        customer_package_id: primaryPkgId,
+        package_days_used: 1,
         payment_status: "paid",
       })
       .select("id")
@@ -179,11 +182,20 @@ export async function createBooking(formData: FormData) {
     }
     if (inserted && !firstPackageBookingId) firstPackageBookingId = inserted.id;
     confirmedPackageDates.push(a.date);
-    touchedPackageIds.add(pkg.id);
-    await svc
-      .from("customer_packages")
-      .update({ days_remaining: pkg.days_remaining })
-      .eq("id", pkg.id);
+    for (const c of a.consumed) touchedPackageIds.add(c.id);
+  }
+
+  // Persist every package balance that changed (consumePackageDay mutated them
+  // in memory). Done once here so multi-package days and partial days are all
+  // covered with a single write each.
+  for (const pkg of packages) {
+    if (startBalances.get(pkg.id) !== pkg.days_remaining) {
+      touchedPackageIds.add(pkg.id);
+      await svc
+        .from("customer_packages")
+        .update({ days_remaining: pkg.days_remaining })
+        .eq("id", pkg.id);
+    }
   }
 
   // Let staff know a customer just booked day care.
@@ -246,24 +258,42 @@ export async function createBooking(formData: FormData) {
   }
   await maybeSendPackageLowAlerts(svc, userId, profile.email, profile.full_name, touchedPackageIds);
 
-  // Otherwise: create Stripe checkout for the drop-in days, with a "pending" booking row each.
+  // Otherwise: create Stripe checkout for the charged days, with a "pending"
+  // booking row each. Days can have different prices now — a full day ($25) vs
+  // a partial day where a package fraction covered part ($12.50) — so group by
+  // the cents charged and emit one line item per distinct price.
   const stripe = getStripe();
-  const dropInLineItem = dropInPriceId
-    ? { price: dropInPriceId, quantity: dropInAllocs.length }
-    : {
+  const fullCents = dropInPriceCents!;
+  const byCharge = new Map<number, typeof dropInAllocs>();
+  for (const a of dropInAllocs) {
+    const cents = chargeCentsFor(a.chargeFraction);
+    const arr = byCharge.get(cents) ?? [];
+    arr.push(a);
+    byCharge.set(cents, arr);
+  }
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  for (const [cents, group] of byCharge) {
+    const partial = cents < fullCents;
+    // Full-price days can use the catalog Stripe price; partial days need an
+    // ad-hoc amount via price_data.
+    if (!partial && dropInPriceId) {
+      lineItems.push({ price: dropInPriceId, quantity: group.length });
+    } else {
+      lineItems.push({
         price_data: {
           currency: "usd" as const,
           product_data: {
-            name: `Day care drop-in (${dog.name})`,
-            description: `Service dates: ${dropInAllocs.map((a) => a.date).join(", ")}`,
+            name: partial
+              ? `Day care (${dog.name}) — package credit applied`
+              : `Day care drop-in (${dog.name})`,
+            description: `Service dates: ${group.map((a) => a.date).join(", ")}`,
           },
-          unit_amount: dropInPriceCents!,
+          unit_amount: cents,
         },
-        quantity: dropInAllocs.length,
-      };
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-    dropInLineItem,
-  ];
+        quantity: group.length,
+      });
+    }
+  }
   if (dogWash) lineItems.push(dogWashLineItem(dog.name));
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -279,7 +309,8 @@ export async function createBooking(formData: FormData) {
     },
   });
 
-  // Pre-create bookings as unpaid, linked to the session id, so the webhook flips them.
+  // Pre-create bookings as unpaid, linked to the session id, so the webhook
+  // flips them. Each carries its own price (full or partial).
   let firstDropInBookingId: string | null = null;
   for (const a of dropInAllocs) {
     const { data: inserted } = await svc
@@ -293,7 +324,11 @@ export async function createBooking(formData: FormData) {
         pickup_time,
         status: "reserved",
         payment_kind: "drop_in",
-        unit_price_cents: dropInPriceCents,
+        // A partial day records the package fraction it drew on (and its
+        // primary package) so cancel can restore it; a pure drop-in records 0.
+        customer_package_id: a.consumed[0]?.id ?? null,
+        package_days_used: Math.round((1 - a.chargeFraction) * 10) / 10,
+        unit_price_cents: chargeCentsFor(a.chargeFraction),
         stripe_checkout_session_id: session.id,
         payment_status: "unpaid",
       })

@@ -23,6 +23,7 @@ import {
   payBooking,
   payDogWash,
   removeCouponFromBooking,
+  rescheduleBooking,
 } from "./actions";
 import ConfirmCancelButton from "./ConfirmCancelButton";
 
@@ -34,6 +35,13 @@ const TOASTS = [
     message: "Payment canceled. You can try again whenever you're ready.",
   },
   { param: "coupon", message: "Coupon applied." },
+  { param: "rescheduled", message: "Booking moved — we've sent a confirmation." },
+  {
+    param: "rescheduled_late",
+    tone: "info" as const,
+    message:
+      "Booking moved. Because it was within 24 hours, a 50% late fee applied — check your balance.",
+  },
   {
     param: "left_waitlist",
     tone: "info" as const,
@@ -59,6 +67,8 @@ export default async function BookingsPage({
     canceled?: string;
     error?: string;
     coupon?: string;
+    rescheduled?: string;
+    rescheduled_late?: string;
     left_waitlist?: string;
   }>;
 }) {
@@ -450,6 +460,12 @@ function Section({
             // Past-due unpaid rows can't be canceled — the customer must pay.
             const showCancel =
               cancelable && b.status === "reserved" && !isPastDue;
+            // Day care days can be moved in place; boarding can't (date range).
+            const showReschedule =
+              cancelable &&
+              b.service_kind === "daycare" &&
+              b.status === "reserved" &&
+              !isPastDue;
             const showPayNow = isUnpaid;
             // A wash stranded on an already-paid (or checked-out) stay — the
             // normal "Pay now" won't cover it, so offer it on its own.
@@ -524,6 +540,9 @@ function Section({
                   )}
                 </div>
                 </div>
+                {showReschedule && (
+                  <RescheduleRow bookingId={b.id} minDate={today} />
+                )}
                 {showPayNow && (
                   <CouponRow
                     bookingId={b.id}
@@ -545,6 +564,42 @@ function Section({
         </ul>
       )}
     </section>
+  );
+}
+
+function RescheduleRow({
+  bookingId,
+  minDate,
+}: {
+  bookingId: string;
+  minDate: string;
+}) {
+  return (
+    <details className="mt-2 text-sm">
+      <summary className="cursor-pointer text-ink-500 hover:text-ink-700">
+        Reschedule to another day
+      </summary>
+      <form action={rescheduleBooking} className="mt-2 flex flex-wrap gap-2">
+        <input type="hidden" name="id" value={bookingId} />
+        <input
+          type="date"
+          name="service_date"
+          required
+          min={minDate}
+          className="input text-sm sm:max-w-xs"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-stone-50"
+        >
+          Move booking
+        </button>
+      </form>
+      <p className="mt-1 text-xs text-ink-400">
+        Free if it&apos;s more than 24 hours away. Within 24 hours, a 50% late
+        fee applies (half a package day, or 50% of the rate).
+      </p>
+    </details>
   );
 }
 

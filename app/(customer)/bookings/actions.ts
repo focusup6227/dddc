@@ -9,6 +9,7 @@ import {
   cancelBookingWithRefund,
   createBookingCheckoutSession,
   isPastDueUnpaid,
+  refundFractionForBooking,
 } from "@/lib/bookings.server";
 import {
   calcCouponDiscount,
@@ -22,7 +23,11 @@ import {
   getUnpaidAddonsForCustomer,
   stampAddonSession,
 } from "@/lib/addons.server";
-import { addDays } from "@/lib/format";
+import { getFullDates } from "@/lib/settings";
+import { getBlackoutDates } from "@/lib/blackouts.server";
+import { assertDogReadyToBook } from "@/lib/vaccines.server";
+import { VACCINE_LABEL } from "@/lib/vaccines";
+import { addDays, todayISO } from "@/lib/format";
 import { appUrl, getStripe } from "@/lib/stripe";
 import {
   cancelWaitlistEntry,
@@ -144,6 +149,217 @@ export async function cancelBooking(formData: FormData) {
 
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
+}
+
+/**
+ * Move a future, reserved day-care booking to a different date in place. The
+ * price for a day-care day is flat, so the booking's payment (package day or
+ * drop-in charge) carries over untouched — we only swap the date after
+ * re-running the same gates a fresh booking must pass. Boarding isn't supported
+ * here (date-range + per-night capacity makes an in-place move ambiguous).
+ */
+export async function rescheduleBooking(formData: FormData) {
+  const { userId, profile } = await requireCustomer();
+  const id = String(formData.get("id") ?? "");
+  const newDate = String(formData.get("service_date") ?? "").trim();
+  if (!id) redirect("/bookings");
+  if (!ISO_RE.test(newDate)) {
+    redirect("/bookings?error=" + encodeURIComponent("Pick a valid date."));
+  }
+
+  const supabase = await createClient();
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("id", id)
+    .eq("customer_id", userId)
+    .maybeSingle<Booking>();
+  if (!booking) redirect("/bookings");
+
+  if (booking.service_kind !== "daycare") {
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent("Only day care bookings can be rescheduled."),
+    );
+  }
+  // Reschedule is for ordinary, not-yet-started reservations — not waitlist
+  // holds, checked-in/out stays, or canceled rows.
+  if (booking.status !== "reserved" || booking.waitlist_offer_expires_at) {
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent("This booking can't be rescheduled."),
+    );
+  }
+  const today = todayISO();
+  if (booking.service_date < today) {
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent("That booking has already started."),
+    );
+  }
+  if (newDate < today) {
+    redirect(
+      "/bookings?error=" + encodeURIComponent("Pick a date in the future."),
+    );
+  }
+  if (newDate === booking.service_date) {
+    redirect("/bookings"); // No change — nothing to do.
+  }
+
+  // Vaccine gate for the new day.
+  const vax = await assertDogReadyToBook(booking.dog_id, newDate);
+  if (!vax.ok) {
+    const missing = vax.missing.map((k) => VACCINE_LABEL[k]).join(", ");
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent(`Upload these vaccine records first: ${missing}`),
+    );
+  }
+
+  // Capacity on the new day (the dog's current booking is on the old day, so it
+  // isn't double-counted here).
+  const full = await getFullDates([newDate]);
+  if (full.has(newDate)) {
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent("That day is full — please pick another."),
+    );
+  }
+
+  // Closures.
+  const blackouts = await getBlackoutDates(newDate, addDays(newDate, 1), "daycare");
+  if (blackouts.has(newDate)) {
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent("We're closed that day — please pick another."),
+    );
+  }
+
+  // The dog can't already have a live booking on the new day.
+  const { data: conflict } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("dog_id", booking.dog_id)
+    .eq("service_date", newDate)
+    .neq("status", "canceled")
+    .neq("id", id)
+    .maybeSingle<{ id: string }>();
+  if (conflict) {
+    redirect(
+      "/bookings?error=" +
+        encodeURIComponent("This dog already has a booking that day."),
+    );
+  }
+
+  const oldDate = booking.service_date;
+  // A move within 24h of the original day incurs the same 50% late penalty a
+  // cancellation would — otherwise rescheduling is a free loophole around it.
+  const late = refundFractionForBooking(booking.service_date, "customer") === 0.5;
+  const svc = createServiceClient();
+  let lateApplied = false;
+
+  if (late && booking.payment_kind === "drop_in" && booking.payment_status === "paid") {
+    // Forfeit 50% of what they paid: keep the charge (no card refund), credit
+    // the other half to their account, and rebook the new day as unpaid so the
+    // credit auto-applies — they owe the remaining 50% to confirm.
+    const penaltyCredit = Math.round((booking.unit_price_cents ?? 0) * 0.5);
+    await svc
+      .from("bookings")
+      .update({
+        status: "canceled",
+        canceled_at: new Date().toISOString(),
+        canceled_by: userId,
+        cancellation_reason: `Rescheduled to ${newDate} (within 24h — 50% kept, 50% credited)`,
+        refund_amount_cents: 0,
+      })
+      .eq("id", id);
+    if (penaltyCredit > 0) {
+      const { data: prof } = await svc
+        .from("profiles")
+        .select("account_credit_cents")
+        .eq("id", userId)
+        .maybeSingle<{ account_credit_cents: number }>();
+      await svc
+        .from("profiles")
+        .update({
+          account_credit_cents: (prof?.account_credit_cents ?? 0) + penaltyCredit,
+        })
+        .eq("id", userId);
+    }
+    await svc.from("bookings").insert({
+      customer_id: userId,
+      dog_id: booking.dog_id,
+      service_date: newDate,
+      service_end_date: addDays(newDate, 1),
+      drop_off_time: booking.drop_off_time,
+      pickup_time: booking.pickup_time,
+      status: "reserved",
+      payment_kind: "drop_in",
+      unit_price_cents: booking.unit_price_cents,
+      payment_status: "unpaid",
+    });
+    lateApplied = true;
+  } else {
+    // Move in place. Free when >24h out; for a late package-funded move we
+    // additionally debit a half day below as the penalty.
+    const { error } = await supabase
+      .from("bookings")
+      .update({ service_date: newDate, service_end_date: addDays(newDate, 1) })
+      .eq("id", id)
+      .eq("customer_id", userId);
+    if (error) {
+      redirect(
+        "/bookings?error=" +
+          encodeURIComponent("Couldn't reschedule — please try again."),
+      );
+    }
+
+    if (late && booking.payment_kind === "package" && booking.customer_package_id) {
+      const { data: pkg } = await svc
+        .from("customer_packages")
+        .select("id, days_remaining")
+        .eq("id", booking.customer_package_id)
+        .maybeSingle<{ id: string; days_remaining: number }>();
+      if (pkg) {
+        await svc
+          .from("customer_packages")
+          .update({ days_remaining: Math.max(0, pkg.days_remaining - 0.5) })
+          .eq("id", pkg.id);
+        lateApplied = true;
+      }
+    }
+  }
+
+  // The old day just freed up — offer it to anyone waiting.
+  try {
+    await processWaitlist("daycare", enumerateDates(oldDate, addDays(oldDate, 1)));
+  } catch (e) {
+    console.error("[waitlist] process after reschedule failed", e);
+  }
+
+  // Confirm the new date for moves that don't leave a balance to settle (the
+  // late drop-in case is unpaid — the balance banner + pay flow cover it).
+  if (!(late && booking.payment_kind === "drop_in" && booking.payment_status === "paid")) {
+    const { data: dog } = await supabase
+      .from("dogs")
+      .select("name")
+      .eq("id", booking.dog_id)
+      .maybeSingle<{ name: string }>();
+    const isPackage = booking.payment_kind === "package";
+    await sendBookingConfirmation({
+      to: profile.email,
+      customerName: profile.full_name || profile.email,
+      dogName: dog?.name ?? "your dog",
+      dates: [newDate],
+      paidByPackageCount: isPackage ? 1 : 0,
+      dropInCount: isPackage ? 0 : 1,
+      dropInTotalCents: isPackage ? 0 : booking.unit_price_cents ?? 0,
+    });
+  }
+
+  revalidatePath("/bookings");
+  revalidatePath("/dashboard");
+  redirect(`/bookings?${lateApplied ? "rescheduled_late=1" : "rescheduled=1"}`);
 }
 
 /** Join the waitlist for a full daycare day or boarding span. */

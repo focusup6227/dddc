@@ -24,7 +24,30 @@ export default async function StaffIncidentsPage() {
     .limit(100);
   const incidents = (incidentRows ?? []) as Incident[];
 
-  const dogIds = Array.from(new Set(incidents.map((i) => i.dog_id)));
+  // Resolve every dog involved in each incident through the junction. Each
+  // incident maps to an ordered list of dog ids.
+  const incidentIds = incidents.map((i) => i.id);
+  const { data: linkRows } = incidentIds.length
+    ? await supabase
+        .from("incident_dogs")
+        .select("incident_id, dog_id")
+        .in("incident_id", incidentIds)
+    : { data: [] as { incident_id: string; dog_id: string }[] };
+  const dogIdsByIncident = new Map<string, string[]>();
+  for (const link of (linkRows ?? []) as {
+    incident_id: string;
+    dog_id: string;
+  }[]) {
+    const list = dogIdsByIncident.get(link.incident_id) ?? [];
+    list.push(link.dog_id);
+    dogIdsByIncident.set(link.incident_id, list);
+  }
+  // Fall back to the primary dog_id for any incident with no junction rows yet.
+  for (const i of incidents) {
+    if (!dogIdsByIncident.has(i.id)) dogIdsByIncident.set(i.id, [i.dog_id]);
+  }
+
+  const dogIds = Array.from(new Set((linkRows ?? []).map((l) => l.dog_id).concat(incidents.map((i) => i.dog_id))));
   const { data: dogRows } = dogIds.length
     ? await supabase
         .from("dogs")
@@ -93,8 +116,23 @@ export default async function StaffIncidentsPage() {
       ) : (
         <ul className="divide-y divide-stone-200/80 rounded-2xl border border-stone-200/80 bg-white shadow-soft">
           {incidents.map((i) => {
-            const dog = dogsById.get(i.dog_id);
-            const owner = dog ? ownersById.get(dog.owner_id) : null;
+            const incidentDogs = (dogIdsByIncident.get(i.id) ?? [])
+              .map((id) => dogsById.get(id))
+              .filter(Boolean) as Pick<Dog, "id" | "name" | "owner_id">[];
+            const dogNames =
+              incidentDogs.length > 0
+                ? incidentDogs.map((d) => d.name).join(", ")
+                : "Unknown dog";
+            const owners = Array.from(
+              new Set(
+                incidentDogs
+                  .map((d) => {
+                    const o = ownersById.get(d.owner_id);
+                    return o ? o.full_name || o.email : null;
+                  })
+                  .filter(Boolean) as string[],
+              ),
+            );
             return (
               <li key={i.id}>
                 <Link
@@ -104,13 +142,11 @@ export default async function StaffIncidentsPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-display text-lg font-semibold text-ink-900">
                       {INCIDENT_KIND_LABEL[i.kind]} ·{" "}
-                      <span className="text-brand-700">
-                        {dog?.name ?? "Unknown dog"}
-                      </span>
+                      <span className="text-brand-700">{dogNames}</span>
                     </p>
                     <p className="text-sm text-ink-500">
                       {formatDateShort(i.occurred_on)}
-                      {owner ? ` · ${owner.full_name || owner.email}` : ""}
+                      {owners.length > 0 ? ` · ${owners.join(", ")}` : ""}
                     </p>
                     <p className="mt-1 line-clamp-1 text-sm text-ink-700">
                       {i.description}

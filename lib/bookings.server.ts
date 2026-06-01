@@ -138,22 +138,41 @@ export async function cancelBookingWithRefund(args: {
   let stripeRefundId: string | null = null;
   let packageDayRestored = false;
 
-  if (booking.payment_kind === "package" && booking.customer_package_id) {
-    if (fraction === 1) {
-      const { data: pkg } = await svc
-        .from("customer_packages")
-        .select("*")
-        .eq("id", booking.customer_package_id)
-        .maybeSingle<CustomerPackage>();
-      if (pkg && pkg.days_remaining < pkg.days_total) {
+  // Restore the package days this booking consumed — whether it was fully
+  // package-funded (1.0) or partially (e.g. 0.5, with the rest paid in cash).
+  // Only outside 24h; within 24h the package portion is forfeited, matching the
+  // 50% cash rule. Capped so a restore can't push a package over its total.
+  if (
+    booking.customer_package_id &&
+    (booking.package_days_used ?? 0) > 0 &&
+    fraction === 1
+  ) {
+    const { data: pkg } = await svc
+      .from("customer_packages")
+      .select("*")
+      .eq("id", booking.customer_package_id)
+      .maybeSingle<CustomerPackage>();
+    if (pkg) {
+      const restore = Math.min(
+        booking.package_days_used,
+        pkg.days_total - pkg.days_remaining,
+      );
+      if (restore > 0) {
         await svc
           .from("customer_packages")
-          .update({ days_remaining: pkg.days_remaining + 1 })
+          .update({
+            days_remaining: Math.round((pkg.days_remaining + restore) * 10) / 10,
+          })
           .eq("id", pkg.id);
         packageDayRestored = true;
       }
     }
-  } else if (
+  }
+
+  // Refund the cash portion of any paid drop-in (a full day, or the cash half
+  // of a partially package-funded day). Runs alongside the package restore
+  // above — a partial day gets both.
+  if (
     booking.payment_kind === "drop_in" &&
     booking.payment_status === "paid" &&
     booking.stripe_payment_intent_id &&

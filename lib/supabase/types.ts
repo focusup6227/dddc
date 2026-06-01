@@ -38,6 +38,19 @@ export interface NotifyPrefs {
   report_cards: boolean;
 }
 
+/** One scheduled feeding: a time of day plus how much to feed. */
+export interface FeedingScheduleItem {
+  time: string; // "HH:MM" 24-hour
+  amount: string; // e.g. "1 cup kibble"
+}
+
+/** One scheduled dose: a time, the medication name, and the dose. */
+export interface MedicationScheduleItem {
+  time: string; // "HH:MM" 24-hour
+  name: string;
+  dose: string; // e.g. "1 tablet"
+}
+
 export interface Dog {
   id: string;
   owner_id: string;
@@ -57,10 +70,12 @@ export interface Dog {
   vaccination_notes: string | null;
   allergies: string | null;
   medications: string | null;
+  medication_schedule: MedicationScheduleItem[];
   health_issues: string | null;
   gets_along_with: string[];
   additional_notes: string | null;
   feeding_notes: string | null;
+  feeding_schedule: FeedingScheduleItem[];
   behavior_notes: string | null;
   staff_notes: string | null;
   active: boolean;
@@ -126,6 +141,10 @@ export interface Booking {
   status: BookingStatus;
   payment_kind: PaymentKind;
   customer_package_id: string | null;
+  // Package days this booking consumed: 1.0 fully package-funded, a fraction
+  // (e.g. 0.5) for a partially-funded day, 0 for a pure cash drop-in. Drives
+  // exact restoration on cancel.
+  package_days_used: number;
   unit_price_cents: number | null;
   stripe_payment_intent_id: string | null;
   stripe_checkout_session_id: string | null;

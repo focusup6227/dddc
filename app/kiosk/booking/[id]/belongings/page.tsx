@@ -2,11 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireFullStaff } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getBelongings, lastStayBelongings } from "@/lib/belongings.server";
+import {
+  getBelongings,
+  lastStayBelongings,
+  QUICK_ADD_BELONGINGS,
+} from "@/lib/belongings.server";
 import { DogAvatar } from "@/components/DogAvatar";
 import type { Belonging, Booking, Dog, Profile } from "@/lib/supabase/types";
-import { kioskRemoveBelonging } from "../../../actions";
-import { BelongingsAdder } from "../BelongingsAdder";
+import { BelongingsManager } from "../BelongingsManager";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +53,6 @@ export default async function BelongingsStepPage({
         })
       : [];
 
-  const returnTo = `/kiosk/booking/${booking.id}/belongings`;
   const ownerName = cust.full_name || cust.email;
 
   return (
@@ -70,49 +72,13 @@ export default async function BelongingsStepPage({
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-soft">
-        {items.length === 0 ? (
-          <p className="px-6 py-5 text-sm text-ink-500">Nothing logged yet.</p>
-        ) : (
-          <ul className="divide-y divide-stone-200/80">
-            {items.map((b) => (
-              <li
-                key={b.id}
-                className="flex items-center justify-between gap-3 px-6 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium text-ink-900">
-                    {b.label}
-                    {b.quantity > 1 && (
-                      <span className="ml-1 text-ink-500">× {b.quantity}</span>
-                    )}
-                  </p>
-                  {b.notes && <p className="text-xs text-ink-500">{b.notes}</p>}
-                </div>
-                <form action={kioskRemoveBelonging}>
-                  <input type="hidden" name="belonging_id" value={b.id} />
-                  <input type="hidden" name="booking_id" value={booking.id} />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <button
-                    type="submit"
-                    aria-label={`Remove ${b.label}`}
-                    className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-sm font-semibold text-ink-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                  >
-                    ✕
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="border-t border-stone-200/80 bg-cream-50 p-6">
-          <BelongingsAdder
-            bookingId={booking.id}
-            prefillItems={prefillItems}
-            returnTo={returnTo}
-          />
-        </div>
+      <section className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-soft">
+        <BelongingsManager
+          bookingId={booking.id}
+          initialItems={items}
+          prefillItems={prefillItems}
+          quickAdd={[...QUICK_ADD_BELONGINGS]}
+        />
       </section>
 
       <Link

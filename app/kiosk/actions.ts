@@ -21,14 +21,17 @@ import {
 import { isTimeInWindow } from "@/lib/hours";
 import { createBookingCheckoutSession } from "@/lib/bookings.server";
 import { addDogWash, dogWashLineItem } from "@/lib/addons.server";
+import { consumePackageDay } from "@/lib/packageAllocation";
 import {
   addBelonging,
+  getBelongings,
   lastStayBelongings,
   removeBelonging,
   returnAllBelongings,
   setBelongingReturned,
 } from "@/lib/belongings.server";
 import type {
+  Belonging,
   Booking,
   BookingAddon,
   CheckIn,
@@ -251,7 +254,8 @@ export async function kioskCreateBooking(formData: FormData) {
     redirect(`/kiosk/booking/new?error=Customer+not+found`);
   }
 
-  // Paid packages with remaining days, FIFO.
+  // Paid packages with any remaining balance, FIFO. Fractional balances (from a
+  // late-reschedule half-day penalty) cover part of a day; the rest is cash.
   const { data: pkgRows } = await svc
     .from("customer_packages")
     .select("*")
@@ -260,21 +264,14 @@ export async function kioskCreateBooking(formData: FormData) {
     .gt("days_remaining", 0)
     .order("created_at");
   const packages = (pkgRows ?? []) as CustomerPackage[];
+  const startBalances = new Map(packages.map((p) => [p.id, p.days_remaining]));
 
-  const allocations: { date: string; pkg: CustomerPackage | null }[] = [];
-  let cursor = 0;
-  for (const date of dates) {
-    while (cursor < packages.length && packages[cursor].days_remaining <= 0) cursor++;
-    if (cursor < packages.length) {
-      allocations.push({ date, pkg: packages[cursor] });
-      packages[cursor].days_remaining -= 1;
-    } else {
-      allocations.push({ date, pkg: null });
-    }
-  }
-
-  const packageAllocs = allocations.filter((a) => a.pkg);
-  const dropInAllocs = allocations.filter((a) => !a.pkg);
+  const perDay = dates.map((date) => {
+    const { chargeFraction, consumed } = consumePackageDay(packages);
+    return { date, chargeFraction, consumed };
+  });
+  const packageAllocs = perDay.filter((a) => a.chargeFraction === 0);
+  const dropInAllocs = perDay.filter((a) => a.chargeFraction > 0);
 
   let dropInPriceCents: number | null = null;
   let dropInPriceId: string | null = null;
@@ -295,13 +292,16 @@ export async function kioskCreateBooking(formData: FormData) {
     dropInPriceCents = dropInPkg!.price_cents;
     dropInPriceId = dropInPkg!.stripe_price_id;
   }
+  const chargeCentsFor = (fraction: number) =>
+    Math.round((dropInPriceCents ?? 0) * fraction);
 
-  // Insert package-funded bookings + decrement package balances.
+  // Insert package-funded (fully covered) bookings. Primary package recorded;
+  // balances persisted once below.
   const confirmedPackageDates: string[] = [];
   const touchedPackageIds = new Set<string>();
   let firstPackageBookingId: string | null = null;
   for (const a of packageAllocs) {
-    const pkg = a.pkg!;
+    const primaryPkgId = a.consumed[0]!.id;
     const { data: inserted, error: insErr } = await svc
       .from("bookings")
       .insert({
@@ -313,7 +313,8 @@ export async function kioskCreateBooking(formData: FormData) {
         pickup_time,
         status: "reserved",
         payment_kind: "package",
-        customer_package_id: pkg.id,
+        customer_package_id: primaryPkgId,
+        package_days_used: 1,
         payment_status: "paid",
       })
       .select("id")
@@ -328,11 +329,18 @@ export async function kioskCreateBooking(formData: FormData) {
     }
     if (inserted && !firstPackageBookingId) firstPackageBookingId = inserted.id;
     confirmedPackageDates.push(a.date);
-    touchedPackageIds.add(pkg.id);
-    await svc
-      .from("customer_packages")
-      .update({ days_remaining: pkg.days_remaining })
-      .eq("id", pkg.id);
+    for (const c of a.consumed) touchedPackageIds.add(c.id);
+  }
+
+  // Persist every package balance that changed.
+  for (const pkg of packages) {
+    if (startBalances.get(pkg.id) !== pkg.days_remaining) {
+      touchedPackageIds.add(pkg.id);
+      await svc
+        .from("customer_packages")
+        .update({ days_remaining: pkg.days_remaining })
+        .eq("id", pkg.id);
+    }
   }
 
   if (confirmedPackageDates.length > 0) {
@@ -374,23 +382,37 @@ export async function kioskCreateBooking(formData: FormData) {
     redirect("/kiosk?paid=1");
   }
 
-  // Stripe checkout for drop-in days.
-  const kioskDropInLineItem = dropInPriceId
-    ? { price: dropInPriceId, quantity: dropInAllocs.length }
-    : {
+  // Stripe checkout for charged days — grouped by price so full ($25) and
+  // partial ($12.50, package-credit-applied) days each get a line item.
+  const fullCents = dropInPriceCents!;
+  const byCharge = new Map<number, typeof dropInAllocs>();
+  for (const a of dropInAllocs) {
+    const cents = chargeCentsFor(a.chargeFraction);
+    const arr = byCharge.get(cents) ?? [];
+    arr.push(a);
+    byCharge.set(cents, arr);
+  }
+  const kioskLineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  for (const [cents, group] of byCharge) {
+    const partial = cents < fullCents;
+    if (!partial && dropInPriceId) {
+      kioskLineItems.push({ price: dropInPriceId, quantity: group.length });
+    } else {
+      kioskLineItems.push({
         price_data: {
           currency: "usd" as const,
           product_data: {
-            name: `Day care drop-in (${dog!.name})`,
-            description: `Service dates: ${dropInAllocs.map((a) => a.date).join(", ")}`,
+            name: partial
+              ? `Day care (${dog!.name}) — package credit applied`
+              : `Day care drop-in (${dog!.name})`,
+            description: `Service dates: ${group.map((a) => a.date).join(", ")}`,
           },
-          unit_amount: dropInPriceCents!,
+          unit_amount: cents,
         },
-        quantity: dropInAllocs.length,
-      };
-  const kioskLineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-    kioskDropInLineItem,
-  ];
+        quantity: group.length,
+      });
+    }
+  }
   if (dogWash) kioskLineItems.push(dogWashLineItem(dog!.name));
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -420,7 +442,9 @@ export async function kioskCreateBooking(formData: FormData) {
         pickup_time,
         status: "reserved",
         payment_kind: "drop_in",
-        unit_price_cents: dropInPriceCents,
+        customer_package_id: a.consumed[0]?.id ?? null,
+        package_days_used: Math.round((1 - a.chargeFraction) * 10) / 10,
+        unit_price_cents: chargeCentsFor(a.chargeFraction),
         stripe_checkout_session_id: session.id,
         payment_status: "unpaid",
       })
@@ -1100,133 +1124,162 @@ export async function kioskPayGroup(formData: FormData) {
 
 const MAX_BELONGING_QTY = 99;
 
-/**
- * Where a belongings action returns to. The forms post an optional `return_to`
- * so the post-check-in step screen can keep you on itself instead of bouncing
- * to the booking detail page. Anything not under /kiosk/ falls back to the
- * booking's belongings section.
- */
-function belongingsReturn(formData: FormData, bookingId: string): string {
-  const rt = String(formData.get("return_to") ?? "");
-  return rt.startsWith("/kiosk/")
-    ? rt
-    : `/kiosk/booking/${bookingId}#belongings`;
-}
-
-/** Log one item dropped off with a dog on this booking. */
-export async function kioskAddBelonging(formData: FormData) {
-  const { userId } = await requireFullStaff();
-  const booking_id = String(formData.get("booking_id") ?? "");
-  const label = String(formData.get("label") ?? "").trim();
-  if (!booking_id) redirect("/kiosk");
-  if (!label) {
-    redirect(`/kiosk/booking/${booking_id}?error=Name+the+item+to+add`);
-  }
-  const qtyRaw = Number(formData.get("quantity") ?? 1);
-  const quantity = Number.isFinite(qtyRaw)
-    ? Math.min(MAX_BELONGING_QTY, Math.max(1, Math.floor(qtyRaw)))
+function clampQty(raw: unknown): number {
+  const n = Number(raw ?? 1);
+  return Number.isFinite(n)
+    ? Math.min(MAX_BELONGING_QTY, Math.max(1, Math.floor(n)))
     : 1;
-  const notes = String(formData.get("notes") ?? "").trim() || null;
-
-  const svc = createServiceClient();
-  const { data: booking } = await svc
-    .from("bookings")
-    .select("id, dog_id, customer_id, status")
-    .eq("id", booking_id)
-    .maybeSingle<Pick<Booking, "id" | "dog_id" | "customer_id" | "status">>();
-  if (!booking || booking.status === "canceled") {
-    redirect(`/kiosk/booking/${booking_id}?error=Booking+not+found`);
-  }
-
-  await addBelonging(svc, {
-    bookingId: booking!.id,
-    dogId: booking!.dog_id,
-    customerId: booking!.customer_id,
-    label,
-    quantity,
-    notes,
-    staffId: userId,
-  });
-
-  const back = belongingsReturn(formData, booking_id);
-  revalidatePath(`/kiosk/booking/${booking_id}`);
-  redirect(back);
 }
 
-/** Prefill the checklist from the dog's most recent prior visit. */
-export async function kioskPrefillBelongings(formData: FormData) {
-  const { userId } = await requireFullStaff();
-  const booking_id = String(formData.get("booking_id") ?? "");
-  if (!booking_id) redirect("/kiosk");
+/**
+ * Belongings mutations used by the client-side BelongingsManager. Unlike the
+ * old form actions these DON'T redirect — they mutate, revalidate, and return
+ * the fresh list, so the manager updates optimistically with no page reload.
+ */
 
-  const svc = createServiceClient();
-  const { data: booking } = await svc
+async function loadBelongingsBooking(
+  svc: ReturnType<typeof createServiceClient>,
+  bookingId: string,
+) {
+  const { data } = await svc
     .from("bookings")
     .select("id, dog_id, customer_id, status")
-    .eq("id", booking_id)
+    .eq("id", bookingId)
     .maybeSingle<Pick<Booking, "id" | "dog_id" | "customer_id" | "status">>();
-  if (!booking || booking.status === "canceled") {
-    redirect(`/kiosk/booking/${booking_id}?error=Booking+not+found`);
+  return data;
+}
+
+/** Log one item dropped off with a dog. Returns the updated list. */
+export async function liveAddBelonging(input: {
+  bookingId: string;
+  label: string;
+  quantity?: number;
+  notes?: string | null;
+}): Promise<Belonging[]> {
+  const { userId } = await requireFullStaff();
+  const svc = createServiceClient();
+  const label = (input.label ?? "").trim();
+  if (!input.bookingId || !label) {
+    return input.bookingId ? getBelongings(svc, input.bookingId) : [];
   }
+  const booking = await loadBelongingsBooking(svc, input.bookingId);
+  if (!booking || booking.status === "canceled") return [];
+
+  const addQty = clampQty(input.quantity);
+  // If an un-returned item with the same label is already logged, bump its
+  // quantity instead of creating a duplicate row (re-adding "Leash" → ×3, not
+  // two "Leash" entries). Match on trimmed, case-insensitive label.
+  const current = await getBelongings(svc, booking.id);
+  const match = current.find(
+    (b) => !b.returned_at && b.label.trim().toLowerCase() === label.toLowerCase(),
+  );
+  if (match) {
+    await svc
+      .from("booking_belongings")
+      .update({ quantity: Math.min(MAX_BELONGING_QTY, match.quantity + addQty) })
+      .eq("id", match.id);
+  } else {
+    await addBelonging(svc, {
+      bookingId: booking.id,
+      dogId: booking.dog_id,
+      customerId: booking.customer_id,
+      label,
+      quantity: addQty,
+      notes: (input.notes ?? "").trim() || null,
+      staffId: userId,
+    });
+  }
+  revalidatePath(`/kiosk/booking/${booking.id}`);
+  return getBelongings(svc, booking.id);
+}
+
+/** Prefill from the dog's most recent prior visit. Returns the updated list. */
+export async function livePrefillBelongings(input: {
+  bookingId: string;
+}): Promise<Belonging[]> {
+  const { userId } = await requireFullStaff();
+  const svc = createServiceClient();
+  if (!input.bookingId) return [];
+  const booking = await loadBelongingsBooking(svc, input.bookingId);
+  if (!booking || booking.status === "canceled") return [];
 
   const items = await lastStayBelongings(svc, {
-    dogId: booking!.dog_id,
-    excludeBookingId: booking!.id,
+    dogId: booking.dog_id,
+    excludeBookingId: booking.id,
   });
   for (const item of items) {
     await addBelonging(svc, {
-      bookingId: booking!.id,
-      dogId: booking!.dog_id,
-      customerId: booking!.customer_id,
+      bookingId: booking.id,
+      dogId: booking.dog_id,
+      customerId: booking.customer_id,
       label: item.label,
       quantity: item.quantity,
       staffId: userId,
     });
   }
-
-  const back = belongingsReturn(formData, booking_id);
-  revalidatePath(`/kiosk/booking/${booking_id}`);
-  redirect(back);
+  revalidatePath(`/kiosk/booking/${booking.id}`);
+  return getBelongings(svc, booking.id);
 }
 
-export async function kioskRemoveBelonging(formData: FormData) {
+export async function liveRemoveBelonging(input: {
+  bookingId: string;
+  id: string;
+}): Promise<Belonging[]> {
   await requireFullStaff();
-  const id = String(formData.get("belonging_id") ?? "");
-  const booking_id = String(formData.get("booking_id") ?? "");
-  if (!id || !booking_id) redirect("/kiosk");
-
   const svc = createServiceClient();
-  await removeBelonging(svc, id);
-
-  const back = belongingsReturn(formData, booking_id);
-  revalidatePath(`/kiosk/booking/${booking_id}`);
-  redirect(back);
+  if (!input.id || !input.bookingId) {
+    return input.bookingId ? getBelongings(svc, input.bookingId) : [];
+  }
+  await removeBelonging(svc, input.id);
+  revalidatePath(`/kiosk/booking/${input.bookingId}`);
+  return getBelongings(svc, input.bookingId);
 }
 
-/** Toggle a single item returned / still-here. */
-export async function kioskToggleBelongingReturned(formData: FormData) {
-  const { userId } = await requireFullStaff();
-  const id = String(formData.get("belonging_id") ?? "");
-  const booking_id = String(formData.get("booking_id") ?? "");
-  const returned = String(formData.get("returned") ?? "") === "1";
-  if (!id || !booking_id) redirect("/kiosk");
-
+/** Set the quantity on an existing item (the +/- stepper in the list). */
+export async function liveSetBelongingQuantity(input: {
+  bookingId: string;
+  id: string;
+  quantity: number;
+}): Promise<Belonging[]> {
+  await requireFullStaff();
   const svc = createServiceClient();
-  await setBelongingReturned(svc, { id, returned, staffId: userId });
-
-  revalidatePath(`/kiosk/booking/${booking_id}`);
-  redirect(`/kiosk/booking/${booking_id}#belongings`);
+  if (!input.id || !input.bookingId) {
+    return input.bookingId ? getBelongings(svc, input.bookingId) : [];
+  }
+  await svc
+    .from("booking_belongings")
+    .update({ quantity: clampQty(input.quantity) })
+    .eq("id", input.id);
+  revalidatePath(`/kiosk/booking/${input.bookingId}`);
+  return getBelongings(svc, input.bookingId);
 }
 
-/** Mark every still-here item returned at once (whole pickup in one tap). */
-export async function kioskReturnAllBelongings(formData: FormData) {
+export async function liveSetBelongingReturned(input: {
+  bookingId: string;
+  id: string;
+  returned: boolean;
+}): Promise<Belonging[]> {
   const { userId } = await requireFullStaff();
-  const booking_id = String(formData.get("booking_id") ?? "");
-  if (!booking_id) redirect("/kiosk");
-
   const svc = createServiceClient();
-  await returnAllBelongings(svc, { bookingId: booking_id, staffId: userId });
+  if (!input.id || !input.bookingId) {
+    return input.bookingId ? getBelongings(svc, input.bookingId) : [];
+  }
+  await setBelongingReturned(svc, {
+    id: input.id,
+    returned: input.returned,
+    staffId: userId,
+  });
+  revalidatePath(`/kiosk/booking/${input.bookingId}`);
+  return getBelongings(svc, input.bookingId);
+}
 
-  revalidatePath(`/kiosk/booking/${booking_id}`);
-  redirect(`/kiosk/booking/${booking_id}#belongings`);
+export async function liveReturnAllBelongings(input: {
+  bookingId: string;
+}): Promise<Belonging[]> {
+  const { userId } = await requireFullStaff();
+  const svc = createServiceClient();
+  if (!input.bookingId) return [];
+  await returnAllBelongings(svc, { bookingId: input.bookingId, staffId: userId });
+  revalidatePath(`/kiosk/booking/${input.bookingId}`);
+  return getBelongings(svc, input.bookingId);
 }

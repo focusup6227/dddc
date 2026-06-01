@@ -18,6 +18,27 @@ function num(v: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Zip the parallel arrays the schedule editor submits (one value per field per
+ * row) into objects, dropping rows the owner left entirely blank.
+ */
+function buildFeedingSchedule(formData: FormData) {
+  const times = formData.getAll("feeding_time").map((v) => String(v).trim());
+  const amounts = formData.getAll("feeding_amount").map((v) => String(v).trim());
+  return times
+    .map((time, i) => ({ time, amount: amounts[i] ?? "" }))
+    .filter((r) => r.time || r.amount);
+}
+
+function buildMedicationSchedule(formData: FormData) {
+  const times = formData.getAll("med_time").map((v) => String(v).trim());
+  const names = formData.getAll("med_name").map((v) => String(v).trim());
+  const doses = formData.getAll("med_dose").map((v) => String(v).trim());
+  return times
+    .map((time, i) => ({ time, name: names[i] ?? "", dose: doses[i] ?? "" }))
+    .filter((r) => r.time || r.name || r.dose);
+}
+
 export async function saveDog(formData: FormData) {
   const { userId } = await requireCustomer();
   const id = str(formData.get("id"));
@@ -45,6 +66,8 @@ export async function saveDog(formData: FormData) {
       .filter(Boolean),
     additional_notes: str(formData.get("additional_notes")),
     feeding_notes: str(formData.get("feeding_notes")),
+    feeding_schedule: buildFeedingSchedule(formData),
+    medication_schedule: buildMedicationSchedule(formData),
     behavior_notes: str(formData.get("behavior_notes")),
   };
 

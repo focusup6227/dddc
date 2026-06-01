@@ -37,13 +37,11 @@ import {
   kioskCheckOutGroup,
   kioskPayGroup,
   kioskRemoveAddon,
-  kioskRemoveBelonging,
-  kioskReturnAllBelongings,
   kioskTakePayment,
-  kioskToggleBelongingReturned,
   kioskUpdateStay,
 } from "../../actions";
-import { BelongingsAdder } from "./BelongingsAdder";
+import { QUICK_ADD_BELONGINGS } from "@/lib/belongings.server";
+import { BelongingsManager } from "./BelongingsManager";
 
 const TOASTS = [
   { param: "paid", message: "Payment received." },
@@ -248,10 +246,43 @@ export default async function KioskBookingPage({
             {dog.allergies || <em className="text-ink-400">None noted</em>}
           </Field>
           <Field label="Medications">
-            {dog.medications || <em className="text-ink-400">None</em>}
+            {dog.medication_schedule && dog.medication_schedule.length > 0 ? (
+              <ul className="space-y-1">
+                {dog.medication_schedule.map((m, i) => (
+                  <li key={i}>
+                    <span className="font-medium text-ink-900">
+                      {formatTime(m.time) || "—"}
+                    </span>{" "}
+                    {m.name}
+                    {m.dose ? ` · ${m.dose}` : ""}
+                  </li>
+                ))}
+                {dog.medications && (
+                  <li className="text-ink-500">{dog.medications}</li>
+                )}
+              </ul>
+            ) : (
+              dog.medications || <em className="text-ink-400">None</em>
+            )}
           </Field>
           <Field label="Feeding">
-            {dog.feeding_notes || <em className="text-ink-400">None</em>}
+            {dog.feeding_schedule && dog.feeding_schedule.length > 0 ? (
+              <ul className="space-y-1">
+                {dog.feeding_schedule.map((f, i) => (
+                  <li key={i}>
+                    <span className="font-medium text-ink-900">
+                      {formatTime(f.time) || "—"}
+                    </span>{" "}
+                    {f.amount}
+                  </li>
+                ))}
+                {dog.feeding_notes && (
+                  <li className="text-ink-500">{dog.feeding_notes}</li>
+                )}
+              </ul>
+            ) : (
+              dog.feeding_notes || <em className="text-ink-400">None</em>
+            )}
           </Field>
           <Field label="Behavior">
             {dog.behavior_notes || <em className="text-ink-400">None noted</em>}
@@ -458,14 +489,13 @@ function Belongings({
   const canEdit =
     booking.status !== "canceled" && booking.status !== "checked_out";
   const outstanding = items.filter((b) => !b.returned_at);
-  const returned = items.filter((b) => b.returned_at);
 
   return (
     <section
       id="belongings"
-      className="overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-soft scroll-mt-4"
+      className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-soft scroll-mt-4"
     >
-      <div className="flex items-center justify-between gap-3 px-6 pt-5">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-lg font-semibold text-ink-900">
           Belongings
         </h2>
@@ -478,100 +508,16 @@ function Belongings({
         )}
       </div>
 
-      {items.length === 0 ? (
-        <div className="px-6 pt-2 text-sm text-ink-500">Nothing logged yet.</div>
-      ) : (
-        <ul className="mt-3 divide-y divide-stone-200/80">
-          {[...outstanding, ...returned].map((b) => {
-            const isReturned = !!b.returned_at;
-            return (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-3 px-6 py-3"
-              >
-                <div className="min-w-0">
-                  <p
-                    className={`font-medium ${isReturned ? "text-ink-400 line-through" : "text-ink-900"}`}
-                  >
-                    {b.label}
-                    {b.quantity > 1 && (
-                      <span className="ml-1 text-ink-500">× {b.quantity}</span>
-                    )}
-                  </p>
-                  {b.notes && (
-                    <p className="text-xs text-ink-500">{b.notes}</p>
-                  )}
-                  {isReturned && (
-                    <p className="text-xs text-emerald-700">Returned ✓</p>
-                  )}
-                </div>
-                {canEdit && (
-                  <div className="flex shrink-0 items-center gap-2">
-                    <form action={kioskToggleBelongingReturned}>
-                      <input type="hidden" name="belonging_id" value={b.id} />
-                      <input
-                        type="hidden"
-                        name="booking_id"
-                        value={booking.id}
-                      />
-                      <input
-                        type="hidden"
-                        name="returned"
-                        value={isReturned ? "0" : "1"}
-                      />
-                      <button
-                        type="submit"
-                        className={
-                          isReturned
-                            ? "rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-semibold text-ink-600 transition-colors hover:bg-cream-50"
-                            : "rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
-                        }
-                      >
-                        {isReturned ? "Undo" : "Returned"}
-                      </button>
-                    </form>
-                    <form action={kioskRemoveBelonging}>
-                      <input type="hidden" name="belonging_id" value={b.id} />
-                      <input
-                        type="hidden"
-                        name="booking_id"
-                        value={booking.id}
-                      />
-                      <button
-                        type="submit"
-                        aria-label={`Remove ${b.label}`}
-                        className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-sm font-semibold text-ink-500 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        ✕
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {canEdit && outstanding.length > 1 && (
-        <div className="px-6 pt-3">
-          <form action={kioskReturnAllBelongings}>
-            <input type="hidden" name="booking_id" value={booking.id} />
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white shadow-soft transition-all hover:bg-emerald-700 active:translate-y-px"
-            >
-              Return all {outstanding.length}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {canEdit && (
-        <div className="mt-4 border-t border-stone-200/80 bg-cream-50 p-6">
-          <BelongingsAdder bookingId={booking.id} prefillItems={prefillItems} />
-        </div>
-      )}
+      <div className="mt-3">
+        <BelongingsManager
+          bookingId={booking.id}
+          initialItems={items}
+          prefillItems={prefillItems}
+          quickAdd={[...QUICK_ADD_BELONGINGS]}
+          canEdit={canEdit}
+          showReturns
+        />
+      </div>
     </section>
   );
 }
