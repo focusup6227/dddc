@@ -144,6 +144,48 @@ export default async function AccountPage({
 
         <div className="border-t border-stone-200/80 pt-5">
           <h3 className="font-display text-lg font-semibold text-ink-900">
+            Text notifications
+          </h3>
+          <p className="mt-1 text-sm text-ink-500">
+            Get booking updates by text in addition to email. Standard message
+            rates may apply. Reply STOP to any text to opt out.
+          </p>
+          <label className="mt-3 flex items-start gap-3">
+            <input
+              type="checkbox"
+              name="sms_opt_in"
+              defaultChecked={profile.sms_opt_in}
+              className="mt-1 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span className="text-sm text-ink-900">
+              Text me about my bookings
+              <span className="mt-0.5 block text-xs text-ink-500">
+                Requires a phone number above.
+              </span>
+            </span>
+          </label>
+          <fieldset className="mt-3 space-y-2 pl-7">
+            <legend className="sr-only">Which texts?</legend>
+            <NotifyToggle
+              name="notify_confirmations"
+              label="Booking confirmations"
+              defaultChecked={profile.notify_prefs?.confirmations ?? true}
+            />
+            <NotifyToggle
+              name="notify_reminders"
+              label="Day-before reminders"
+              defaultChecked={profile.notify_prefs?.reminders ?? true}
+            />
+            <NotifyToggle
+              name="notify_report_cards"
+              label="Report card notifications"
+              defaultChecked={profile.notify_prefs?.report_cards ?? true}
+            />
+          </fieldset>
+        </div>
+
+        <div className="border-t border-stone-200/80 pt-5">
+          <h3 className="font-display text-lg font-semibold text-ink-900">
             Emergency contact
           </h3>
           <p className="mt-1 text-sm text-ink-500">
@@ -177,6 +219,28 @@ export default async function AccountPage({
         .
       </p>
     </div>
+  );
+}
+
+function NotifyToggle({
+  name,
+  label,
+  defaultChecked,
+}: {
+  name: string;
+  label: string;
+  defaultChecked: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-2.5 text-sm text-ink-700">
+      <input
+        type="checkbox"
+        name={name}
+        defaultChecked={defaultChecked}
+        className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+      />
+      {label}
+    </label>
   );
 }
 

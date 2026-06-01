@@ -23,8 +23,18 @@ export interface Profile {
   emergency_contact_phone: string | null;
   referral_code: string | null;
   account_credit_cents: number;
+  sms_opt_in: boolean;
+  sms_opt_in_at: string | null;
+  sms_opt_out_at: string | null;
+  notify_prefs: NotifyPrefs;
   created_at: string;
   updated_at: string;
+}
+
+export interface NotifyPrefs {
+  confirmations: boolean;
+  reminders: boolean;
+  report_cards: boolean;
 }
 
 export interface Dog {
