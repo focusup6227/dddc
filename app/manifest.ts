@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Dixon Doggy Day Care and Boarding",
     short_name: "DDDC",
     description:
-      "Day care, boarding, and grooming for Dixon's favorite dogs. Customer portal + operator + kiosk.",
+      "Day care, boarding, and baths for Dixon's favorite dogs. Customer portal + operator + kiosk.",
     start_url: "/",
     display: "standalone",
     orientation: "any",

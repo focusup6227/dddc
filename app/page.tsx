@@ -10,6 +10,14 @@ import {
   MascotFace,
   TennisBall,
 } from "@/components/illustrations";
+import {
+  business,
+  fullAddress,
+  mapEmbedUrl,
+  mapLinkUrl,
+  hours,
+  faqs,
+} from "@/lib/business";
 
 const BOARDING_RATE_CENTS = 3000;
 
@@ -268,6 +276,94 @@ export default async function HomePage() {
             </ul>
           </div>
         </div>
+        <p className="mt-6 text-center text-sm text-ink-700">
+          Add a <span className="font-semibold text-ink-900">bath</span> to any
+          day care or boarding stay for{" "}
+          <span className="font-semibold text-ink-900">{formatMoney(1000)}</span>{" "}
+          — your pup goes home clean and fresh.
+        </p>
+      </section>
+
+      {/* ─────────────────── Hours & Location ──────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-16">
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Hours */}
+          <div className="card">
+            <h2 className="text-xl font-semibold text-ink-900">Hours</h2>
+            <p className="mt-1 text-sm text-ink-700">
+              Drop-off and pickup during open hours.
+            </p>
+            <ul className="mt-4 divide-y divide-stone-200">
+              {hours.map(({ day, hours: h }) => (
+                <li
+                  key={day}
+                  className="flex items-baseline justify-between py-2.5 text-sm"
+                >
+                  <span className="font-medium text-ink-900">{day}</span>
+                  <span className={h ? "text-ink-700" : "text-ink-400"}>
+                    {h ?? "Closed"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Location */}
+          <div className="card flex flex-col">
+            <h2 className="text-xl font-semibold text-ink-900">Where we are</h2>
+            <p className="mt-1 text-sm text-ink-700">{fullAddress}</p>
+            <a
+              href={mapLinkUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 block overflow-hidden rounded-xl border border-stone-200"
+            >
+              <iframe
+                title="Map to Dixon Doggy Day Care"
+                src={mapEmbedUrl}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="h-56 w-full"
+              />
+            </a>
+            <a
+              href={mapLinkUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 text-sm font-medium text-brand-600 hover:text-brand-700"
+            >
+              Get directions →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ───────────────────────── FAQ ─────────────────────────── */}
+      <section className="mx-auto max-w-3xl px-6 py-12">
+        <div className="text-center">
+          <span className="pill-neutral">Good to know</span>
+          <h2 className="mt-4 text-3xl font-bold tracking-tight text-ink-900">
+            Frequently asked questions
+          </h2>
+        </div>
+        <div className="mt-10 space-y-3">
+          {faqs.map(({ q, a }) => (
+            <details
+              key={q}
+              className="group card cursor-pointer transition-colors hover:border-stone-300"
+            >
+              <summary className="flex list-none items-center justify-between gap-4 font-semibold text-ink-900 [&::-webkit-details-marker]:hidden">
+                {q}
+                <span className="shrink-0 text-brand-500 transition-transform duration-200 group-open:rotate-45">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </span>
+              </summary>
+              <p className="mt-3 text-sm leading-relaxed text-ink-700">{a}</p>
+            </details>
+          ))}
+        </div>
       </section>
 
       {/* ──────────────────────── CTA band ─────────────────────── */}
@@ -303,6 +399,24 @@ export default async function HomePage() {
           <p className="font-display text-base font-semibold text-ink-900">
             Dixon Doggy Day Care &amp; Boarding
           </p>
+          <div className="flex flex-col items-center gap-1 text-ink-700 sm:flex-row sm:gap-4">
+            <a href={business.phoneHref} className="hover:text-brand-700">
+              {business.phone}
+            </a>
+            <span className="hidden text-ink-400 sm:inline">·</span>
+            <a href={`mailto:${business.email}`} className="hover:text-brand-700">
+              {business.email}
+            </a>
+            <span className="hidden text-ink-400 sm:inline">·</span>
+            <a
+              href={mapLinkUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-brand-700"
+            >
+              {fullAddress}
+            </a>
+          </div>
           <p>
             Staff member?{" "}
             <Link

@@ -20,7 +20,7 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: "Dixon Doggy Day Care and Boarding",
-  description: "Day care, boarding, and grooming for Dixon's favorite dogs.",
+  description: "Day care, boarding, and baths for Dixon's favorite dogs.",
   applicationName: "DDDC",
   appleWebApp: {
     capable: true,
